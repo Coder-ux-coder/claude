@@ -8,3 +8,10 @@ venv/
 *.features.json
 /out/
 /scratch/
+
+# Node (browser tests only)
+node_modules/
+package-lock.json
+
+# Screenshots
+/shots/

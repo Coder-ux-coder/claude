@@ -105,6 +105,21 @@ change the answer**. Quote real numbers with units. Never report a bare label.
 For an indeterminate result, say what specifically was missing and what
 recording would resolve it — a longer sample, wideband audio, a single speaker.
 
+## Visual analyser (browser)
+
+For a visual read — evidence ledger, pitch trace against the population bands,
+formant map, live microphone — serve the page and open it:
+
+```bash
+python3 web/serve.py          # http://localhost:8000
+```
+
+It runs the identical scoring in-browser (weights generated from the same
+`priors.json`), so its verdict matches the CLI. Microphone capture needs a
+secure context, which `localhost` provides and a `file://` URL does not.
+Use it when the user wants to *see* the evidence, record live, or when
+explaining a borderline result to someone else.
+
 ## Batch mode
 
 ```bash

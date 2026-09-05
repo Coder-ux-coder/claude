@@ -21,6 +21,35 @@ audio ─> extract_features.py ─> features.json ─> score.py ─> ledger ─>
 
 Every verdict decomposes into named measurements with units. Nothing is opaque.
 
+## The visual analyser
+
+![evidence ledger](docs/ledger.png)
+
+A single-page browser analyser — live microphone, file upload, and a full
+visual breakdown:
+
+- **Verdict gauge** — the calibrated probability on a male↔female axis, with
+  the abstention band drawn where it actually sits
+- **Evidence ledger** — diverging bars, one per cue, length = weight × log-
+  likelihood ratio. The whole argument in one picture: on a borderline voice
+  you can see tract length outvoting both pitch cues
+- **Pitch trace** — F0 over time against the population ranges, with the
+  160–190 Hz overlap band called out
+- **Resonance panel** — F1–F4 against both distributions, plus the pooled
+  vocal-tract-length estimate on its own scale
+- **Live monitor** — waveform, spectrum and instantaneous pitch while recording
+
+```bash
+python3 web/serve.py          # then open http://localhost:8000
+```
+
+Everything runs locally in the browser; no audio is uploaded. Microphone
+capture requires a secure context, which `localhost` provides and opening the
+file directly does not.
+
+The page scores with weights **generated** from `priors.json` by
+`web/build_priors.py`, so the browser and the CLI cannot drift apart.
+
 ## Quick start
 
 ```bash
@@ -62,6 +91,28 @@ a probable child, multiple speakers, a missing resonance block, or evidence
 coverage below 55%. **An abstention is a correct outcome.**
 
 ## Validation
+
+Three suites, all of which must pass:
+
+| Suite | What it proves |
+|---|---|
+| `scripts/selfcheck.py` | 19 checks: measurement accuracy against synthetic ground truth, correct verdicts, correct abstentions, and that the degradation gates still fire |
+| `tests/web_test.js` | The browser page loads, every demo voice reaches the right verdict, every chart draws, no console errors, no horizontal overflow |
+| `tests/parity.js` | The browser analyser and the Python pipeline agree on identical audio |
+
+```bash
+python3 .claude/skills/voice-gender/scripts/selfcheck.py
+npm install && npm test
+```
+
+The parity suite compares twice, because there are two different questions.
+Against Python's **own LPC path** — the same algorithm the browser implements —
+agreement is tight (worst deviation 2.3%), which is what catches a
+mistranslated port. Against Python's **default Praat tracker** it is looser and
+allowed to be: those are genuinely different estimators, and F1 is where they
+differ most (up to 6.4%), which is exactly why F1 carries only 0.03 scoring
+weight. Asserting tighter agreement there would claim a precision the two
+methods do not have.
 
 `selfcheck.py` synthesises voices through a source-filter model with known F0
 and formants, then asserts the pipeline recovers them (F0 within 5%, F3 within
