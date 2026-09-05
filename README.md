@@ -43,6 +43,13 @@ visual breakdown:
 python3 web/serve.py          # then open http://localhost:8000
 ```
 
+A published copy is available as a private artifact:
+<https://claude.ai/code/artifact/89f34606-e755-4eee-9eda-fa2e33f8518e> — built
+from the same source by `web/build_artifact.py`, which inlines the priors and
+opens the page on a worked example. File upload and the synthesised voices work
+there; microphone capture may be withheld from a shared page, so `localhost`
+remains the reliable route for live recording.
+
 Everything runs locally in the browser; no audio is uploaded. Microphone
 capture requires a secure context, which `localhost` provides and opening the
 file directly does not.
