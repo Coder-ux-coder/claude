@@ -362,19 +362,31 @@ def cmd_ui(args) -> int:
 
 # -------------------------------------------------------------------- parser
 
+def _common_flags(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--config", default=None, help="path to pipeline.yml")
+    parser.add_argument("--env", default=".env", help="path to the .env file")
+    parser.add_argument("--data-dir", default="data",
+                        help="where the run database lives")
+    parser.add_argument("--out", default=None, help="output directory")
+    parser.add_argument("--demo", action="store_true",
+                        help="use fictional fixtures; no network, no credentials")
+    parser.add_argument("--quiet", action="store_true")
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="leadenrich",
         description="Waterfall lead enrichment for LinkedIn-sourced clinic "
                     "decision-makers, with per-field provenance.")
-    p.add_argument("--config", default=None, help="path to pipeline.yml")
-    p.add_argument("--env", default=".env", help="path to the .env file")
-    p.add_argument("--data-dir", default="data", help="where the run database lives")
-    p.add_argument("--out", default=None, help="output directory")
-    p.add_argument("--demo", action="store_true",
-                   help="use fictional fixtures; no network, no credentials")
-    p.add_argument("--quiet", action="store_true")
-    sub = p.add_subparsers(dest="command", required=True)
+    _common_flags(p)
+
+    # The same flags are accepted after the subcommand too, so
+    # `leadenrich demo --quiet` works as readily as `leadenrich --quiet demo`.
+    common = argparse.ArgumentParser(add_help=False)
+    _common_flags(common)
+
+    sub = p.add_subparsers(dest="command", required=True, parser_class=(
+        lambda **kw: argparse.ArgumentParser(parents=[common], **kw)))
 
     def add_sheet_flags(sp):
         sp.add_argument("--sheet", action="store_true",
@@ -429,8 +441,38 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
+SUBCOMMANDS = {"run", "demo", "resume", "export", "review", "doctor", "runs",
+               "smoke", "ui"}
+
+
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    """Accept the shared flags on either side of the subcommand.
+
+    ``leadenrich --demo run leads.csv`` and ``leadenrich run leads.csv --demo``
+    both work. argparse alone cannot do this: the subparser's defaults would
+    overwrite anything given before the subcommand, so the leading flags are
+    parsed separately and merged in.
+    """
+    parser = build_parser()
+    argv = list(sys.argv[1:] if argv is None else argv)
+
+    split = next((i for i, tok in enumerate(argv) if tok in SUBCOMMANDS), len(argv))
+    leading, remainder = argv[:split], argv[split:]
+
+    flags_only = argparse.ArgumentParser(add_help=False)
+    _common_flags(flags_only)
+    pre, _unknown = flags_only.parse_known_args(leading)
+
+    args = parser.parse_args(remainder or argv)
+
+    # A flag given before the subcommand wins over the subparser's default.
+    defaults = {"config": None, "env": ".env", "data_dir": "data", "out": None}
+    for flag, default in defaults.items():
+        if getattr(args, flag, default) == default and getattr(pre, flag, default) != default:
+            setattr(args, flag, getattr(pre, flag))
+    for flag in ("demo", "quiet"):
+        if getattr(pre, flag, False):
+            setattr(args, flag, True)
     return args.func(args)
 
 

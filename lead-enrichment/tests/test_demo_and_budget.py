@@ -192,3 +192,65 @@ def test_a_run_stays_inside_its_configured_caps(store):
     assert pipe.budget.total_requests <= 3
     assert pipe.stats.processed == 10, "every row still completes, just unenriched"
     assert pipe.budget.skips.get("greedy", 0) > 0
+
+
+# --------------------------------------------------------------------- cli ---
+
+def _invoke(argv, fake_run):
+    """Drive ``cli.main`` with the run command swapped for a recorder.
+
+    Both the module attribute and the parser's stored default are replaced,
+    because argparse captures the function object at parser-build time.
+    """
+    import leadenrich.cli as cli
+
+    real = cli.cmd_run
+    cli.cmd_run = fake_run
+    original_build = cli.build_parser
+
+    def build_with_fake():
+        parser = original_build()
+        choices = parser._subparsers._group_actions[0].choices
+        for sub in choices.values():
+            if sub.get_default("func") is real:
+                sub.set_defaults(func=fake_run)
+        return parser
+
+    cli.build_parser = build_with_fake
+    try:
+        return cli.main(argv)
+    finally:
+        cli.cmd_run = real
+        cli.build_parser = original_build
+
+
+def test_shared_flags_work_on_either_side_of_the_subcommand():
+    """``--demo run x`` and ``run x --demo`` must behave identically.
+
+    argparse alone gets this wrong: the subparser's own defaults overwrite
+    anything given before the subcommand, silently dropping ``--demo`` and
+    sending what the operator believed was a dry run at live paid providers.
+    """
+    for argv in (["--demo", "run", str(SAMPLE)], ["run", str(SAMPLE), "--demo"]):
+        seen: dict = {}
+        rc = _invoke(argv, lambda a: seen.update(
+            {"demo": a.demo, "input": a.input}) or 0)
+        assert rc == 0
+        assert seen["demo"] is True, f"--demo was lost for {argv}"
+        assert seen["input"] == str(SAMPLE)
+
+
+def test_quiet_flag_works_after_the_subcommand():
+    seen: dict = {}
+    _invoke(["run", str(SAMPLE), "--quiet"],
+            lambda a: seen.update({"quiet": a.quiet}) or 0)
+    assert seen["quiet"] is True
+
+
+def test_path_flag_given_first_is_not_reset_by_the_subparser(tmp_path):
+    seen: dict = {}
+    rc = _invoke(["--out", str(tmp_path), "--demo", "run", str(SAMPLE)],
+                 lambda a: seen.update({"out": a.out, "demo": a.demo}) or 0)
+    assert rc == 0
+    assert seen["out"] == str(tmp_path)
+    assert seen["demo"] is True
