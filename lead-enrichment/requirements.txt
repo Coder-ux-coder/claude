@@ -1,0 +1,13 @@
+# Core -- required
+requests>=2.31
+PyYAML>=6.0
+phonenumbers>=8.13      # E.164 parsing and Indian number-type detection
+Flask>=3.0              # the browser interface
+
+# Google Sheets delivery -- optional. Without these, CSV export still works
+# and the Sheets step reports a clear, actionable message instead of failing.
+google-api-python-client>=2.100
+google-auth>=2.23
+
+# Tests
+pytest>=7.4

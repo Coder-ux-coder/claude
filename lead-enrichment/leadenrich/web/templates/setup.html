@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Setup{% endblock %}
+{% block body %}
+<h1>Setup</h1>
+<p class="sub">Which providers are wired up, and what each one still needs.
+Keys are read from your <code>.env</code> file — never typed into this page.</p>
+
+<div class="note">
+  <strong>How to add a key.</strong> Copy <code>.env.example</code> to
+  <code>.env</code>, paste the key next to the right variable name, and restart.
+  A provider with no key is <em>skipped</em>, never faked — so you can start with
+  one provider and add the rest later.
+</div>
+
+{% for stage, info in readiness.items() %}
+<h2 style="text-transform:capitalize">{{ stage }}
+  {% if info.ready %}<span class="pill ok">ready</span>
+  {% else %}<span class="pill warn">no credentials</span>{% endif %}
+</h2>
+<div class="panel" style="padding:6px 0">
+  <div class="scroll"><table>
+    <tr><th>Provider</th><th>Status</th><th>Environment variable</th><th>Notes</th></tr>
+    {% for p in info.providers %}
+    <tr>
+      <td>
+        <strong>{{ p.name }}</strong>
+        {% if p.docs %}<br><a class="small muted" href="{{ p.docs }}" target="_blank" rel="noopener">docs</a>{% endif %}
+      </td>
+      <td>{% if p.ready %}<span class="pill ok">ready</span>
+          {% else %}<span class="pill warn">missing</span>{% endif %}</td>
+      <td class="small"><code>{{ p.needs }}</code></td>
+      <td class="small muted">{{ p.note }}</td>
+    </tr>
+    {% endfor %}
+  </table></div>
+</div>
+{% endfor %}
+
+<h2>Google Sheets</h2>
+<div class="panel">
+  {% if sheets.ok %}
+    <p><span class="pill ok">ready</span> {{ sheets.message }}</p>
+  {% else %}
+    <p><span class="pill warn">not configured</span> {{ sheets.message }}</p>
+  {% endif %}
+  {% if sheets.service_account_email %}
+  <p class="small">Share your spreadsheet with
+     <code>{{ sheets.service_account_email }}</code> as an <strong>Editor</strong>.
+     Forgetting this share is the usual cause of a 403.</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,191 @@
+# ==========================================================================
+#  Lead enrichment pipeline configuration
+#
+#  SECRETS NEVER GO IN THIS FILE. Each provider names an environment variable;
+#  the key itself lives in .env (which is git-ignored) or in your shell.
+#  Copy .env.example to .env and fill in only the providers you have bought.
+#
+#  A provider with no key is SKIPPED, not failed -- the waterfall simply moves
+#  to the next one. You can therefore start with one provider and add more later
+#  without changing a line of code.
+# ==========================================================================
+
+# ---- Waterfall order. This is the knob you will actually tune. ------------
+# Providers are tried top to bottom. The first ACCEPTED result wins and the
+# rest of the chain is skipped, so put your most accurate provider first and
+# your cheapest fallbacks last.
+waterfalls:
+  identity:
+    - apollo            # accepts the LinkedIn URL directly
+    - pdl               # accepts the LinkedIn URL directly
+    # - enrichlayer     # see note below before enabling
+    - linkedin_slug     # free local fallback: probable name only
+
+  email:
+    - prospeo           # takes the LinkedIn URL; strongest on LinkedIn-sourced rows
+    - findymail         # charges only on a successful find -- a miss is free
+    - hunter            # returns public source URLs: evidence for the Source column
+    - anymailfinder
+    - dropcontact       # async; EU-processed; derives rather than looks up
+    - snov              # cheapest, asked last
+
+  validation:
+    - zerobounce
+    - hunter_verifier   # fallback validator
+
+  phone:
+    - google_places     # the clinic's own published Google Business Profile
+    - website           # the clinic's own public contact page
+
+# ---- Providers -----------------------------------------------------------
+providers:
+  apollo:
+    enabled: true
+    api_key_env: APOLLO_API_KEY
+    extra_env:
+      webhook_url: APOLLO_WEBHOOK_URL   # only needed if reveal_phone_number is on
+    credits_per_call: 1.0
+    timeout: 30
+    options:
+      reveal_personal_emails: false     # work email only, by design
+      reveal_phone_number: false        # async + requires a public webhook URL
+
+  pdl:
+    enabled: true
+    api_key_env: PDL_API_KEY
+    credits_per_call: 1.0
+    options:
+      min_likelihood: 6                 # 1-10. Higher = fewer, better matches.
+
+  enrichlayer:
+    # DISABLED. Markets itself as Proxycurl's successor and inherits the legal
+    # exposure that closed Proxycurl in July 2025. Review with counsel first.
+    enabled: false
+    api_key_env: ENRICHLAYER_API_KEY
+    credits_per_call: 1.0
+
+  linkedin_slug:
+    enabled: true
+    credits_per_call: 0.0               # local string parse, costs nothing
+
+  prospeo:
+    enabled: true
+    api_key_env: PROSPEO_API_KEY
+    credits_per_call: 1.0
+
+  findymail:
+    enabled: true
+    api_key_env: FINDYMAIL_API_KEY
+    credits_per_call: 1.0
+
+  hunter:
+    enabled: true
+    api_key_env: HUNTER_API_KEY
+    credits_per_call: 1.0
+    options:
+      max_duration: 10                  # documented range 3-20 seconds
+
+  anymailfinder:
+    enabled: true
+    api_key_env: ANYMAILFINDER_API_KEY
+    credits_per_call: 1.0
+
+  dropcontact:
+    enabled: true
+    api_key_env: DROPCONTACT_API_KEY
+    credits_per_call: 1.0
+    options:
+      max_polls: 6
+      poll_interval: 5.0
+
+  snov:
+    enabled: true
+    extra_env:
+      client_id: SNOV_CLIENT_ID
+      client_secret: SNOV_CLIENT_SECRET
+    credits_per_call: 1.0
+
+  zerobounce:
+    enabled: true
+    api_key_env: ZEROBOUNCE_API_KEY
+    credits_per_call: 1.0
+
+  hunter_verifier:
+    enabled: true
+    api_key_env: HUNTER_API_KEY
+    credits_per_call: 1.0
+    options:
+      max_polls: 4
+      poll_interval: 3.0
+
+  google_places:
+    enabled: true
+    api_key_env: GOOGLE_MAPS_API_KEY
+    # Phone and website are Enterprise-SKU fields (~$20/1,000, ~1,000 free/month).
+    credits_per_call: 1.0
+    options:
+      region_code: IN
+      region: IN
+      max_results: 3
+
+  website:
+    enabled: true
+    credits_per_call: 0.0               # public pages, no vendor cost
+    timeout: 20
+    options:
+      max_pages: 3
+      region: IN
+      user_agent: "leadenrich-bot/1.0 (+public business contact lookup)"
+
+# ---- Email quality gate --------------------------------------------------
+# Deliverability and ownership are separate questions. An address must pass
+# BOTH to reach the delivered Email column.
+email_policy:
+  require_validation: true
+  accept_deliverability: [deliverable]        # catch-all and unknown are NOT accepted
+  accept_ownership: [provider_asserted, published_on_company_site]
+  export_risky: false          # true = also export risky, clearly labelled
+  reject_role_accounts: true   # info@ / contact@ are not a named person's mailbox
+  reject_free_webmail: false   # many Indian clinics legitimately use Gmail
+  min_finder_score: 0          # e.g. 80 to demand high finder confidence
+
+# ---- Phone policy: the compliance control. Read docs/COMPLIANCE.md. -------
+phone_policy:
+  require_public_evidence: true          # no source URL -> not exported
+  allow_provider_personal_mobile: false  # KEEP FALSE unless you have a legal basis
+  default_region: IN
+  accept_landline: true
+  export_contact_type_label: true        # say what kind of line it is
+
+# ---- Reliability ---------------------------------------------------------
+retry:
+  max_attempts: 4       # applies ONLY to transient failures (429/5xx/timeouts)
+  base_delay: 1.0
+  max_delay: 30.0
+  jitter: 0.25
+
+# ---- Spend controls. A tripped cap SKIPS a provider, never fails a row. ---
+budget:
+  max_total_requests: 20000
+  max_estimated_credits: 12000
+  per_provider:
+    apollo: 2500
+    pdl: 2500
+    prospeo: 2500
+    findymail: 2500
+    hunter: 2500
+    anymailfinder: 2000
+    dropcontact: 2000
+    snov: 2000
+    zerobounce: 3000
+    google_places: 2200      # Enterprise SKU -- watch this one
+
+concurrency: 4
+
+# Call every identity provider even after one answers fully, so their answers
+# can be cross-checked and disagreements surfaced. Roughly doubles identity
+# cost -- switch it on for a pilot or a spot-check sample, off for a full run.
+identity_corroboration: false
+
+output_dir: out
+demo_mode: false

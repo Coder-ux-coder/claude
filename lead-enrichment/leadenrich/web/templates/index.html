@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>Enrich a list of leads</h1>
+<p class="sub">Upload a CSV of LinkedIn profile URLs. Every row is checkpointed,
+so you can close this page and come back.</p>
+
+{% set unready = readiness.values() | rejectattr('ready') | list %}
+{% if unready | length == 4 %}
+<div class="note warn">
+  <strong>No API keys are configured yet.</strong> You can still press
+  <em>Run the demo</em> below to see exactly what the system produces — it uses
+  fictional sample data and makes no network calls. When you have keys, add them
+  on the <a href="{{ url_for('setup') }}">Setup</a> page.
+</div>
+{% elif unready %}
+<div class="note warn">
+  Some stages have no credentials yet
+  ({{ unready | length }} of 4). Those stages are skipped, not faked —
+  see <a href="{{ url_for('setup') }}">Setup</a>.
+</div>
+{% endif %}
+
+<div class="grid two">
+  <div class="panel">
+    <h2 style="margin-top:0">Start a run</h2>
+    <form method="post" action="{{ url_for('start') }}" enctype="multipart/form-data">
+      <label for="file">Your CSV file</label>
+      <input type="file" name="file" id="file" accept=".csv">
+      <p class="small muted" style="margin:8px 0 0">
+        A <code>LinkedIn URL</code> column is all that is required. Adding
+        <code>Name</code>, <code>Clinic</code> or <code>Domain</code> columns
+        raises the match rate substantially — a bare profile URL often will not
+        resolve on its own.
+      </p>
+      <label for="limit">Only process the first N rows (optional — use this for a pilot)</label>
+      <input type="number" name="limit" id="limit" min="1" placeholder="e.g. 100">
+      <div style="margin-top:18px; display:flex; gap:10px; flex-wrap:wrap">
+        <button class="primary" type="submit" name="mode" value="live">Run enrichment</button>
+        <button type="submit" name="mode" value="demo">Run the demo</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="panel">
+    <h2 style="margin-top:0">How it works</h2>
+    <ol class="steps small">
+      <li><strong>Identity</strong> — resolve the profile to a name, role and clinic.</li>
+      <li><strong>Email</strong> — try each provider in order; the first hit wins.</li>
+      <li><strong>Validation</strong> — a catch-all or unknown result is never
+          counted as confirmed.</li>
+      <li><strong>Phone</strong> — published business numbers only, each with the
+          URL that proves it.</li>
+      <li><strong>Review</strong> — anything doubtful is queued for you rather
+          than shipped.</li>
+    </ol>
+    <p class="small muted" style="margin-bottom:0">
+      You get three files: the six delivery columns, a full audit trail, and the
+      review queue.
+    </p>
+  </div>
+</div>
+
+{% if runs %}
+<h2>Recent runs</h2>
+<div class="panel" style="padding:6px 0">
+  <div class="scroll"><table>
+    <tr><th>Run</th><th>Status</th><th>Rows</th><th>Input</th></tr>
+    {% for r in runs %}
+    <tr>
+      <td><a href="{{ url_for('run_page', run_id=r.run_id) }}">{{ r.run_id }}</a></td>
+      <td>
+        {% if r.status == 'done' %}<span class="pill ok">done</span>
+        {% elif r.status == 'failed' %}<span class="pill bad">failed</span>
+        {% else %}<span class="pill warn">{{ r.status }}</span>{% endif %}
+      </td>
+      <td class="small">{{ r.counts.get('done', 0) }} / {{ r.counts.values() | sum }}</td>
+      <td class="small muted">{{ r.input_path or '' }}</td>
+    </tr>
+    {% endfor %}
+  </table></div>
+</div>
+{% endif %}
+{% endblock %}

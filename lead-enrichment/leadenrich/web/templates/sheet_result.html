@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>Google Sheets</h1>
+{% if res.ok %}
+  <p class="sub"><span class="pill ok">sent</span> {{ res.message }}</p>
+  <a class="btn primary" href="{{ res.spreadsheet_url }}" target="_blank" rel="noopener">Open the sheet</a>
+{% else %}
+  <p class="sub"><span class="pill warn">not sent</span> {{ res.message }}</p>
+  {% if res.service_account_email %}
+  <div class="note warn">Share the spreadsheet with
+    <code>{{ res.service_account_email }}</code> as an <strong>Editor</strong>, then try again.</div>
+  {% endif %}
+{% endif %}
+<p style="margin-top:18px"><a class="btn" href="{{ url_for('run_page', run_id=run_id) }}">Back to the run</a></p>
+{% endblock %}
