@@ -33,7 +33,7 @@ def test_demo_needs_no_credentials_and_no_network(demo_run):
     assert stats.processed == 7 and stats.skipped_duplicates == 1
     for rec in rows:
         for call in rec.calls:
-            assert call.provider.startswith(("demo_", "linkedin_slug", "client_input")), \
+            assert call.provider.startswith(("demo:", "linkedin_slug", "client_input")), \
                 f"demo run must not touch a real provider ({call.provider})"
 
 
@@ -41,7 +41,7 @@ def test_demo_exercises_the_full_waterfall(demo_run):
     """Each of A, B and C must be the winning provider for at least one row."""
     _cfg, _rid, _stats, rows = demo_run
     winners = {r.email.provenance.provider for r in rows if r.email.is_present()}
-    assert {"demo_email_a", "demo_email_b", "demo_email_c"} <= winners
+    assert {"demo:prospeo", "demo:findymail", "demo:hunter"} <= winners
 
 
 def test_demo_transient_failure_is_retried_then_the_chain_continues(demo_run):
@@ -49,9 +49,9 @@ def test_demo_transient_failure_is_retried_then_the_chain_continues(demo_run):
     from leadenrich.models import CallOutcome
     _cfg, _rid, _stats, rows = demo_run
     rec = next(r for r in rows if "sanjay" in r.inp.linkedin_url)
-    a_call = next(c for c in rec.calls if c.provider == "demo_email_a")
+    a_call = next(c for c in rec.calls if c.provider == "demo:prospeo")
     assert a_call.outcome == CallOutcome.TRANSIENT_ERROR.value
-    assert any(c.provider == "demo_email_b" for c in rec.calls), \
+    assert any(c.provider == "demo:findymail" for c in rec.calls), \
         "the chain must continue past a transient failure"
 
 

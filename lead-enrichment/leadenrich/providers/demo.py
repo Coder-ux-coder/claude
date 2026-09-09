@@ -4,6 +4,12 @@ Every value here is **clearly fictional**: names are invented, clinics use the
 ``.example`` reserved TLD, and phone numbers sit in India's documentation range
 (+91 99999 xxxxx). Nothing in this module touches the network.
 
+The fixture providers are deliberately named after the **real** providers
+they stand in for -- ``demo:prospeo`` rehearses what Prospeo does, in the
+position Prospeo occupies in the shipped waterfall. A demo run therefore
+teaches the actual pipeline rather than an abstract A/B/C, and the trace a
+new operator reads matches the one they will see once their keys are in.
+
 The fixtures are arranged so a demo run exercises every branch the real pipeline
 has: provider A finding an address, A missing and B finding it, A and B missing
 and C finding it, a transient failure that retries and then succeeds, a
@@ -60,21 +66,21 @@ DEMO_IDENTITIES: dict[str, dict[str, str]] = {
 #: will say about it. This is the table that drives the A -> B -> C fallback.
 DEMO_EMAILS: dict[str, dict[str, Any]] = {
     "dr-anaya-varma-demo1": {
-        "provider": "demo_email_a", "address": "anaya.varma@meridianskin.example",
+        "provider": "demo:prospeo", "address": "anaya.varma@meridianskin.example",
         "status": "valid", "score": 96},
     "rohan-desai-demo2": {
-        "provider": "demo_email_b", "address": "rohan@blueharbourdental.example",
+        "provider": "demo:findymail", "address": "rohan@blueharbourdental.example",
         "status": "valid", "score": 91},
     "dr-kavya-nair-demo3": {
-        "provider": "demo_email_c", "address": "k.nair@auroraeyecare.example",
+        "provider": "demo:hunter", "address": "k.nair@auroraeyecare.example",
         "status": "valid", "score": 88},
     "sanjay-iyer-demo4": {
         # Provider B answers, but the domain is catch-all -- the gate must refuse.
-        "provider": "demo_email_b", "address": "sanjay@northgatephysio.example",
+        "provider": "demo:findymail", "address": "sanjay@northgatephysio.example",
         "status": "catch-all", "score": 72},
     "dr-meera-joshi-demo5": {
         # A role mailbox: perfectly deliverable, not a named person's inbox.
-        "provider": "demo_email_c", "address": "info@lotuswellness.example",
+        "provider": "demo:hunter", "address": "info@lotuswellness.example",
         "status": "valid", "score": 80},
     # demo6 is in no provider's table: all three miss, ending in a clean no_match.
 }
@@ -122,10 +128,10 @@ class _Demo(Provider):
 
 
 @registry.register
-class DemoIdentityProvider(_Demo):
-    name = "demo_identity"
+class DemoApolloFixture(_Demo):
+    name = "demo:apollo"
     stage = "identity"
-    NOTE = "Fictional fixtures. No network, no credentials."
+    NOTE = "Fictional stand-in for Apollo. No network, no credentials."
 
     def can_handle(self, rec, ctx=None) -> bool:
         return bool(rec.inp.linkedin_url)
@@ -145,7 +151,7 @@ class DemoIdentityProvider(_Demo):
 
 class _DemoEmail(_Demo):
     stage = "email"
-    NOTE = "Fictional fixtures. Demonstrates waterfall fallback."
+    NOTE = "Fictional stand-in, in the real provider position it mirrors."
 
     def can_handle(self, rec, ctx=None) -> bool:
         return bool(_slug(rec))
@@ -156,7 +162,7 @@ class _DemoEmail(_Demo):
 
         # demo4 makes provider A fail transiently the first time it is asked, so
         # a demo run visibly exercises retry-then-continue behaviour.
-        if self.name == "demo_email_a" and slug == "sanjay-iyer-demo4":
+        if self.name == "demo:prospeo" and slug == "sanjay-iyer-demo4":
             key = f"{self.name}:{slug}"
             seen = ctx.setdefault("_demo_transient_seen", set())
             if key not in seen:
@@ -181,25 +187,25 @@ class _DemoEmail(_Demo):
 
 
 @registry.register
-class DemoEmailA(_DemoEmail):
-    name = "demo_email_a"
+class DemoProspeoFixture(_DemoEmail):
+    name = "demo:prospeo"
 
 
 @registry.register
-class DemoEmailB(_DemoEmail):
-    name = "demo_email_b"
+class DemoFindymailFixture(_DemoEmail):
+    name = "demo:findymail"
 
 
 @registry.register
-class DemoEmailC(_DemoEmail):
-    name = "demo_email_c"
+class DemoHunterFixture(_DemoEmail):
+    name = "demo:hunter"
 
 
 @registry.register
-class DemoValidator(_Demo):
-    name = "demo_validator"
+class DemoZeroBounceFixture(_Demo):
+    name = "demo:zerobounce"
     stage = "validation"
-    NOTE = "Fictional fixtures. Returns the status recorded in the fixture table."
+    NOTE = "Fictional stand-in for ZeroBounce; returns the fixture status."
 
     def can_handle(self, rec, ctx=None) -> bool:
         return bool((ctx or {}).get("email"))
@@ -227,10 +233,10 @@ class DemoValidator(_Demo):
 
 
 @registry.register
-class DemoPlacesProvider(_Demo):
-    name = "demo_places"
+class DemoGooglePlacesFixture(_Demo):
+    name = "demo:google_places"
     stage = "phone"
-    NOTE = "Fictional business listings. Numbers use India's +91 99999 doc range."
+    NOTE = "Fictional stand-in for Google Places. Doc-range numbers only."
 
     def can_handle(self, rec, ctx=None) -> bool:
         ctx = ctx or {}
@@ -253,10 +259,10 @@ class DemoPlacesProvider(_Demo):
 
 
 @registry.register
-class DemoWebsiteProvider(_Demo):
-    name = "demo_website"
+class DemoWebsiteFixture(_Demo):
+    name = "demo:website"
     stage = "phone"
-    NOTE = "Fictional public pages. Exercises direct-line classification."
+    NOTE = "Fictional stand-in for the website reader. Direct-line logic."
 
     def can_handle(self, rec, ctx=None) -> bool:
         ctx = ctx or {}

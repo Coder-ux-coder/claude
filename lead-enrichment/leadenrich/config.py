@@ -166,14 +166,18 @@ def load_config(path: str | Path | None = None, *, demo: bool = False) -> Config
     if cfg.demo_mode:
         # Demo runs use fixture adapters only -- no network, no credentials, and
         # visibly fictional data. Every stage is rewritten to its demo provider.
+        # The demo mirrors the shipped waterfall position for position, so a
+        # demo trace reads exactly like a live one -- same provider names in the
+        # same order -- with fixtures behind them instead of paid APIs.
         cfg.waterfalls = {
-            "identity": ["demo_identity", "linkedin_slug"],
-            "email": ["demo_email_a", "demo_email_b", "demo_email_c"],
-            "validation": ["demo_validator"],
-            "phone": ["demo_places", "demo_website"],
+            "identity": ["demo:apollo", "linkedin_slug"],
+            "email": ["demo:prospeo", "demo:findymail", "demo:hunter"],
+            "validation": ["demo:zerobounce"],
+            "phone": ["demo:google_places", "demo:website"],
         }
-        for n in ("demo_identity", "demo_email_a", "demo_email_b", "demo_email_c",
-                  "demo_validator", "demo_places", "demo_website", "linkedin_slug"):
+        for n in ("demo:apollo", "demo:prospeo", "demo:findymail", "demo:hunter",
+                  "demo:zerobounce", "demo:google_places", "demo:website",
+                  "linkedin_slug"):
             cfg.providers.setdefault(n, ProviderConfig(name=n, credits_per_call=0.0))
             cfg.providers[n].enabled = True
     return cfg
