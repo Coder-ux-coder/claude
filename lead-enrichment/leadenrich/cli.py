@@ -626,7 +626,7 @@ def cmd_ui(args) -> int:
     from .web.app import serve
     load_dotenv(args.env)
     serve(config_path=args.config, data_dir=args.data_dir,
-          host=args.host, port=args.port, demo=args.demo)
+          host=args.host, port=args.port, demo=args.demo, env_path=args.env)
     return 0
 
 

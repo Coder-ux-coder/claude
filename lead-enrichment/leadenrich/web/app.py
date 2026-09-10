@@ -14,6 +14,8 @@ import time
 import uuid
 from pathlib import Path
 
+import os
+
 from flask import (Flask, Response, jsonify, redirect, render_template,
                    request, send_file, url_for)
 
@@ -30,12 +32,15 @@ _LOCK = threading.Lock()
 
 
 def create_app(config_path: str | None = None, data_dir: str = "data",
-               demo: bool = False) -> Flask:
+               demo: bool = False, env_path: str = ".env",
+               local_only: bool = True) -> Flask:
     app = Flask(__name__)
     app.config["CONFIG_PATH"] = config_path
     app.config["DATA_DIR"] = data_dir
     app.config["DEMO"] = demo
     app.config["UPLOAD_DIR"] = str(Path(data_dir) / "uploads")
+    app.config["ENV_PATH"] = env_path or ".env"
+    app.config["LOCAL_ONLY"] = local_only
     Path(app.config["UPLOAD_DIR"]).mkdir(parents=True, exist_ok=True)
 
     def store() -> Store:
@@ -58,10 +63,52 @@ def create_app(config_path: str | None = None, data_dir: str = "data",
 
     @app.route("/setup")
     def setup():
+        from ..cli import KEY_PROMPTS, _mask, _read_env_file
         from ..sheets import preflight
+        env_path = Path(app.config["ENV_PATH"])
+        current = _read_env_file(env_path)
+        keys = [{"var": v, "provider": prov, "why": why, "where": where,
+                 "masked": _mask(current.get(v, "")),
+                 "set": bool(current.get(v))}
+                for v, prov, why, where in KEY_PROMPTS]
         return render_template("setup.html",
                                readiness=_readiness(cfg(demo_override=False)),
-                               sheets=preflight())
+                               sheets=preflight(), keys=keys,
+                               env_path=str(env_path),
+                               local_only=app.config["LOCAL_ONLY"],
+                               saved=request.args.get("saved"))
+
+    @app.route("/setup/keys", methods=["POST"])
+    def save_keys():
+        """Write the pasted keys to .env.
+
+        Refused outright unless the server is bound to loopback. A form that
+        accepts API keys must never be reachable from another machine, and the
+        check belongs here rather than in a warning nobody reads.
+        """
+        from ..cli import KEY_PROMPTS, _read_env_file, _write_env_file
+        if not app.config["LOCAL_ONLY"]:
+            return render_template(
+                "error.html",
+                message="Key entry is disabled because this server is not "
+                        "bound to localhost.",
+                details=["Restart without --host, or set the keys with "
+                         "`python3 -m leadenrich.cli keys` instead."]), 403
+
+        env_path = Path(app.config["ENV_PATH"])
+        values = _read_env_file(env_path)
+        changed = 0
+        for var, *_rest in KEY_PROMPTS:
+            entered = (request.form.get(var) or "").strip()
+            if entered:
+                values[var] = entered
+                changed += 1
+        _write_env_file(env_path, values)
+        # Reload so the running process sees the new keys without a restart.
+        for var, *_rest in KEY_PROMPTS:
+            if values.get(var):
+                os.environ[var] = values[var]
+        return redirect(url_for("setup", saved=changed))
 
     @app.route("/run/<run_id>")
     def run_page(run_id: str):
@@ -247,9 +294,17 @@ def _row_view(rec) -> dict:
 
 
 def serve(config_path=None, data_dir="data", host="127.0.0.1", port=8000,
-          demo=False) -> None:
-    load_dotenv()
-    app = create_app(config_path, data_dir, demo)
+          demo=False, env_path=".env") -> None:
+    load_dotenv(env_path)
+    # Key entry is offered only on loopback. Bound anywhere else, the form is
+    # withheld rather than shown with a warning.
+    local_only = host in ("127.0.0.1", "localhost", "::1")
+    app = create_app(config_path, data_dir, demo, env_path=env_path,
+                     local_only=local_only)
     banner = "  DEMO MODE -- fictional data, no network" if demo else ""
-    print(f"\n  Lead enrichment UI:  http://{host}:{port}{banner}\n")
+    print(f"\n  Lead enrichment UI:  http://{host}:{port}{banner}")
+    if local_only:
+        print(f"  Paste your API keys at:  http://{host}:{port}/setup\n")
+    else:
+        print("  Key entry disabled: not bound to localhost\n")
     app.run(host=host, port=port, debug=False, threaded=True)
