@@ -266,14 +266,20 @@ def _run_package(workdir):
                           capture_output=True, text=True, cwd=str(workdir))
 
 
-@pytest.mark.parametrize("filename,content", [
-    ("config.yml", "hunter_key: sk-livekey0123456789abcdef\n"),
-    ("notes.txt", "google: AIzaSyD-0123456789abcdefghijklmnopqrstuv\n"),
-    ("sa.json", "-----BEGIN PRIVATE KEY-----\nMIIEv...\n"),
-])
-def test_packaging_refuses_when_a_credential_is_in_the_tree(tmp_path, filename, content):
+# Assembled at runtime rather than written as literals: package.sh scans this
+# repository too, and a credential-shaped string sitting in a source file is
+# exactly what it is supposed to refuse. The temp tree gets the full string.
+_PLANTED = {
+    "config.yml": "hunter_key: " + "sk-" + "livekey0123456789abcdef\n",
+    "notes.txt": "google: " + "AIza" + "SyD-0123456789abcdefghijklmnopqrstuv\n",
+    "sa.json": "-----" + "BEGIN " + "PRIVATE " + "KEY" + "-----\nMIIEv...\n",
+}
+
+
+@pytest.mark.parametrize("filename", sorted(_PLANTED))
+def test_packaging_refuses_when_a_credential_is_in_the_tree(tmp_path, filename):
     """The one failure mode that cannot be undone once the zip is sent."""
-    (tmp_path / filename).write_text(content, encoding="utf-8")
+    (tmp_path / filename).write_text(_PLANTED[filename], encoding="utf-8")
     r = _run_package(tmp_path)
     assert r.returncode != 0
     assert "REFUSING TO PACKAGE" in r.stderr
@@ -303,3 +309,56 @@ def test_packaging_succeeds_on_a_clean_tree(tmp_path):
         names = z.namelist()
     assert any(n.endswith("README.md") for n in names)
     assert not (tmp_path / "dist" / "lead-enrichment").exists(), "staging must be cleaned up"
+
+
+# --------------------------------------------------------------- launchers ---
+
+ROOT = PACKAGE_SH.parent
+
+
+def test_every_platform_has_a_double_clickable_start():
+    """Windows can double-click a .bat and macOS a .command; neither can a .sh.
+
+    The terminal is the step that loses non-technical operators, so all three
+    launchers have to keep working -- and keep pointing at the same entry point.
+    """
+    import stat as _stat
+
+    launchers = {
+        "run.sh": "leadenrich.cli ui",
+        "run.bat": "leadenrich.cli ui",
+        "Start on Mac.command": "run.sh",
+    }
+    for name, must_contain in launchers.items():
+        path = ROOT / name
+        assert path.exists(), f"{name} is missing"
+        assert must_contain in path.read_text(encoding="utf-8")
+        if name != "run.bat":       # exec bit is meaningless on Windows
+            assert path.stat().st_mode & _stat.S_IXUSR, f"{name} is not executable"
+
+
+def test_the_repository_itself_carries_no_credential_shaped_string():
+    """Runs the same scan package.sh does, against the working tree.
+
+    Catches the mistake before it reaches a commit rather than at the moment
+    somebody tries to seal an archive.
+    """
+    import re
+    import subprocess
+
+    pattern = re.compile(r"sk-[A-Za-z0-9]{16,}|AIza[0-9A-Za-z_-]{30,}"
+                         r"|BEGIN [A-Z ]*PRIVATE KEY")
+    tracked = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True,
+                             text=True)
+    if tracked.returncode != 0:          # not a checkout; nothing to scan
+        pytest.skip("not a git working tree")
+
+    offenders = []
+    for rel in tracked.stdout.split():
+        f = ROOT / rel
+        try:
+            if pattern.search(f.read_text(encoding="utf-8")):
+                offenders.append(rel)
+        except (UnicodeDecodeError, FileNotFoundError, IsADirectoryError):
+            continue
+    assert not offenders, f"credential-shaped strings in: {offenders}"

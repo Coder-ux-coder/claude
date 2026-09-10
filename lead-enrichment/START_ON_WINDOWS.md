@@ -76,6 +76,13 @@ git checkout claude/intelligent-newton-tx4mru
 Your browser opens at `http://127.0.0.1:8000`. Leave the Terminal window open;
 Ctrl+C stops the app.
 
+**After the first time, you never need the terminal again.** Open the
+`lead-enrichment` folder in Finder and double-click **Start on Mac.command**.
+macOS will ask for confirmation the first time — right-click it, choose **Open**,
+then **Open** again. From then on a plain double-click starts the app.
+
+(Windows has this already: double-click `run.bat` in File Explorer.)
+
 ---
 
 ## Once it is running
@@ -98,6 +105,10 @@ git pull
 ```
 
 then `.\run.bat` or `./run.sh`.
+
+Or skip the terminal entirely: double-click **run.bat** (Windows) or
+**Start on Mac.command** (Mac) in the folder. You only need `git pull` when you
+want the latest changes.
 
 ---
 

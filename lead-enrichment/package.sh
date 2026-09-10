@@ -58,8 +58,16 @@ dist, name, archive = Path(sys.argv[1]), sys.argv[2], Path(sys.argv[3])
 stage = dist / name
 with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as z:
     for f in sorted(stage.rglob("*")):
-        if f.is_file():
-            z.write(f, arcname=str(Path(name) / f.relative_to(stage)))
+        if not f.is_file():
+            continue
+        arcname = str(Path(name) / f.relative_to(stage))
+        info = zipfile.ZipInfo.from_file(f, arcname)
+        # from_file drops the mode on some paths; set it explicitly so the
+        # launchers survive the round trip. A run.sh that arrives without its
+        # execute bit is a support request from every recipient on macOS.
+        info.external_attr = (f.stat().st_mode & 0xFFFF) << 16
+        info.compress_type = zipfile.ZIP_DEFLATED
+        z.writestr(info, f.read_bytes())
 PYZIP
 rm -rf "$STAGE"
 
