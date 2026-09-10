@@ -205,7 +205,7 @@ for credential-shaped strings — refusing to seal the archive if it finds one.
 ## Tests
 
 ```bash
-python3 -m pytest          # 286 tests, no network, no credentials
+python3 -m pytest          # 311 tests, no network, no credentials
 ```
 
 | Suite | Proves |
@@ -223,6 +223,8 @@ python3 -m pytest          # 286 tests, no network, no credentials
 | `test_resilience.py` | Rate-limit pacing exactly matches published limits; the breaker drops a dead provider but never a merely flaky one |
 | `test_webfetch.py` | Every real-world page failure: lying charsets, PDFs, oversized pages, JS walls, redirect loops, timeouts |
 | `test_handover.py` | The client bundle: fill rates counted not estimated, duplicates out of every denominator, every blank cell explained by the gate that refused it, a withheld number counted but never printed, and packaging that refuses to seal an archive containing a credential |
+| `test_env_parsing.py` | A copied `.env.example` leaves every paid provider switched off; a trailing comment never becomes the key; a `#` inside a real key is never truncated; the keyless providers stay available |
+| `test_installers.py` | Each single-file installer's own extraction logic recovers an intact archive — including the Windows one, which cannot be run here |
 | `test_web_handover.py` | The browser route that builds the bundle: the same partial-run guard as the CLI, and a demo run stamped fictional whichever path built it |
 | `test_website_integration.py` | **No mocked transport** — the provider runs over a real socket against a realistic clinic site, honours robots.txt, follows the site's own "Reach Us" link, and picks a doctor's published direct line over the switchboard |
 

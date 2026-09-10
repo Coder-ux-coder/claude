@@ -5,12 +5,27 @@
 so you can close this page and come back.</p>
 
 {% set unready = readiness.values() | rejectattr('ready') | list %}
-{% if unready | length == 4 %}
+{% set paid = readiness.email.ready or readiness.validation.ready %}
+{% if not paid %}
 <div class="note warn">
-  <strong>No API keys are configured yet.</strong> You can still press
-  <em>Run the demo</em> below to see exactly what the system produces — it uses
-  fictional sample data and makes no network calls. When you have keys, add them
-  on the <a href="{{ url_for('setup') }}">Setup</a> page.
+  <strong>No API keys yet — and you can still use this today.</strong>
+  <table style="margin:10px 0 4px; width:auto">
+    <tr><td style="padding:3px 14px 3px 0">✅ <strong>Names and roles</strong></td>
+        <td class="small muted">read from the profile URL itself</td></tr>
+    <tr><td style="padding:3px 14px 3px 0">✅ <strong>Phone numbers</strong></td>
+        <td class="small muted">read from each clinic's own website, with the page
+        that proves it</td></tr>
+    <tr><td style="padding:3px 14px 3px 0">✅ <strong>The full delivery pack</strong></td>
+        <td class="small muted">Leads.csv, audit trail, cover note — all of it</td></tr>
+    <tr><td style="padding:3px 14px 3px 0">⛔ <strong>Email addresses</strong></td>
+        <td class="small muted">this is the only part that needs a paid key</td></tr>
+  </table>
+  <p class="small" style="margin:6px 0 0">
+    Press <em>Run the demo</em> to walk the whole thing through on sample data, or
+    upload your real CSV now — include a <code>Domain</code> or <code>Clinic</code>
+    column and the phone lookup starts working immediately.
+    Keys go on the <a href="{{ url_for('setup') }}">Setup</a> page whenever you want them.
+  </p>
 </div>
 {% elif unready %}
 <div class="note warn">

@@ -7,6 +7,7 @@ loaded at startup). Nothing here ever prompts for a key.
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -14,6 +15,31 @@ from typing import Any
 import yaml
 
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "pipeline.yml"
+
+
+def _parse_env_value(raw: str) -> str:
+    """Read one .env value, honouring quotes and trailing comments.
+
+    ``KEY=   # what this is for`` must yield an empty value, not the comment.
+    Without this a blank template file makes every provider look configured,
+    the readiness display says so, and each one then dies on a 401 mid-run --
+    which is a far more expensive way to learn that no key was ever set.
+
+    A ``#`` is only a comment when whitespace precedes it: keys and passwords
+    contain hashes, and stripping those would silently corrupt a working
+    credential, which is worse than the bug being fixed.
+    """
+    raw = raw.strip()
+    if raw.startswith("#"):
+        return ""
+    if raw[:1] in ('"', "'"):
+        quote = raw[0]
+        end = raw.find(quote, 1)
+        return raw[1:end] if end != -1 else raw[1:]
+    cut = re.search(r"\s#", raw)
+    if cut:
+        raw = raw[:cut.start()]
+    return raw.strip()
 
 
 def load_dotenv(path: str | Path = ".env") -> int:
@@ -27,7 +53,9 @@ def load_dotenv(path: str | Path = ".env") -> int:
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, _, val = line.partition("=")
-        key, val = key.strip(), val.strip().strip('"').strip("'")
+        key, val = key.strip(), _parse_env_value(val)
+        if key.startswith("export "):
+            key = key[len("export "):].strip()
         if key and key not in os.environ:
             os.environ[key] = val
             loaded += 1
