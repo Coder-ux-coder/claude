@@ -78,6 +78,28 @@ def _phone_withheld_reason(rec: LeadRecord) -> str:
     return "a number was found but carried no source URL to prove publication"
 
 
+#: Demo fixtures name themselves so their output can never be mistaken for real.
+DEMO_PROVIDER_PREFIX = "demo:"
+
+
+def contains_demo_data(records: list[LeadRecord]) -> bool:
+    """True if any delivered value came from a fixture rather than a provider.
+
+    Read from the records, not from configuration. A config flag describes the
+    process that is running now; this describes the data in front of you, and
+    survives a re-export under different settings. Getting it wrong ships
+    invented clinics to a paying client with nothing on the cover to say so.
+    """
+    for rec in records:
+        for fv in rec.fields().values():
+            if fv.provenance.provider.startswith(DEMO_PROVIDER_PREFIX):
+                return True
+        for call in rec.calls:
+            if call.provider.startswith(DEMO_PROVIDER_PREFIX):
+                return True
+    return False
+
+
 def compute_stats(records: list[LeadRecord]) -> dict:
     """Everything the cover note asserts, derived from the records themselves."""
     duplicates = [r for r in records if r.duplicate_of]
@@ -325,6 +347,8 @@ def build_handover(records: list[LeadRecord], *, run_id: str,
     directory.mkdir(parents=True, exist_ok=True)
 
     stats = compute_stats(records)
+    # The caller's flag can only add the banner, never remove it.
+    demo = bool(demo) or contains_demo_data(records)
 
     write_delivery(directory / LEADS_CSV, records,
                    label_contact_type=label_contact_type)

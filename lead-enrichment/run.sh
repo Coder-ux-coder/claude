@@ -5,6 +5,22 @@ cd "$(dirname "$0")"
 
 PY="${PYTHON:-python3}"
 
+if ! command -v "$PY" >/dev/null 2>&1; then
+  # Without this the shell prints "command not found: python3", which tells a
+  # non-technical operator nothing about what to do next.
+  echo
+  echo "  Python was not found on this computer."
+  echo
+  echo "  Mac:    install it from https://www.python.org/downloads/"
+  echo "          (or run:  xcode-select --install)"
+  echo "  Linux:  sudo apt install python3 python3-pip"
+  echo
+  echo "  Then double-click this file again."
+  echo
+  read -r -p "  Press Enter to close." _ 2>/dev/null || true
+  exit 1
+fi
+
 if ! "$PY" -c "import flask, requests, yaml, phonenumbers" >/dev/null 2>&1; then
   echo "Installing dependencies (first run only)..."
   "$PY" -m pip install --quiet -r requirements.txt

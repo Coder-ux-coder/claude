@@ -205,7 +205,7 @@ for credential-shaped strings — refusing to seal the archive if it finds one.
 ## Tests
 
 ```bash
-python3 -m pytest          # 283 tests, no network, no credentials
+python3 -m pytest          # 286 tests, no network, no credentials
 ```
 
 | Suite | Proves |

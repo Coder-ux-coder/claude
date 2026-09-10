@@ -327,7 +327,7 @@ def test_every_platform_has_a_double_clickable_start():
     launchers = {
         "run.sh": "leadenrich.cli ui",
         "run.bat": "leadenrich.cli ui",
-        "Start on Mac.command": "run.sh",
+        "Start on Mac.command": "bash ./run.sh",
     }
     for name, must_contain in launchers.items():
         path = ROOT / name
@@ -362,3 +362,44 @@ def test_the_repository_itself_carries_no_credential_shaped_string():
         except (UnicodeDecodeError, FileNotFoundError, IsADirectoryError):
             continue
     assert not offenders, f"credential-shaped strings in: {offenders}"
+
+
+# ---------------------------------------------- the banner that must not lie ---
+
+def test_fixture_data_stamps_itself_whatever_the_caller_says(tmp_path):
+    """The regression that shipped invented clinics with a clean cover.
+
+    The web launcher starts without --demo, so the app's config said "not a
+    demo" while the operator clicked "Run the demo". The banner has to come
+    from the records, not from how the process was started.
+    """
+    from leadenrich.handover import contains_demo_data
+
+    rec = _delivered()
+    rec.name.provenance.provider = "demo:apollo"
+    assert contains_demo_data([rec])
+
+    res = build_handover([rec], run_id="run-9", outdir=tmp_path, demo=False)
+    note = (res.directory / COVER_MD).read_text(encoding="utf-8")
+    assert "FICTIONAL DATA" in note
+
+
+def test_a_provider_call_alone_is_enough_to_stamp_it(tmp_path):
+    """A row a fixture answered with nothing still proves the run was a demo."""
+    from leadenrich.models import CallOutcome, ProviderCall
+    from leadenrich.handover import contains_demo_data
+
+    rec = _delivered("Nobody", email=False, phone=False)
+    for fv in rec.fields().values():
+        fv.provenance.provider = ""
+    rec.calls.append(ProviderCall(provider="demo:hunter", stage="email",
+                                  outcome=CallOutcome.NO_MATCH.value))
+    assert contains_demo_data([rec])
+
+
+def test_real_provider_data_is_never_stamped(tmp_path):
+    from leadenrich.handover import contains_demo_data
+    assert not contains_demo_data([_delivered(), _email_refused("catch_all")])
+
+    res = build_handover([_delivered()], run_id="run-9", outdir=tmp_path, demo=False)
+    assert "FICTIONAL DATA" not in (res.directory / COVER_MD).read_text(encoding="utf-8")
