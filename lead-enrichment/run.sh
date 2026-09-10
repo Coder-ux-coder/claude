@@ -20,4 +20,14 @@ if [ ! -f .env ]; then
   echo
 fi
 
+echo
+echo "  Starting. Open http://127.0.0.1:8000 if your browser does not."
+echo "  Paste your API keys at http://127.0.0.1:8000/setup"
+echo "  Leave this window open while you use it. Press Ctrl+C to stop."
+echo
+
+# Best effort -- harmless if neither exists (a headless box, say).
+(command -v open >/dev/null 2>&1 && sleep 2 && open http://127.0.0.1:8000) &
+(command -v xdg-open >/dev/null 2>&1 && sleep 2 && xdg-open http://127.0.0.1:8000) &
+
 exec "$PY" -m leadenrich.cli ui "$@"

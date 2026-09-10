@@ -6,8 +6,13 @@ Three steps. You do not need any API keys for step 1.
 
 ```bash
 cd lead-enrichment
-./run.sh
+./run.sh          # Mac or Linux
+run.bat           # Windows
 ```
+
+**Never opened a terminal before?**
+[`START_ON_WINDOWS.md`](START_ON_WINDOWS.md) walks through it from zero — where
+the terminal is, what to install first, and what to paste.
 
 Your browser opens on `http://127.0.0.1:8000`. Press **Run the demo**.
 
