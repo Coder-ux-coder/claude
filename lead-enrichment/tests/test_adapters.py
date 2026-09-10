@@ -322,14 +322,16 @@ def test_google_places_no_match_when_nothing_is_listed(session, client):
     assert result.outcome == CallOutcome.NO_MATCH.value
 
 
-def test_website_reader_respects_robots_and_keeps_the_page_url(session, client, monkeypatch):
+def test_website_reader_respects_robots_and_keeps_the_page_url(
+        session, client, monkeypatch):
+    """A disallowed page is skipped; a delivered number cites the page it came from."""
     monkeypatch.setattr(
         "leadenrich.providers.phone_sources.WebsiteContactProvider._robots_allows",
         lambda self, url, ua: "/about" not in url)
     html = ('<html><body>Meridian Skin Clinic. '
-            '<a href="tel:+918041234567">Reception</a></body></html>')
-    session.always(FakeResponse(200, {}, text=html), FakeResponse(200, {}, text=html),
-                   FakeResponse(200, {}, text=html))
+            '<a href="tel:+918041234567">Reception</a>'
+            + "<p>pad</p>" * 40 + '</body></html>')
+    session.always(FakeResponse(200, headers={"content-type": "text/html"}, text=html))
     p = build("website", client, options={"max_pages": 2})
     result, _ = p.execute(lead(domain="meridianskin.example"),
                           {"domain": "meridianskin.example",
@@ -338,6 +340,58 @@ def test_website_reader_respects_robots_and_keeps_the_page_url(session, client, 
     assert result.phones[0].source_url.startswith("https://meridianskin.example")
     assert not any("/about" in c["url"] for c in session.calls), \
         "robots.txt disallow must be honoured"
+
+
+def test_website_reader_falls_back_to_www_and_http(session, client):
+    """Clinic sites are inconsistent about scheme and www; the first that answers wins."""
+    dead = FakeResponse(0, headers={}, text="")
+    good = FakeResponse(200, headers={"content-type": "text/html"},
+                        text="<html><body>Call 022 2456 7890"
+                             + "<p>pad</p>" * 40 + "</body></html>")
+    session.route("https://clinic.example", dead)
+    session.route("https://www.clinic.example", good, good, good, good)
+    p = build("website", client, options={"max_pages": 1})
+    result, _ = p.execute(lead(domain="clinic.example"), {"domain": "clinic.example"})
+    assert result.outcome == CallOutcome.HIT.value
+    assert "www.clinic.example" in result.raw["site"]
+
+
+def test_website_reader_reports_a_javascript_wall_rather_than_no_number(
+        session, client):
+    """The false negative that matters: we never saw the page, so say so."""
+    session.always(FakeResponse(
+        200, headers={"content-type": "text/html"},
+        text="<html><body>Please enable JavaScript to run this app."
+             + "<p>pad</p>" * 40 + "</body></html>"))
+    p = build("website", client)
+    result, _ = p.execute(lead(domain="clinic.example"), {"domain": "clinic.example"})
+    assert result.outcome == CallOutcome.NO_MATCH.value
+    assert result.raw.get("needs_human") is True
+    assert "by hand" in result.detail
+
+
+def test_website_reader_follows_the_sites_own_contact_link(session, client):
+    home = FakeResponse(200, headers={"content-type": "text/html"},
+                        text='<html><body><a href="/reach-us">Reach Us</a>'
+                             + "<p>pad</p>" * 40 + "</body></html>")
+    contact = FakeResponse(200, headers={"content-type": "text/html"},
+                           text="<html><body>Dr Nair, direct line "
+                                "+91 98200 12345" + "<p>pad</p>" * 40 + "</body></html>")
+    session.route("/reach-us", contact)
+    session.always(home)
+    p = build("website", client, options={"max_pages": 3})
+    result, _ = p.execute(lead(domain="clinic.example"),
+                          {"domain": "clinic.example", "full_name": "Dr Kavya Nair"})
+    assert result.outcome == CallOutcome.HIT.value
+    assert any("/reach-us" in u for u in result.raw["pages_checked"])
+
+
+def test_website_reader_reports_a_dead_site_cleanly(session, client):
+    session.always(FakeResponse(500, headers={"content-type": "text/html"}, text="err"))
+    p = build("website", client)
+    result, _ = p.execute(lead(domain="gone.example"), {"domain": "gone.example"})
+    assert result.outcome == CallOutcome.NO_MATCH.value
+    assert "did not answer" in result.detail
 
 
 def test_website_reader_needs_no_credentials():

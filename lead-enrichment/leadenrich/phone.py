@@ -193,6 +193,7 @@ def classify_contact_type(
     from_business_listing: bool = False,
     is_mobile: bool = False,
     proximity: int = 45,
+    name_proximity: int = 170,
 ) -> str:
     """Decide what kind of business contact a published number is.
 
@@ -200,6 +201,14 @@ def classify_contact_type(
     for the named individual is a published direct line; one captioned
     "reception" or "call us" is the clinic's main line. With no label either way,
     it stays a clinic line -- the conservative, honest default.
+
+    Two different windows, because real clinic markup puts them at different
+    distances. A caption like "Direct line:" sits immediately beside the number,
+    so it must be within ``proximity``. The person's *name*, though, is usually a
+    heading with a bio paragraph beneath it -- comfortably past 45 characters and
+    still unambiguously the same card. ``name_proximity`` is therefore wider, and
+    a nearer general label ("reception") still wins, which is what stops the
+    switchboard on a doctor's own page being read as her direct line.
     """
     ctx = (context or "").lower()
 
@@ -218,13 +227,15 @@ def classify_contact_type(
     d_general = _hint_distance(ctx, _MAIN_LINE_HINTS)
     d_named = _hint_distance(ctx, [surname]) if surname else None
 
-    # A direct-line label must be close, and must beat any general label.
+    # The label must be adjacent; the name only needs to be in the same card.
     direct_close = d_direct is not None and d_direct <= proximity
-    named_close = d_named is not None and d_named <= proximity
+    named_close = d_named is not None and d_named <= name_proximity
     general_close = d_general is not None and d_general <= proximity
 
     if direct_close and named_close:
-        if not general_close or min(d_direct, d_named) < d_general:
+        # A nearer "reception" still wins: a switchboard printed on a doctor's
+        # own page is the clinic's line, not hers.
+        if not general_close or d_direct < d_general:
             return ContactType.PUBLISHED_DIRECT_LINE.value
 
     if general_close:

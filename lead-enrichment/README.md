@@ -33,7 +33,16 @@ domain accepts everything and therefore proves neither, so catch-all and unknown
 never reach the delivered Email column. Role mailboxes (`info@`, `contact@`) are
 refused too — deliverable, but not a named decision-maker's inbox.
 
-**3 · A phone policy that cannot be bypassed by accident.** Every delivered
+**3 · Built to survive 2,000 rows, not just eight.** Every provider is paced to
+its published rate limit (Hunter's 15/second *and* 500/minute are both enforced),
+and a provider whose key is wrong or whose credits have run out is dropped from
+the run on its first `401` rather than being re-proved on every remaining row.
+Real websites get real handling: `www`/scheme fallbacks, the site's own contact
+link followed rather than paths guessed, a byte ceiling, and a Cloudflare or
+JavaScript wall reported as *needs a human* instead of the false negative "no
+number found".
+
+**4 · A phone policy that cannot be bypassed by accident.** Every delivered
 number is one the business itself published, carries the URL that proves it, and
 is labelled with what kind of line it is. A provider's `mobile_phone` field with
 no publication evidence is stored, labelled
@@ -77,6 +86,9 @@ and a review queue that nothing is silently dropped from.
 | `normalize.py` | Slug parsing, domains, role canonicalisation, similarity |
 | `store.py` | SQLite checkpoints; the UI and CLI share one database |
 | `budget.py` | Spend caps that skip a provider rather than fail a row |
+| `ratelimit.py` | Token buckets honouring each provider's published pace |
+| `breaker.py` | Drops a dead provider from the run after repeated permanent failures |
+| `webfetch.py` | Defensive fetching of real public pages: charset, size, walls |
 | `io_csv.py` | Ingest, the six delivered columns, audit and review files |
 | `sheets.py` | Google Sheets delivery, degrading cleanly when unconfigured |
 | `providers/` | One adapter per documented API; each cites its `DOC_URL` |
@@ -103,13 +115,18 @@ parsing follow the documented contracts cited in
 its documented response shape. Before your first paid run:
 
 ```bash
-python3 -m leadenrich.cli doctor
-python3 -m leadenrich.cli smoke --provider hunter --name "Jane Doe" --domain example.com
+python3 -m leadenrich.cli doctor    # what is configured, what is missing
+python3 -m leadenrich.cli verify    # one live call per provider, pass/fail report
 ```
 
-`smoke` makes exactly one live call and prints the raw response next to what the
-adapter parsed from it. That is the step that converts *documented* into
-*verified*, and it costs a credit or two.
+`verify` is the step that converts *documented* into *verified*. It calls every
+provider you have configured once, reports whether the key authenticates and the
+adapter parses the response, and writes `out/verify_report.json`. It costs a
+handful of credits. `smoke --provider <name>` does the same for one provider and
+prints the raw response beside the parse.
+
+See [`CREDENTIALS.md`](CREDENTIALS.md) for where each key comes from. Keys live
+in a git-ignored `.env` — never in chat, an issue, or a commit.
 
 ---
 
@@ -162,6 +179,9 @@ python3 -m pytest          # 194 tests, no network, no credentials
 | `test_dedupe_and_export.py` | Dedupe keys; exactly six delivered columns; audit retains URL/provider/timestamp/contact-type/status |
 | `test_demo_and_budget.py` | Full demo run is deterministic, exercises every branch, and stays inside its caps |
 | `test_normalize.py` | Slug parsing, domains, role seniority, similarity measures |
+| `test_resilience.py` | Rate-limit pacing exactly matches published limits; the breaker drops a dead provider but never a merely flaky one |
+| `test_webfetch.py` | Every real-world page failure: lying charsets, PDFs, oversized pages, JS walls, redirect loops, timeouts |
+| `test_website_integration.py` | **No mocked transport** — the provider runs over a real socket against a realistic clinic site, honours robots.txt, follows the site's own "Reach Us" link, and picks a doctor's published direct line over the switchboard |
 
 ---
 
@@ -181,9 +201,16 @@ python3 -m pytest          # 194 tests, no network, no credentials
 
 * **A bare LinkedIn URL may not resolve.** Proxycurl's July 2025 shutdown ended
   the "URL in, data out" era. Ask clients for name, clinic and domain columns.
-* **Live provider behaviour is unverified here.** Adapters follow current
-  documentation and are tested against those shapes; `smoke` is how you confirm
-  each one against a real account.
+* **Paid provider behaviour is unverified here.** Adapters follow current
+  documentation and are tested against those response shapes, but no vendor
+  account exists in the build environment, so none has been called live.
+  `verify` is how you confirm each one on your own machine, and it should be the
+  first thing you run after adding keys.
+* **The website reader, by contrast, is proven over real HTTP** — against a live
+  external site and against a locally served clinic site in
+  `test_website_integration.py`. Real Indian clinic domains were unreachable
+  from the build sandbox (egress policy), so those specific sites remain
+  untested.
 * **No independent India/clinic coverage benchmark exists.** Published waterfall
   hit rates come from vendor blogs and were measured on US/EU tech B2B. Run a
   pilot; quote from that.

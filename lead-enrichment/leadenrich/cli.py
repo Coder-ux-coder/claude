@@ -19,7 +19,7 @@ from pathlib import Path
 from .config import load_config, load_dotenv
 from .io_csv import (read_inputs, write_audit, write_delivery, write_review,
                      write_run_report)
-from .models import LeadInput, LeadRecord
+from .models import CallOutcome, LeadInput, LeadRecord
 from .pipeline import Pipeline, prepare_run
 from .providers import registry
 from .store import Store
@@ -335,6 +335,120 @@ def cmd_smoke(args) -> int:
     return 0
 
 
+def cmd_verify(args) -> int:
+    """Make one real call per configured provider and report what came back.
+
+    This is the step that turns "written against the documentation" into
+    "confirmed against the live API". It runs on your machine, with your keys,
+    and costs a handful of credits. Run it before the first paid batch, and
+    again whenever a provider changes plan -- an expired plan looks exactly
+    like a broken adapter until you check.
+    """
+    load_dotenv(args.env)
+    cfg = load_config(args.config)
+    out = _outdir(cfg, args)
+
+    probe = {
+        "identity": dict(linkedin_url=args.linkedin_url, full_name=args.name,
+                         company=args.company, domain=args.domain),
+        "email": dict(linkedin_url=args.linkedin_url, full_name=args.name,
+                      company=args.company, domain=args.domain),
+        "validation": dict(email=args.email),
+        "phone": dict(company=args.company, domain=args.domain,
+                      location=args.location),
+    }
+
+    print(bold("\n  Live provider check"))
+    print(dim(f"  probe: {args.name} · {args.company} · {args.domain}"))
+    print(dim("  one real call per provider; this consumes a few credits\n"))
+
+    report, failures, checked = [], 0, 0
+    for stage in ("identity", "email", "validation", "phone"):
+        names = cfg.enabled_in(stage)
+        if not names:
+            continue
+        print(bold(f"  {stage}"))
+        for name in names:
+            pc = cfg.provider(name)
+            prov = registry.build(name, pc) if pc else None
+            entry = {"stage": stage, "provider": name}
+
+            if prov is None:
+                print(f"    {red('X')}  {name:<16} not registered")
+                entry["result"] = "not_registered"
+                report.append(entry); failures += 1
+                continue
+            if not prov.available():
+                need = pc.api_key_env or ", ".join(pc.extra_env.values()) or "-"
+                print(f"    {yellow('--')} {name:<16} {dim('no credentials (' + need + ')')}")
+                entry["result"] = "no_credentials"
+                report.append(entry)
+                continue
+
+            ctx = dict(probe[stage])
+            rec = LeadRecord(inp=LeadInput(
+                linkedin_url=ctx.get("linkedin_url", "") or "",
+                full_name=ctx.get("full_name", "") or "",
+                company=ctx.get("company", "") or "",
+                domain=ctx.get("domain", "") or "",
+                location=ctx.get("location", "") or ""))
+            if not prov.can_handle(rec, ctx):
+                print(f"    {yellow('--')} {name:<16} "
+                      f"{dim(prov.missing_input_reason(rec, ctx))}")
+                entry["result"] = "insufficient_probe_input"
+                report.append(entry)
+                continue
+
+            checked += 1
+            result, call = prov.execute(rec, ctx)
+            entry.update({"result": result.outcome, "http_status": result.http_status,
+                          "ms": call.duration_ms, "detail": result.detail[:300]})
+
+            unreachable = any(
+                m in (result.detail or "").lower()
+                for m in ("did not answer", "unreachable", "timed out",
+                          "connection", "transport failure"))
+
+            if result.outcome == CallOutcome.HIT.value:
+                mark, note = green("OK "), "returned data"
+            elif result.outcome == CallOutcome.NO_MATCH.value and not unreachable:
+                # A clean no-match still proves auth, routing and parsing work.
+                mark, note = green("OK "), "reachable, no match for this probe"
+            elif result.outcome == CallOutcome.NO_MATCH.value:
+                # Nothing answered. Calling that OK would be the same false
+                # negative the pipeline itself is built to avoid.
+                mark = yellow("??")
+                note = "nothing answered -- check network/DNS: " + result.detail[:70]
+                entry["result"] = "unreachable"
+                failures += 1
+            else:
+                mark = red("FAIL")
+                note = result.detail[:110] or result.outcome
+                failures += 1
+            print(f"    {mark} {name:<16} {dim(str(call.duration_ms) + 'ms')}  {note}")
+            report.append(entry)
+        print()
+
+    path = out / "verify_report.json"
+    path.write_text(json.dumps(
+        {"checked": checked, "failures": failures, "providers": report},
+        indent=2), encoding="utf-8")
+
+    print(bold("  Verdict"))
+    if not checked:
+        print(yellow("    Nothing was checked -- no provider has credentials yet."))
+        print(dim("    Add keys to .env, then run this again."))
+    elif failures:
+        print(red(f"    {failures} provider(s) failed. Fix these before a paid run."))
+        print(dim("    401 = wrong key · 402/403 = plan or permission · "
+                  "5xx = provider outage"))
+    else:
+        print(green(f"    All {checked} configured provider(s) answered."))
+        print(dim("    Adapters confirmed against the live APIs. Safe to pilot."))
+    print(dim(f"\n  report: {path}"))
+    return 1 if failures else 0
+
+
 def cmd_runs(args) -> int:
     store = _store(args)
     runs = store.list_runs()
@@ -434,6 +548,16 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--email", default=None, help="for validation providers")
     s.set_defaults(func=cmd_smoke)
 
+    v2 = sub.add_parser("verify", help="one live call per provider; confirms your keys")
+    v2.add_argument("--linkedin-url",
+                    default="https://www.linkedin.com/in/williamhgates")
+    v2.add_argument("--name", default="Satya Nadella")
+    v2.add_argument("--company", default="Microsoft")
+    v2.add_argument("--domain", default="microsoft.com")
+    v2.add_argument("--email", default="satya.nadella@microsoft.com")
+    v2.add_argument("--location", default="Redmond, Washington")
+    v2.set_defaults(func=cmd_verify)
+
     u = sub.add_parser("ui", help="open the browser interface")
     u.add_argument("--host", default="127.0.0.1")
     u.add_argument("--port", type=int, default=8000)
@@ -442,7 +566,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 SUBCOMMANDS = {"run", "demo", "resume", "export", "review", "doctor", "runs",
-               "smoke", "ui"}
+               "smoke", "verify", "ui"}
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -107,6 +107,8 @@ class Config:
     retry: RetryPolicy = field(default_factory=RetryPolicy)
     budget: BudgetConfig = field(default_factory=BudgetConfig)
     concurrency: int = 4
+    #: Consecutive permanent failures before a provider is dropped from the run.
+    breaker_threshold: int = 5
     #: When true, every identity provider is called even after one answers
     #: fully, so their answers can be cross-checked. Doubles identity cost;
     #: worth it on a pilot or a sample audit, rarely on a full run.
@@ -157,6 +159,7 @@ def load_config(path: str | Path | None = None, *, demo: bool = False) -> Config
         retry=RetryPolicy(**(data.get("retry") or {})),
         budget=BudgetConfig(**(data.get("budget") or {})),
         concurrency=int(data.get("concurrency", 4)),
+        breaker_threshold=int(data.get("breaker_threshold", 5)),
         identity_corroboration=bool(data.get("identity_corroboration", False)),
         demo_mode=bool(data.get("demo_mode", False)) or demo,
         output_dir=data.get("output_dir", "out"),

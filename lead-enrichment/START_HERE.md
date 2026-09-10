@@ -24,10 +24,13 @@ Prefer the terminal? `python3 -m leadenrich.cli demo`
 cp .env.example .env      # run.sh does this for you on first launch
 ```
 
-Open `.env`, paste a key next to the right name, save. Then:
+Open `.env`, paste a key next to the right name, save. **Never paste a key into
+a chat window** — see [`CREDENTIALS.md`](CREDENTIALS.md) for where each one comes
+from. Then:
 
 ```bash
-python3 -m leadenrich.cli doctor
+python3 -m leadenrich.cli doctor    # what is configured, what is missing
+python3 -m leadenrich.cli verify    # one live call each — proves the keys work
 ```
 
 That prints exactly which providers are live, which are missing, and what each

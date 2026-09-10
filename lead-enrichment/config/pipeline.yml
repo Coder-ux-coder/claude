@@ -47,6 +47,8 @@ providers:
     credits_per_call: 1.0
     timeout: 30
     options:
+      # Documented ~100 req/min for person enrichment; plan-dependent.
+      rate_per_minute: 100
       reveal_personal_emails: false     # work email only, by design
       reveal_phone_number: false        # async + requires a public webhook URL
 
@@ -55,6 +57,9 @@ providers:
     api_key_env: PDL_API_KEY
     credits_per_call: 1.0
     options:
+      # No published figure. Deliberately conservative -- raise once you
+      # have seen your plan's actual headroom.
+      rate_per_minute: 60
       min_likelihood: 6                 # 1-10. Higher = fewer, better matches.
 
   enrichlayer:
@@ -72,29 +77,40 @@ providers:
     enabled: true
     api_key_env: PROSPEO_API_KEY
     credits_per_call: 1.0
-
+    options:
+      # Documented ~150 req/min.
+      rate_per_minute: 150
   findymail:
     enabled: true
     api_key_env: FINDYMAIL_API_KEY
     credits_per_call: 1.0
-
+    options:
+      # No published figure; conservative.
+      rate_per_minute: 60
   hunter:
     enabled: true
     api_key_env: HUNTER_API_KEY
     credits_per_call: 1.0
     options:
+      # Documented 15 req/s AND 500 req/min. Both are enforced.
+      rate_per_second: 15
+      rate_per_minute: 500
       max_duration: 10                  # documented range 3-20 seconds
 
   anymailfinder:
     enabled: true
     api_key_env: ANYMAILFINDER_API_KEY
     credits_per_call: 1.0
-
+    options:
+      # No published figure; conservative.
+      rate_per_minute: 60
   dropcontact:
     enabled: true
     api_key_env: DROPCONTACT_API_KEY
     credits_per_call: 1.0
     options:
+      # Async and slow per row; keep the pace gentle.
+      rate_per_minute: 30
       max_polls: 6
       poll_interval: 5.0
 
@@ -104,17 +120,23 @@ providers:
       client_id: SNOV_CLIENT_ID
       client_secret: SNOV_CLIENT_SECRET
     credits_per_call: 1.0
-
+    options:
+      # No published figure; conservative.
+      rate_per_minute: 60
   zerobounce:
     enabled: true
     api_key_env: ZEROBOUNCE_API_KEY
     credits_per_call: 1.0
-
+    options:
+      # Generous in practice, but pacing avoids burst 429s.
+      rate_per_minute: 300
   hunter_verifier:
     enabled: true
     api_key_env: HUNTER_API_KEY
     credits_per_call: 1.0
     options:
+      rate_per_second: 15
+      rate_per_minute: 500
       max_polls: 4
       poll_interval: 3.0
 
@@ -124,6 +146,9 @@ providers:
     # Phone and website are Enterprise-SKU fields (~$20/1,000, ~1,000 free/month).
     credits_per_call: 1.0
     options:
+      # Generous quota, but every call is billed -- pace it so a
+      # runaway loop cannot empty the budget in seconds.
+      rate_per_minute: 300
       region_code: IN
       region: IN
       max_results: 3
@@ -133,9 +158,16 @@ providers:
     credits_per_call: 0.0               # public pages, no vendor cost
     timeout: 20
     options:
-      max_pages: 3
+      # Politeness toward clinic websites, not a vendor limit. These are small
+      # practices; do not hammer them.
+      rate_per_minute: 30
+      max_pages: 4
       region: IN
       user_agent: "leadenrich-bot/1.0 (+public business contact lookup)"
+      # Real-world guards, all exercised by tests
+      max_bytes: 2000000        # stop reading a page after 2 MB
+      max_redirects: 5
+      follow_site_contact_link: true
 
 # ---- Email quality gate --------------------------------------------------
 # Deliverability and ownership are separate questions. An address must pass
@@ -181,6 +213,12 @@ budget:
     google_places: 2200      # Enterprise SKU -- watch this one
 
 concurrency: 4
+
+# Drop a provider from the run after this many consecutive PERMANENT failures
+# (bad key, exhausted plan). Transient errors never count -- that is what the
+# retry policy is for. A 401/402/403 trips immediately regardless: the key will
+# not become correct partway through a run.
+breaker_threshold: 5
 
 # Call every identity provider even after one answers fully, so their answers
 # can be cross-checked and disagreements surfaced. Roughly doubles identity

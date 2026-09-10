@@ -20,6 +20,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable
 
+from .breaker import FATAL_STATUSES, CircuitBreaker
 from .budget import Budget, BudgetExceeded
 from .config import Config
 from .httpclient import HttpClient
@@ -31,6 +32,7 @@ from .normalize import (canonical_linkedin_url, company_similarity, dedupe_key,
                         normalise_role, split_name)
 from .phone import select_exportable
 from .providers import registry
+from .ratelimit import LimiterRegistry
 from .store import Store
 from .validation import map_status, select_email
 
@@ -74,10 +76,33 @@ class Pipeline:
             max_estimated_credits=cfg.budget.max_estimated_credits,
             per_provider=dict(cfg.budget.per_provider))
         self.stats = RunStats()
+        self.limiters = LimiterRegistry()
+        self.breaker = CircuitBreaker(threshold=cfg.breaker_threshold)
         self._providers: dict[str, Any] = {}
         self._warnings: list[str] = []
 
     # ------------------------------------------------------------- helpers
+    def _update_breaker(self, name: str, result) -> None:
+        """Feed one call's outcome to the breaker.
+
+        Only *permanent* failures count. A transient error is what the retry
+        layer exists for, and tripping on it would disable a healthy provider
+        during a bad minute.
+        """
+        outcome = result.outcome
+        if outcome in (CallOutcome.HIT.value, CallOutcome.NO_MATCH.value):
+            self.breaker.record_success(name)
+            return
+        if outcome != CallOutcome.PERMANENT_ERROR.value:
+            return
+        status = result.http_status
+        if status in FATAL_STATUSES:
+            # These never resolve mid-run, so one is enough.
+            self.breaker.open_now(
+                name, f"HTTP {status}: {FATAL_STATUSES[status]}")
+        elif self.breaker.record_permanent_failure(name, result.detail):
+            pass
+
     def _provider(self, name: str):
         """Instantiate lazily and cache -- Snov's token cache depends on this."""
         if name not in self._providers:
@@ -130,7 +155,30 @@ class Pipeline:
             rec.log_call(call)
             return None, call
 
+        # A provider whose key is wrong or whose credits are gone will fail on
+        # every remaining row. Skip it rather than re-proving that 2,000 times.
+        if self.breaker.is_open(name):
+            call = ProviderCall(provider=name, stage=stage,
+                                outcome=CallOutcome.SKIPPED_PROVIDER_DOWN.value,
+                                started_at=time.time(),
+                                detail=f"provider disabled for this run: "
+                                       f"{self.breaker.reason(name)}")
+            rec.log_call(call)
+            return None, call
+
+        # Wait for the provider's published pace before calling. A 429 costs
+        # more than the wait does.
+        try:
+            self.limiters.for_provider(name, prov.cfg.options).acquire()
+        except TimeoutError as exc:
+            call = ProviderCall(provider=name, stage=stage,
+                                outcome=CallOutcome.TRANSIENT_ERROR.value,
+                                started_at=time.time(), detail=str(exc))
+            rec.log_call(call)
+            return None, call
+
         result, call = prov.execute(rec, ctx)
+        self._update_breaker(name, result)
         if call.estimated_credits:
             try:
                 self.budget.charge(name, call.estimated_credits)
@@ -471,6 +519,17 @@ class Pipeline:
             rec.stages_done.append("identity_check")
         return rec
 
+    def run_summary(self) -> dict[str, Any]:
+        """Spend, plus anything that changed how the run behaved."""
+        out = dict(self.budget.summary())
+        disabled = self.breaker.summary()
+        if disabled:
+            out["disabled_providers"] = disabled
+        waits = self.limiters.summary()
+        if waits:
+            out["rate_limit_waits"] = waits
+        return out
+
     @staticmethod
     def _key(rec: LeadRecord) -> str:
         return dedupe_key(rec.inp.linkedin_url, rec.name.value or rec.inp.full_name,
@@ -517,17 +576,17 @@ class Pipeline:
             if rec.needs_review():
                 self.stats.needs_review += 1
 
-            self.store.save_budget(self.run_id, self.budget.summary())
+            self.store.save_budget(self.run_id, self.run_summary())
             self.progress({
                 "event": "row_done", "index": idx, "total": self.stats.total,
                 "row_id": rec.inp.row_id, "name": rec.name.value or "",
                 "email": rec.email.value or "", "phone": rec.phone.value or "",
                 "review": rec.needs_review(),
                 "stats": self.stats.as_dict(),
-                "budget": self.budget.summary(),
+                "budget": self.run_summary(),
             })
 
-        self.store.save_budget(self.run_id, self.budget.summary())
+        self.store.save_budget(self.run_id, self.run_summary())
         return self.stats
 
 

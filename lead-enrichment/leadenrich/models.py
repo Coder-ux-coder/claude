@@ -100,6 +100,7 @@ class CallOutcome(str, Enum):
     SKIPPED_NO_CREDENTIALS = "skipped_no_credentials"
     SKIPPED_BUDGET = "skipped_budget"
     SKIPPED_INSUFFICIENT_INPUT = "skipped_insufficient_input"
+    SKIPPED_PROVIDER_DOWN = "skipped_provider_down"   # circuit breaker is open
 
 
 # --------------------------------------------------------------------------
