@@ -13,8 +13,10 @@ fi
 if [ ! -f .env ]; then
   cp .env.example .env
   echo
-  echo "  Created .env -- add your API keys there when you have them."
-  echo "  Until then, use the 'Run the demo' button to see how it works."
+  echo "  Created .env for your API keys."
+  echo "  To fill it in without editing files by hand, run:"
+  echo "      $PY -m leadenrich.cli keys"
+  echo "  Until then, the 'Run the demo' button works with no keys at all."
   echo
 fi
 

@@ -335,6 +335,162 @@ def cmd_smoke(args) -> int:
     return 0
 
 
+#: The keys worth asking for, in the order they earn their place. Each entry is
+#: (env var, provider, one-line reason, where to get it).
+KEY_PROMPTS = [
+    ("HUNTER_API_KEY", "Hunter.io",
+     "email finder AND verifier on one key", "hunter.io -> account menu -> API"),
+    ("GOOGLE_MAPS_API_KEY", "Google Places (New)",
+     "published clinic phone numbers",
+     "console.cloud.google.com -> enable Places API (New) -> Credentials"),
+    ("ZEROBOUNCE_API_KEY", "ZeroBounce",
+     "the validation gate", "zerobounce.net -> API"),
+    ("PROSPEO_API_KEY", "Prospeo",
+     "takes the LinkedIn URL directly", "prospeo.io -> Settings -> API"),
+    ("FINDYMAIL_API_KEY", "Findymail",
+     "bills only on a hit, so misses are free", "findymail.com -> Settings -> API"),
+    ("APOLLO_API_KEY", "Apollo.io",
+     "identity resolution (needs a PAID plan)",
+     "apollo.io -> Settings -> Integrations -> API"),
+    ("ANYMAILFINDER_API_KEY", "Anymail Finder", "extra tail coverage",
+     "anymailfinder.com -> API"),
+    ("DROPCONTACT_API_KEY", "Dropcontact", "extra tail coverage",
+     "dropcontact.com -> API & integrations"),
+    ("SNOV_CLIENT_ID", "Snov.io (user id)", "extra tail coverage",
+     "snov.io -> API"),
+    ("SNOV_CLIENT_SECRET", "Snov.io (secret)", "the matching secret",
+     "snov.io -> API"),
+    ("GOOGLE_SHEETS_CREDENTIALS_FILE", "Google Sheets",
+     "full path to the service-account JSON file (optional)",
+     "Cloud Console -> Credentials -> Service account -> Keys"),
+    ("GOOGLE_SHEET_ID", "Google Sheets",
+     "the long id from your sheet's URL (optional)", "the spreadsheet URL"),
+]
+
+#: Asked for by default. The rest need --all, so a first run is four questions,
+#: not twelve.
+ESSENTIAL = {"HUNTER_API_KEY", "GOOGLE_MAPS_API_KEY", "ZEROBOUNCE_API_KEY",
+             "PROSPEO_API_KEY"}
+
+
+def _read_env_file(path: Path) -> dict[str, str]:
+    values: dict[str, str] = {}
+    if not path.exists():
+        return values
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            k, _, v = line.partition("=")
+            values[k.strip()] = v.strip()
+    return values
+
+
+def _write_env_file(path: Path, values: dict[str, str]) -> None:
+    """Write .env with owner-only permissions.
+
+    The mode matters: a world-readable file of API keys on a shared machine is
+    the same mistake as committing them, just quieter.
+    """
+    lines = [
+        "# lead-enrichment credentials.",
+        "# Written by `leadenrich keys`. Git-ignored -- never commit this file,",
+        "# and never paste these values into a chat window or an issue.",
+        "",
+    ]
+    for var, provider, why, _where in KEY_PROMPTS:
+        val = values.get(var, "")
+        lines.append(f"# {provider} -- {why}")
+        lines.append(f"{var}={val}")
+        lines.append("")
+    for k, v in sorted(values.items()):
+        if k not in {p[0] for p in KEY_PROMPTS}:
+            lines.append(f"{k}={v}")
+    path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+    try:
+        path.chmod(0o600)
+    except OSError:
+        pass
+
+
+def _mask(value: str) -> str:
+    """Show enough to recognise a key, never enough to use it."""
+    if not value:
+        return ""
+    if len(value) <= 8:
+        return "*" * len(value)
+    return value[:4] + "*" * (len(value) - 8) + value[-4:]
+
+
+def cmd_keys(args) -> int:
+    """Ask for each key and write .env, so nobody has to create it by hand."""
+    import getpass
+
+    path = Path(args.env)
+    existing = _read_env_file(path)
+
+    if args.show:
+        print(bold(f"\n  Keys in {path}\n"))
+        if not path.exists():
+            print(yellow("    no .env yet -- run: python3 -m leadenrich.cli keys"))
+            return 0
+        for var, provider, _why, _w in KEY_PROMPTS:
+            val = existing.get(var, "")
+            mark = green("set  ") if val else dim("empty")
+            print(f"    {mark} {var:<32} {dim(_mask(val))}")
+        print()
+        return 0
+
+    wanted = KEY_PROMPTS if args.all else [
+        k for k in KEY_PROMPTS if k[0] in ESSENTIAL]
+
+    print(bold(f"\n  Setting up {path}\n"))
+    print("  Paste each key and press Enter. Press Enter on its own to skip"
+          " (or keep\n  what is already there). Typing is hidden -- that is"
+          " normal, keep pasting.\n")
+    if not args.all:
+        print(dim("  Asking only for the keys that matter first. "
+                  "Use --all for every provider.\n"))
+
+    updated = dict(existing)
+    changed = 0
+    try:
+        for var, provider, why, where in wanted:
+            current = existing.get(var, "")
+            print(bold(f"  {provider}") + dim(f"  —  {why}"))
+            print(dim(f"    get it: {where}"))
+            if current:
+                print(dim(f"    currently set ({_mask(current)}); "
+                          f"Enter keeps it"))
+            try:
+                entered = getpass.getpass(f"    {var} = ").strip()
+            except (EOFError, KeyboardInterrupt):
+                raise
+            if entered:
+                updated[var] = entered
+                changed += 1
+                print(green("    saved"))
+            elif current:
+                print(dim("    kept"))
+            else:
+                print(dim("    skipped"))
+            print()
+    except (KeyboardInterrupt, EOFError):
+        print(yellow("\n  Stopped. Nothing was written."))
+        return 130
+
+    _write_env_file(path, updated)
+    filled = sum(1 for v in updated.values() if v)
+    print(bold("  Done"))
+    print(f"    wrote {path}  ({filled} key(s) set, {changed} changed this time)")
+    print(dim("    file permissions set to owner-only"))
+    print()
+    print("  Next:")
+    print(f"    python3 -m leadenrich.cli doctor    {dim('# what is configured')}")
+    print(f"    python3 -m leadenrich.cli verify    {dim('# prove the keys work')}")
+    print()
+    return 0
+
+
 def cmd_verify(args) -> int:
     """Make one real call per configured provider and report what came back.
 
@@ -548,6 +704,13 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--email", default=None, help="for validation providers")
     s.set_defaults(func=cmd_smoke)
 
+    k = sub.add_parser("keys", help="create .env and paste your API keys in")
+    k.add_argument("--all", action="store_true",
+                   help="ask for every provider, not just the essential four")
+    k.add_argument("--show", action="store_true",
+                   help="list which keys are set (masked), without changing anything")
+    k.set_defaults(func=cmd_keys)
+
     v2 = sub.add_parser("verify", help="one live call per provider; confirms your keys")
     v2.add_argument("--linkedin-url",
                     default="https://www.linkedin.com/in/williamhgates")
@@ -566,7 +729,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 SUBCOMMANDS = {"run", "demo", "resume", "export", "review", "doctor", "runs",
-               "smoke", "verify", "ui"}
+               "smoke", "verify", "keys", "ui"}
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -21,12 +21,15 @@ Prefer the terminal? `python3 -m leadenrich.cli demo`
 ## 2. Add your keys, when you have them
 
 ```bash
-cp .env.example .env      # run.sh does this for you on first launch
+python3 -m leadenrich.cli keys
 ```
 
-Open `.env`, paste a key next to the right name, save. **Never paste a key into
-a chat window** — see [`CREDENTIALS.md`](CREDENTIALS.md) for where each one comes
-from. Then:
+That asks for each key in turn and writes `.env` for you — no file editing, no
+hunting for the right variable name. Press Enter to skip any you do not have
+yet, and run it again later to add more. Typing is hidden, which is normal.
+
+**Never paste a key into a chat window** — see [`CREDENTIALS.md`](CREDENTIALS.md)
+for where each one comes from. Then:
 
 ```bash
 python3 -m leadenrich.cli doctor    # what is configured, what is missing

@@ -254,3 +254,63 @@ def test_path_flag_given_first_is_not_reset_by_the_subparser(tmp_path):
     assert rc == 0
     assert seen["out"] == str(tmp_path)
     assert seen["demo"] is True
+
+
+# --------------------------------------------------------------- env file ---
+
+def test_env_file_round_trips_values(tmp_path):
+    from leadenrich.cli import _read_env_file, _write_env_file
+    path = tmp_path / ".env"
+    _write_env_file(path, {"HUNTER_API_KEY": "abc123", "PROSPEO_API_KEY": ""})
+    back = _read_env_file(path)
+    assert back["HUNTER_API_KEY"] == "abc123"
+    assert back["PROSPEO_API_KEY"] == ""
+
+
+def test_env_file_is_written_owner_only(tmp_path):
+    """A world-readable file of API keys is the same mistake as committing them."""
+    import stat
+    from leadenrich.cli import _write_env_file
+    path = tmp_path / ".env"
+    _write_env_file(path, {"HUNTER_API_KEY": "secret"})
+    mode = stat.S_IMODE(path.stat().st_mode)
+    assert mode == 0o600, f"expected owner-only, got {oct(mode)}"
+
+
+def test_env_file_preserves_unknown_variables(tmp_path):
+    """Someone's own extra variable must survive a re-run of the wizard."""
+    from leadenrich.cli import _read_env_file, _write_env_file
+    path = tmp_path / ".env"
+    path.write_text("MY_OWN_THING=keepme\nHUNTER_API_KEY=old\n", encoding="utf-8")
+    values = _read_env_file(path)
+    values["HUNTER_API_KEY"] = "new"
+    _write_env_file(path, values)
+    back = _read_env_file(path)
+    assert back["MY_OWN_THING"] == "keepme"
+    assert back["HUNTER_API_KEY"] == "new"
+
+
+def test_comments_and_blank_lines_are_ignored_when_reading(tmp_path):
+    from leadenrich.cli import _read_env_file
+    path = tmp_path / ".env"
+    path.write_text("# a comment\n\nHUNTER_API_KEY=abc\n  \n", encoding="utf-8")
+    assert _read_env_file(path) == {"HUNTER_API_KEY": "abc"}
+
+
+@pytest.mark.parametrize("value,expected", [
+    ("abcd1234efgh", "abcd****efgh"),
+    ("short", "*****"),
+    ("", ""),
+])
+def test_masking_shows_enough_to_recognise_never_enough_to_use(value, expected):
+    from leadenrich.cli import _mask
+    assert _mask(value) == expected
+
+
+def test_every_prompted_key_exists_in_the_env_template():
+    """The wizard and the template must not drift apart."""
+    from pathlib import Path
+    from leadenrich.cli import KEY_PROMPTS
+    template = (Path(__file__).resolve().parents[1] / ".env.example").read_text()
+    for var, *_rest in KEY_PROMPTS:
+        assert var in template, f"{var} is prompted for but missing from .env.example"

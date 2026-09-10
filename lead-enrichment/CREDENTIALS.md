@@ -13,10 +13,16 @@ provider here has a "regenerate key" button, and it takes ten seconds.
 
 ```bash
 cd lead-enrichment
-cp .env.example .env      # run.sh does this for you on first launch
+python3 -m leadenrich.cli keys
 ```
 
-Open `.env` in any text editor, paste each key after its `=`, save. Then:
+That prompts for each key and writes `.env` for you, with owner-only file
+permissions. Press Enter to skip anything you do not have yet; run it again
+later to add more. `keys --all` asks for every provider, `keys --show` lists
+which are set (masked).
+
+Prefer editing the file yourself? `cp .env.example .env` and fill in the blanks.
+Either way, then:
 
 ```bash
 python3 -m leadenrich.cli doctor    # what is configured, what is missing
