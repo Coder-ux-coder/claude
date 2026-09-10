@@ -78,14 +78,31 @@ That is your real labour cost, and it is why input columns matter so much.
 ### 5 · Deliver
 
 ```bash
-python3 -m leadenrich.cli export <run-id> --sheet --sheet-id <ID>
+python3 -m leadenrich.cli deliver <run-id> --client "Acme Clinics" --operator "Your Name"
 ```
 
-Send the client **the delivery file only**. Keep the audit file yourself — it is
-your evidence if a value is ever challenged, and it is the thing that lets you
-answer "where did this come from?" in ten seconds instead of an afternoon.
+That writes `out/<run-id>_handover/` and a zip beside it, holding five files:
+`Leads.csv`, `Needs-review.csv`, `Audit-trail.csv`, a cover `README.md` and a
+`Data-dictionary.md`. Send the folder. Nothing else needs writing.
 
-Include one paragraph with the delivery, every time:
+Two decisions are already made for you inside it, and both are worth
+understanding before a client asks.
+
+**The audit file goes with the delivery, not in your drawer.** The older advice
+— keep the evidence, send only the list — protects you and nobody else. Handing
+over the source URL, provider and check date against every value converts a
+spreadsheet anyone could have bought into a defensible record, and it makes the
+one question that ends most freelance relationships ("where did this come
+from?") answerable by the client themselves, in ten seconds.
+
+**The cover note reports the blanks, not just the fills.** It lists how many
+Email cells are empty because the domain was catch-all, how many because only a
+shared `info@` existed, and how many numbers were withheld for having no public
+evidence. Volunteering that reads as confidence, because a supplier who is
+hiding a weak fill rate does not itemise it. It also forecloses the argument
+where a client reads a blank cell as work not done.
+
+Add one paragraph in the covering email, every time:
 
 > *N rows delivered. Email filled on X%, phone on Y%. Phone numbers are business
 > lines published by each clinic, with the source URL and check date recorded
@@ -95,6 +112,11 @@ Include one paragraph with the delivery, every time:
 
 That last clause costs you almost nothing and reliably turns a complaint into a
 second batch.
+
+If the engagement is for the *pipeline* rather than a list, `./package.sh` builds
+`dist/lead-enrichment-<date>.zip` — code, tests, blueprints and documentation,
+with `.env`, run databases and caches excluded and a credential scan that refuses
+to seal the archive if anything key-shaped survived.
 
 ---
 
@@ -175,6 +197,8 @@ reliably produces.
 | `leadenrich resume <run-id>` | Continue after an interruption |
 | `leadenrich review <run-id>` | Work the review queue |
 | `leadenrich export <run-id> --sheet --sheet-id <ID>` | Re-export, push to Sheets |
+| `leadenrich deliver <run-id> --client "Name"` | Build the client handover folder and zip |
+| `./package.sh` | Package the system itself for handover |
 | `leadenrich runs` | List previous runs |
 
 Prefix with `python3 -m leadenrich.cli` (or install the package and use

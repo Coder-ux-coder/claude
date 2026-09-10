@@ -161,10 +161,51 @@ no key is **skipped, not failed** — so one provider is enough to start.
 
 ---
 
+## Delivering
+
+`export` writes the operator's four files. `deliver` turns a finished run into
+something you can actually send:
+
+```bash
+python3 -m leadenrich.cli deliver <run-id> --client "Acme Clinics" --operator "Your Name"
+```
+
+```
+out/<run-id>_handover/
+  Leads.csv           the six requested columns
+  Needs-review.csv    every flagged row, with the reason and what to do
+  Audit-trail.csv     37 columns: provider, source URL, check timestamp, contact type
+  README.md           cover note — coverage computed from the run, not typed by hand
+  Data-dictionary.md  what every column and every phone label means
+out/<run-id>_handover.zip
+```
+
+The cover note is the part that earns repeat work. It states the fill rate per
+column, breaks the Phone column down by *kind of line*, and then lists **why each
+blank cell is blank** — catch-all domain, shared mailbox, no published number —
+with counts. A withheld provider-supplied mobile is counted and explained there,
+never silently dropped, so the client can see there was nothing lawful to give
+rather than assuming you missed it. See
+[`samples/handover-example/`](samples/handover-example/).
+
+`deliver` refuses a half-finished run unless you pass `--force`, because a fill
+rate computed over rows that were never attempted reads to a client as coverage.
+
+To hand over the **system** rather than a list:
+
+```bash
+./package.sh      # dist/lead-enrichment-<date>.zip
+```
+
+That excludes `.env`, run databases and caches, and then greps the staged copy
+for credential-shaped strings — refusing to seal the archive if it finds one.
+
+---
+
 ## Tests
 
 ```bash
-python3 -m pytest          # 194 tests, no network, no credentials
+python3 -m pytest          # 281 tests, no network, no credentials
 ```
 
 | Suite | Proves |
@@ -181,6 +222,8 @@ python3 -m pytest          # 194 tests, no network, no credentials
 | `test_normalize.py` | Slug parsing, domains, role seniority, similarity measures |
 | `test_resilience.py` | Rate-limit pacing exactly matches published limits; the breaker drops a dead provider but never a merely flaky one |
 | `test_webfetch.py` | Every real-world page failure: lying charsets, PDFs, oversized pages, JS walls, redirect loops, timeouts |
+| `test_handover.py` | The client bundle: fill rates counted not estimated, duplicates out of every denominator, every blank cell explained by the gate that refused it, a withheld number counted but never printed, and packaging that refuses to seal an archive containing a credential |
+| `test_web_handover.py` | The browser route that builds the bundle: the same partial-run guard as the CLI, and a demo run stamped fictional whichever path built it |
 | `test_website_integration.py` | **No mocked transport** — the provider runs over a real socket against a realistic clinic site, honours robots.txt, follows the site's own "Reach Us" link, and picks a doctor's published direct line over the switchboard |
 
 ---
@@ -194,6 +237,7 @@ python3 -m pytest          # 194 tests, no network, no credentials
 | [`docs/OPERATOR_PLAYBOOK.md`](docs/OPERATOR_PLAYBOOK.md) | Pilot → measure → price → deliver → QA |
 | [`docs/COMPLIANCE.md`](docs/COMPLIANCE.md) | DPDP Act, TCCCPR, and the phone-policy reasoning |
 | [`docs/CLIENT_REPLY.md`](docs/CLIENT_REPLY.md) | Ready-to-send proposal with a sample |
+| [`samples/handover-example/`](samples/handover-example/) | What the client actually receives — cover note, data dictionary, and the three CSVs, built from the demo fixtures |
 
 ---
 

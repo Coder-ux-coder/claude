@@ -47,6 +47,36 @@
   </form>
 </div>
 
+<div class="panel">
+  <h2 style="margin-top:0">Build the client handover</h2>
+  <p class="small muted" style="margin-top:4px">
+    One zip holding the six-column <code>Leads.csv</code>, the review list, the full
+    audit trail, a data dictionary, and a cover note whose coverage table — including
+    a count of every blank cell and the reason it is blank — is computed from this
+    run. This is the thing you send.
+  </p>
+  <form method="post" action="{{ url_for('handover', run_id=run_id) }}"
+        style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end">
+    <div style="flex:1 1 260px">
+      <label for="client" style="margin-top:0">Client name</label>
+      <input type="text" name="client" id="client" placeholder="appears on the cover note">
+    </div>
+    <div style="flex:1 1 200px">
+      <label for="operator" style="margin-top:0">Your name</label>
+      <input type="text" name="operator" id="operator" placeholder="for the sign-off">
+    </div>
+    <button class="primary" type="submit">Download handover zip</button>
+    {% if counts.get('pending', 0) or counts.get('in_progress', 0) %}
+    <label class="small muted" style="flex:1 1 100%; margin-top:6px">
+      <input type="checkbox" name="force" value="1" style="width:auto">
+      Package anyway, with
+      {{ counts.get('pending', 0) + counts.get('in_progress', 0) }} row(s) still
+      unprocessed — the fill rates will be computed over rows that were never tried.
+    </label>
+    {% endif %}
+  </form>
+</div>
+
 {% if review %}
 <h2>Needs a human — {{ review | length }} row{{ 's' if review|length != 1 }}</h2>
 <div class="panel" style="padding:6px 0">

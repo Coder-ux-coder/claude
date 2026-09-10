@@ -85,6 +85,19 @@ Three files, every time:
 | `*_audit.csv` | Every source URL, provider, timestamp, validator verdict, contact type | You. Your proof if anything is queried. |
 | `*_review.csv` | Rows that need a human, each with a suggested action | You, before you deliver. |
 
+When the run is finished and you have worked the review queue, one command turns
+it into the folder you actually send:
+
+```bash
+python3 -m leadenrich.cli deliver <run-id> --client "Their Company" --operator "Your Name"
+```
+
+You get `out/<run-id>_handover/` (and a zip) holding the six-column `Leads.csv`,
+the review list, the full audit trail, a data dictionary, and a cover note whose
+coverage table is computed from the run — including a count of every blank cell
+and the reason it is blank. See [`samples/handover-example/`](samples/handover-example/)
+for exactly what lands in a client's inbox.
+
 ## Two things to know before you sell this
 
 **1. A LinkedIn URL alone is a weak input.** Proxycurl — the tool everyone used

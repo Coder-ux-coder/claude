@@ -4,6 +4,7 @@
     leadenrich run leads.csv            enrich a CSV
     leadenrich resume <run-id>          continue an interrupted run
     leadenrich export <run-id>          re-export without re-enriching
+    leadenrich deliver <run-id>         build the client handover bundle
     leadenrich review <run-id>          show what needs a human
     leadenrich doctor                   what is configured, what is missing
     leadenrich smoke --provider hunter  one live call, printed raw
@@ -198,6 +199,66 @@ def _push_sheet(cfg, store, run_id, args) -> None:
         print(yellow(f"  Google Sheets export skipped: {res.message}"))
         if res.service_account_email:
             print(dim(f"    share the sheet with {res.service_account_email} as Editor"))
+
+
+def cmd_deliver(args) -> int:
+    """Assemble the folder that actually gets sent to the client."""
+    from .handover import build_handover
+
+    load_dotenv(args.env)
+    cfg = load_config(args.config, demo=args.demo)
+    store = _store(args)
+    run = store.get_run(args.run_id)
+    if not run:
+        print(red(f"unknown run: {args.run_id}"))
+        return 2
+
+    records = store.all_rows(args.run_id)
+    if not records:
+        print(red(f"run {args.run_id} has no rows"))
+        return 2
+
+    pending = len(store.pending_rows(args.run_id))
+    if pending and not args.force:
+        print(red(f"  {pending} row(s) still unprocessed."))
+        print("  Finish the run first:")
+        print(f"    python3 -m leadenrich.cli resume {args.run_id}")
+        print(dim("  ...or pass --force to package a partial run anyway."))
+        return 2
+
+    res = build_handover(
+        records, run_id=args.run_id, outdir=_outdir(cfg, args),
+        client=args.client, operator=args.operator, demo=bool(args.demo),
+        label_contact_type=cfg.phone_policy.export_contact_type_label,
+        make_zip=not args.no_zip)
+
+    s = res.stats
+    print()
+    print(bold("  Handover bundle ready"))
+    print(f"    folder : {res.directory}")
+    if res.zip_path:
+        print(f"    zip    : {res.zip_path}")
+    print()
+    for name in (f.name for f in res.files):
+        print(dim(f"      {name}"))
+    print()
+    print(f"  {s['rows_delivered']} row(s) delivered"
+          + (f", {s['duplicates_removed']} duplicate(s) removed"
+             if s["duplicates_removed"] else "")
+          + (f", {s['rows_needing_review']} flagged for review"
+             if s["rows_needing_review"] else ""))
+    if args.demo:
+        print()
+        print(yellow("  DEMO bundle -- fictional data. The cover note says so; "
+                     "leave that banner in place."))
+    print()
+    print(bold("  Before you send it:"))
+    print("    1. Open README.md and read the coverage table aloud. If any number "
+          "surprises you, investigate before the client does.")
+    print("    2. Spot-check five rows against Audit-trail.csv -- open the source "
+          "URL and confirm the value is on the page.")
+    print("    3. Confirm no .env, no API key and no internal note is in the folder.")
+    return 0
 
 
 def cmd_review(args) -> int:
@@ -685,6 +746,15 @@ def build_parser() -> argparse.ArgumentParser:
     e.add_argument("run_id")
     add_sheet_flags(e)
     e.set_defaults(func=cmd_export)
+
+    dl = sub.add_parser("deliver", help="build the client handover bundle")
+    dl.add_argument("run_id")
+    dl.add_argument("--client", default="", help="client name for the cover note")
+    dl.add_argument("--operator", default="", help="your name, for the sign-off")
+    dl.add_argument("--no-zip", action="store_true", help="folder only, no archive")
+    dl.add_argument("--force", action="store_true",
+                    help="package even if rows are still unprocessed")
+    dl.set_defaults(func=cmd_deliver)
 
     v = sub.add_parser("review", help="show rows that need a human")
     v.add_argument("run_id")

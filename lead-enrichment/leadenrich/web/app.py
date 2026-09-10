@@ -202,6 +202,39 @@ def create_app(config_path: str | None = None, data_dir: str = "data",
         return send_file(paths[kind].resolve(), as_attachment=True,
                          download_name=paths[kind].name)
 
+    @app.route("/handover/<run_id>", methods=["POST"])
+    def handover(run_id: str):
+        """Build the folder that gets sent to the client, and hand back the zip."""
+        from ..handover import build_handover
+
+        configuration = cfg()
+        st = store()
+        records = st.all_rows(run_id)
+        if not records:
+            return redirect(url_for("run_page", run_id=run_id))
+
+        pending = len(st.pending_rows(run_id))
+        if pending and not request.form.get("force"):
+            # A fill rate computed over rows that were never attempted reads to
+            # a client as coverage. Make the operator say they meant it.
+            return render_template(
+                "error.html",
+                title="Run not finished",
+                message=(f"{pending} row(s) have not been processed yet. Finish the "
+                         "run first, or tick 'package anyway' if you deliberately "
+                         "want a partial bundle."),
+                back=url_for("run_page", run_id=run_id),
+                back_label="Back to the run"), 409
+
+        res = build_handover(
+            records, run_id=run_id, outdir=configuration.output_dir,
+            client=request.form.get("client", "").strip(),
+            operator=request.form.get("operator", "").strip(),
+            demo=bool(configuration.demo_mode),
+            label_contact_type=configuration.phone_policy.export_contact_type_label)
+        return send_file(res.zip_path.resolve(), as_attachment=True,
+                         download_name=res.zip_path.name)
+
     @app.route("/sheet/<run_id>", methods=["POST"])
     def push_sheet(run_id: str):
         from ..sheets import export_to_sheet
