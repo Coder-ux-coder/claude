@@ -1,0 +1,9 @@
+LinkedIn URL,Name,Clinic,Domain,Location,Notes
+https://www.linkedin.com/in/dr-anaya-varma-demo1,,,,"Bengaluru, India",provider A finds the email
+https://www.linkedin.com/in/rohan-desai-demo2,,,,"Mumbai, India",A misses; B finds it
+https://www.linkedin.com/in/dr-kavya-nair-demo3,,,,"Kochi, India",A and B miss; C finds it
+https://www.linkedin.com/in/sanjay-iyer-demo4,,,,"Pune, India",A fails transiently then B returns a catch-all the gate refuses
+https://www.linkedin.com/in/dr-meera-joshi-demo5,,,,"Jaipur, India",role mailbox refused; direct line published on the website
+https://www.linkedin.com/in/arjun-menon-demo6,,,,"Chennai, India",no provider has an email - clean no_match
+https://www.linkedin.com/in/unknown-person-demo7,,,,"Delhi, India",identity unresolved - goes to review
+https://www.linkedin.com/in/dr-anaya-varma-demo1,,,,"Bengaluru, India",duplicate of row 1

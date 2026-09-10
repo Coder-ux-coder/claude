@@ -1,0 +1,4 @@
+row_id,linkedin_url,input_name,input_clinic,input_domain,input_location,status,name,role,clinic,domain,identity_provider,email,email_provider,email_source,email_validator,email_validator_status,email_validator_sub,email_decision,phone,phone_type,phone_source_url,phone_decision,place_id,website,review_reason,checked_at,delivery_phone,delivery_email,delivery_source,deliverable,review_action
+L-0001,https://www.linkedin.com/in/dr-anaya-varma-demo1,Dr Anaya Varma,Meridian Skin Clinic,meridianskin.example,"Bengaluru, Karnataka",pending,,,,,,,,,,,,,,,,,,,,,,,,,
+L-0002,https://www.linkedin.com/in/rohan-desai-demo2,Rohan Desai,Blue Harbour Dental,,"Mumbai, Maharashtra",pending,,,,,,,,,,,,,,,,,,,,,,,,,
+L-0003,https://www.linkedin.com/in/dr-kavya-nair-demo3,,Aurora Eye Care,,"Kochi, Kerala",pending,,,,,,,,,,,,,,,,,,,,,,,,,

@@ -1,0 +1,424 @@
+{
+  "name": "Clinic Leads · 2 · Validate, Phone & Deliver",
+  "flow": [
+    {
+      "id": 1,
+      "module": "google-sheets:filterRows",
+      "version": 2,
+      "parameters": {
+        "__IMTCONN__": null
+      },
+      "mapper": {
+        "from": "drive",
+        "spreadsheetId": "{{SPREADSHEET_ID}}",
+        "sheetId": "Leads",
+        "includesHeaders": false,
+        "tableFirstRow": "A1:BZ1",
+        "filter": [
+          [
+            {
+              "a": "G",
+              "b": "email_done",
+              "o": "text:equal"
+            }
+          ]
+        ],
+        "sortOrder": "asc",
+        "limit": 100,
+        "valueRenderOption": "FORMATTED_VALUE",
+        "dateTimeRenderOption": "FORMATTED_STRING"
+      },
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0
+        },
+        "restore": {},
+        "expect": []
+      }
+    },
+    {
+      "id": 2,
+      "module": "util:SetVariables",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "scope": "roundtrip",
+        "variables": [
+          {
+            "name": "email",
+            "value": "{{1.12}}"
+          },
+          {
+            "name": "email_provider",
+            "value": "{{1.13}}"
+          },
+          {
+            "name": "email_source",
+            "value": "{{1.14}}"
+          },
+          {
+            "name": "clinic",
+            "value": "{{1.9}}"
+          },
+          {
+            "name": "location",
+            "value": "{{1.5}}"
+          }
+        ]
+      },
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 0
+        },
+        "restore": {},
+        "expect": []
+      }
+    },
+    {
+      "id": 3,
+      "module": "http:ActionSendData",
+      "version": 3,
+      "parameters": {
+        "handleErrors": true,
+        "useNewZLibDeCompress": true
+      },
+      "mapper": {
+        "url": "https://api.zerobounce.net/v2/validate",
+        "serializeUrl": false,
+        "method": "get",
+        "headers": [],
+        "qs": [
+          {
+            "name": "api_key",
+            "value": "{{ZEROBOUNCE_API_KEY}}"
+          },
+          {
+            "name": "email",
+            "value": "{{2.email}}"
+          },
+          {
+            "name": "ip_address",
+            "value": ""
+          }
+        ],
+        "parseResponse": true,
+        "authUser": "",
+        "authPass": "",
+        "timeout": 40,
+        "shareCookies": false,
+        "ca": "",
+        "rejectUnauthorized": true,
+        "followRedirect": true,
+        "useQuerystring": false,
+        "gzip": true,
+        "useMtls": false,
+        "followAllRedirects": false
+      },
+      "metadata": {
+        "designer": {
+          "x": 600,
+          "y": 0
+        },
+        "restore": {},
+        "expect": []
+      },
+      "onerror": [
+        {
+          "id": 40,
+          "module": "builtin:Resume",
+          "version": 1,
+          "parameters": {},
+          "mapper": {},
+          "metadata": {
+            "designer": {
+              "x": 600,
+              "y": 150
+            },
+            "restore": {},
+            "expect": []
+          }
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "module": "util:SetVariables",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "scope": "roundtrip",
+        "variables": [
+          {
+            "name": "email_deliverability",
+            "value": "{{switch(3.data.status; \"valid\"; \"deliverable\"; \"invalid\"; \"undeliverable\"; \"catch-all\"; \"risky_catch_all\"; \"unknown\"; \"risky_unknown\"; \"spamtrap\"; \"do_not_mail\"; \"abuse\"; \"do_not_mail\"; \"do_not_mail\"; \"do_not_mail\"; \"risky_unknown\")}}"
+          },
+          {
+            "name": "email_accepted",
+            "value": "{{if(length(2.email) = 0; false; if(contains(\",info,contact,admin,office,hello,help,support,sales,enquiry,enquiries,inquiry,reception,appointments,care,team,mail,clinic,frontdesk,billing,accounts,hr,noreply,no-reply,webmaster,postmaster,\"; \",\" + lower(first(split(2.email; \"@\"))) + \",\"); false; if(3.data.status = \"valid\"; true; false)))}}"
+          },
+          {
+            "name": "email_decision",
+            "value": "{{if(length(2.email) = 0; \"no_match\"; if(contains(\",info,contact,admin,office,hello,help,support,sales,enquiry,enquiries,inquiry,reception,appointments,care,team,mail,clinic,frontdesk,billing,accounts,hr,noreply,no-reply,webmaster,postmaster,\"; \",\" + lower(first(split(2.email; \"@\"))) + \",\"); \"refused_role_mailbox\"; if(3.data.status = \"valid\"; \"accepted\"; \"refused_\" + ifempty(3.data.status; \"not_validated\"))))}}"
+          },
+          {
+            "name": "validator_status",
+            "value": "{{ifempty(3.data.status; \"not_validated\")}}"
+          },
+          {
+            "name": "validator_sub",
+            "value": "{{ifempty(3.data.sub_status; \"\")}}"
+          }
+        ]
+      },
+      "metadata": {
+        "designer": {
+          "x": 900,
+          "y": 0
+        },
+        "restore": {},
+        "expect": []
+      }
+    },
+    {
+      "id": 5,
+      "module": "http:ActionSendData",
+      "version": 3,
+      "parameters": {
+        "handleErrors": true,
+        "useNewZLibDeCompress": true
+      },
+      "mapper": {
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "serializeUrl": false,
+        "method": "post",
+        "headers": [
+          {
+            "name": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "name": "X-Goog-Api-Key",
+            "value": "{{GOOGLE_MAPS_API_KEY}}"
+          },
+          {
+            "name": "X-Goog-FieldMask",
+            "value": "places.id,places.displayName,places.formattedAddress"
+          }
+        ],
+        "qs": [],
+        "parseResponse": true,
+        "authUser": "",
+        "authPass": "",
+        "timeout": 40,
+        "shareCookies": false,
+        "ca": "",
+        "rejectUnauthorized": true,
+        "followRedirect": true,
+        "useQuerystring": false,
+        "gzip": true,
+        "useMtls": false,
+        "followAllRedirects": false,
+        "bodyType": "raw",
+        "contentType": "application/json",
+        "data": "{\"textQuery\":\"{{2.clinic}} {{2.location}}\",\"regionCode\":\"IN\",\"maxResultCount\":3}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 1200,
+          "y": 0
+        },
+        "restore": {},
+        "expect": []
+      },
+      "onerror": [
+        {
+          "id": 41,
+          "module": "builtin:Resume",
+          "version": 1,
+          "parameters": {},
+          "mapper": {},
+          "metadata": {
+            "designer": {
+              "x": 1200,
+              "y": 150
+            },
+            "restore": {},
+            "expect": []
+          }
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "module": "http:ActionSendData",
+      "version": 3,
+      "parameters": {
+        "handleErrors": true,
+        "useNewZLibDeCompress": true
+      },
+      "mapper": {
+        "url": "https://places.googleapis.com/v1/places/{{5.data.places[1].id}}",
+        "serializeUrl": false,
+        "method": "get",
+        "headers": [
+          {
+            "name": "X-Goog-Api-Key",
+            "value": "{{GOOGLE_MAPS_API_KEY}}"
+          },
+          {
+            "name": "X-Goog-FieldMask",
+            "value": "id,displayName,formattedAddress,internationalPhoneNumber,nationalPhoneNumber,websiteUri,googleMapsUri"
+          }
+        ],
+        "qs": [],
+        "parseResponse": true,
+        "authUser": "",
+        "authPass": "",
+        "timeout": 40,
+        "shareCookies": false,
+        "ca": "",
+        "rejectUnauthorized": true,
+        "followRedirect": true,
+        "useQuerystring": false,
+        "gzip": true,
+        "useMtls": false,
+        "followAllRedirects": false
+      },
+      "metadata": {
+        "designer": {
+          "x": 1500,
+          "y": 0
+        },
+        "restore": {},
+        "expect": []
+      },
+      "onerror": [
+        {
+          "id": 42,
+          "module": "builtin:Resume",
+          "version": 1,
+          "parameters": {},
+          "mapper": {},
+          "metadata": {
+            "designer": {
+              "x": 1500,
+              "y": 150
+            },
+            "restore": {},
+            "expect": []
+          }
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "module": "util:SetVariables",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "scope": "roundtrip",
+        "variables": [
+          {
+            "name": "phone_e164",
+            "value": "{{replace(replace(ifempty(6.data.internationalPhoneNumber; \"\"); \" \"; \"\"); \"-\"; \"\")}}"
+          },
+          {
+            "name": "phone_type",
+            "value": "{{if(ifempty(6.data.internationalPhoneNumber; \"\") = \"\"; \"\"; if(contains(\"6789\"; substring(replace(replace(ifempty(6.data.nationalPhoneNumber; \"0\"); \" \"; \"\"); \"-\"; \"\"); 0; 1)); \"business mobile (published)\"; \"clinic main line (published)\"))}}"
+          },
+          {
+            "name": "phone_source_url",
+            "value": "{{ifempty(6.data.googleMapsUri; \"\")}}"
+          },
+          {
+            "name": "phone_accepted",
+            "value": "{{if(ifempty(6.data.internationalPhoneNumber; \"\") = \"\"; false; if(ifempty(6.data.googleMapsUri; \"\") = \"\"; false; true))}}"
+          },
+          {
+            "name": "phone_decision",
+            "value": "{{if(ifempty(6.data.internationalPhoneNumber; \"\") = \"\"; \"no_published_number\"; if(ifempty(6.data.googleMapsUri; \"\") = \"\"; \"withheld_no_evidence\"; \"published\"))}}"
+          },
+          {
+            "name": "clinic_website",
+            "value": "{{ifempty(6.data.websiteUri; \"\")}}"
+          }
+        ]
+      },
+      "metadata": {
+        "designer": {
+          "x": 1800,
+          "y": 0
+        },
+        "restore": {},
+        "expect": []
+      }
+    },
+    {
+      "id": 8,
+      "module": "google-sheets:updateRow",
+      "version": 2,
+      "parameters": {
+        "__IMTCONN__": null
+      },
+      "mapper": {
+        "mode": "map",
+        "spreadsheetId": "{{SPREADSHEET_ID}}",
+        "sheetId": "Leads",
+        "rowNumber": "{{1.__ROW_NUMBER__}}",
+        "tableFirstRow": "A1:BZ1",
+        "values": {
+          "6": "complete",
+          "15": "zerobounce",
+          "16": "{{4.validator_status}}",
+          "17": "{{4.validator_sub}}",
+          "18": "{{4.email_decision}}",
+          "19": "{{7.phone_e164}}",
+          "20": "{{7.phone_type}}",
+          "21": "{{7.phone_source_url}}",
+          "22": "{{7.phone_decision}}",
+          "23": "{{5.data.places[1].id}}",
+          "24": "{{7.clinic_website}}",
+          "25": "{{\"email: \" + 4.email_decision + \" | phone: \" + 7.phone_decision}}",
+          "26": "{{formatDate(now; \"YYYY-MM-DD HH:mm\")}}",
+          "27": "{{if(7.phone_accepted = true; 7.phone_e164 + \" (\" + 7.phone_type + \")\"; \"\")}}",
+          "28": "{{if(4.email_accepted = true; 2.email; \"\")}}",
+          "29": "{{if(4.email_accepted = true; \"Email: \" + 2.email_provider + \" <\" + 2.email_source + \"> | \"; \"\") + if(7.phone_accepted = true; \"Phone: google_places <\" + 7.phone_source_url + \">\"; \"\")}}",
+          "30": "{{if(4.email_accepted = true; \"yes\"; if(7.phone_accepted = true; \"yes\"; \"no\"))}}",
+          "31": "{{switch(4.email_decision; \"refused_role_mailbox\"; \"Shared mailbox, not this person. Check the clinic site for a named address.\"; \"refused_catch-all\"; \"Domain accepts every address, so it proves nothing. Verify by hand or leave the cell blank.\"; \"no_match\"; \"No provider had an address. Add the clinic domain to the row and re-run.\"; \"accepted\"; \"Spot-check against the source URLs.\"; \"Spot-check against the source URLs.\")}}"
+        },
+        "valueInputOption": "USER_ENTERED"
+      },
+      "metadata": {
+        "designer": {
+          "x": 2100,
+          "y": 0
+        },
+        "restore": {},
+        "expect": []
+      }
+    }
+  ],
+  "metadata": {
+    "instant": false,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": false,
+      "slots": null,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "designer": {
+      "orphans": []
+    },
+    "zone": "eu1.make.com",
+    "notes": []
+  }
+}

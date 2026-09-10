@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}Run {{ run_id }}{% endblock %}
+{% block body %}
+<h1>Run {{ run_id }}</h1>
+<p class="sub">
+  {{ meta.input_path or 'demo sample' }} ·
+  <span id="statusPill">
+    {% if live %}<span class="pill warn">running</span>
+    {% elif meta.status == 'done' %}<span class="pill ok">done</span>
+    {% elif meta.status == 'failed' %}<span class="pill bad">failed</span>
+    {% else %}<span class="pill warn">{{ meta.status }}</span>{% endif %}
+  </span>
+</p>
+
+<div class="panel" id="progressPanel" {% if not live %}style="display:none"{% endif %}>
+  <div style="display:flex; justify-content:space-between; margin-bottom:8px">
+    <strong id="progressLabel">Starting…</strong>
+    <span class="muted small" id="progressCount"></span>
+  </div>
+  <div class="bar"><i id="progressBar"></i></div>
+  <div class="small muted" id="progressLast" style="margin-top:10px"></div>
+</div>
+
+<div class="panel">
+  <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center">
+    <a class="btn primary" href="{{ url_for('download', run_id=run_id, kind='delivery') }}">Download delivery CSV</a>
+    <a class="btn" href="{{ url_for('download', run_id=run_id, kind='audit') }}">Audit trail</a>
+    <a class="btn" href="{{ url_for('download', run_id=run_id, kind='review') }}">Review queue ({{ review | length }})</a>
+    {% if counts.get('pending', 0) or counts.get('in_progress', 0) %}
+    <form method="post" action="{{ url_for('resume', run_id=run_id) }}" style="display:inline">
+      <button type="submit">Resume {{ counts.get('pending', 0) + counts.get('in_progress', 0) }} remaining</button>
+    </form>
+    {% endif %}
+  </div>
+  <form method="post" action="{{ url_for('push_sheet', run_id=run_id) }}"
+        style="margin-top:16px; display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end">
+    <div style="flex:1 1 320px">
+      <label for="sheet_id" style="margin-top:0">Google Sheet ID (optional)</label>
+      <input type="text" name="sheet_id" id="sheet_id"
+             placeholder="the long id from the sheet URL">
+    </div>
+    <div style="flex:0 1 160px">
+      <label for="sheet_name" style="margin-top:0">Tab name</label>
+      <input type="text" name="sheet_name" id="sheet_name" value="Leads">
+    </div>
+    <button type="submit">Send to Google Sheets</button>
+  </form>
+</div>
+
+<div class="panel">
+  <h2 style="margin-top:0">Build the client handover</h2>
+  <p class="small muted" style="margin-top:4px">
+    One zip holding the six-column <code>Leads.csv</code>, the review list, the full
+    audit trail, a data dictionary, and a cover note whose coverage table — including
+    a count of every blank cell and the reason it is blank — is computed from this
+    run. This is the thing you send.
+  </p>
+  <form method="post" action="{{ url_for('handover', run_id=run_id) }}"
+        style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end">
+    <div style="flex:1 1 260px">
+      <label for="client" style="margin-top:0">Client name</label>
+      <input type="text" name="client" id="client" placeholder="appears on the cover note">
+    </div>
+    <div style="flex:1 1 200px">
+      <label for="operator" style="margin-top:0">Your name</label>
+      <input type="text" name="operator" id="operator" placeholder="for the sign-off">
+    </div>
+    <button class="primary" type="submit">Download handover zip</button>
+    {% if counts.get('pending', 0) or counts.get('in_progress', 0) %}
+    <label class="small muted" style="flex:1 1 100%; margin-top:6px">
+      <input type="checkbox" name="force" value="1" style="width:auto">
+      Package anyway, with
+      {{ counts.get('pending', 0) + counts.get('in_progress', 0) }} row(s) still
+      unprocessed — the fill rates will be computed over rows that were never tried.
+    </label>
+    {% endif %}
+  </form>
+</div>
+
+{% if review %}
+<h2>Needs a human — {{ review | length }} row{{ 's' if review|length != 1 }}</h2>
+<div class="panel" style="padding:6px 0">
+  <div class="scroll"><table>
+    <tr><th>Name</th><th>Why</th><th>What to do</th></tr>
+    {% for r in review %}
+    <tr>
+      <td>
+        <strong>{{ r.name or '(unresolved)' }}</strong>
+        {% if r.linkedin %}<br><a class="small muted" href="{{ r.linkedin }}" target="_blank" rel="noopener">profile</a>{% endif %}
+      </td>
+      <td class="small">{{ r.why_review }}</td>
+      <td class="small muted">{{ r.suggested_action }}</td>
+    </tr>
+    {% endfor %}
+  </table></div>
+</div>
+{% endif %}
+
+<h2>All rows</h2>
+<div class="panel" style="padding:6px 0">
+  <div class="scroll"><table>
+    <tr><th>Name</th><th>Role</th><th>Clinic</th><th>Phone</th><th>Email</th><th>Status</th></tr>
+    {% for r in rows %}
+    <tr>
+      <td>{{ r.name or '—' }}</td>
+      <td class="small">{{ r.role or '—' }}</td>
+      <td class="small">{{ r.clinic or '—' }}</td>
+      <td class="small">{{ r.phone or '—' }}</td>
+      <td class="small">{{ r.email or '—' }}</td>
+      <td>
+        {% if r.duplicate_of %}<span class="pill warn">duplicate</span>
+        {% elif r.review %}<span class="pill warn">review</span>
+        {% else %}<span class="pill ok">ok</span>{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table></div>
+</div>
+
+<script>
+(function () {
+  var live = {{ 'true' if live else 'false' }};
+  if (!live) return;
+  var cursor = 0, runId = {{ run_id | tojson }};
+  var bar = document.getElementById('progressBar');
+  var label = document.getElementById('progressLabel');
+  var count = document.getElementById('progressCount');
+  var last = document.getElementById('progressLast');
+
+  function poll() {
+    fetch('/progress/' + runId + '?since=' + cursor)
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.events && d.events.length) {
+          cursor = d.cursor;
+          var e = d.events[d.events.length - 1];
+          if (e.total) {
+            var pct = Math.round(100 * e.index / e.total);
+            bar.style.width = pct + '%';
+            label.textContent = 'Enriching…';
+            count.textContent = e.index + ' of ' + e.total + '  (' + pct + '%)';
+          }
+          last.textContent = (e.name || '(unresolved)')
+            + ' — ' + (e.email || 'no email')
+            + ' · ' + (e.phone || 'no phone');
+        }
+        if (d.active) { setTimeout(poll, 900); }
+        else {
+          label.textContent = d.error ? 'Failed' : 'Finished';
+          if (d.error) { last.textContent = d.error; }
+          setTimeout(function () { window.location.reload(); }, 1200);
+        }
+      })
+      .catch(function () { setTimeout(poll, 2500); });
+  }
+  poll();
+})();
+</script>
+{% endblock %}

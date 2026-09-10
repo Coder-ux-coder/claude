@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Setup{% endblock %}
+{% block body %}
+<h1>Setup</h1>
+<p class="sub">Paste your API keys below. They are written straight to
+<code>{{ env_path }}</code> on this machine and go nowhere else.</p>
+
+{% if saved %}
+<div class="note"><strong>Saved.</strong> {{ saved }} key(s) written to
+  <code>{{ env_path }}</code>, and this running app picked them up — no restart
+  needed. Check the stage list further down, then run
+  <code>python3 -m leadenrich.cli verify</code> to prove they authenticate.</div>
+{% endif %}
+
+{% if not local_only %}
+<div class="note warn">
+  <strong>Key entry is switched off.</strong> This server is not bound to
+  localhost, so a form accepting API keys would be reachable from other
+  machines. Restart without <code>--host</code>, or use
+  <code>python3 -m leadenrich.cli keys</code>.
+</div>
+{% else %}
+
+<div class="note">
+  <strong>These stay on your computer.</strong> The form posts to this app
+  running on your own machine — nothing is sent over the internet, and the file
+  is written readable only by you. Leave a box blank to skip it; a key already
+  set is kept unless you type a new one over it.
+</div>
+
+<form method="post" action="{{ url_for('save_keys') }}">
+<div class="panel">
+  {% for k in keys %}
+  <div style="padding:14px 0; border-bottom:1px solid var(--line)">
+    <label for="{{ k.var }}" style="margin-top:0">
+      <strong style="color:var(--ink)">{{ k.provider }}</strong> — {{ k.why }}
+      {% if k.set %}<span class="pill ok" style="margin-left:6px">set</span>{% endif %}
+    </label>
+    <input type="password" name="{{ k.var }}" id="{{ k.var }}"
+           autocomplete="off" spellcheck="false"
+           placeholder="{% if k.set %}{{ k.masked }} — type to replace{% else %}paste {{ k.var }} here{% endif %}">
+    <p class="small muted" style="margin:5px 0 0">
+      <code>{{ k.var }}</code> · get it from {{ k.where }}
+    </p>
+  </div>
+  {% endfor %}
+  <div style="padding-top:16px">
+    <button class="primary" type="submit">Save keys</button>
+    <span class="small muted" style="margin-left:10px">
+      Written to <code>{{ env_path }}</code></span>
+  </div>
+</div>
+</form>
+{% endif %}
+
+<h2>What each stage can do right now</h2>
+{% for stage, info in readiness.items() %}
+<h2 style="text-transform:capitalize">{{ stage }}
+  {% if info.ready %}<span class="pill ok">ready</span>
+  {% else %}<span class="pill warn">no credentials</span>{% endif %}
+</h2>
+<div class="panel" style="padding:6px 0">
+  <div class="scroll"><table>
+    <tr><th>Provider</th><th>Status</th><th>Environment variable</th><th>Notes</th></tr>
+    {% for p in info.providers %}
+    <tr>
+      <td>
+        <strong>{{ p.name }}</strong>
+        {% if p.docs %}<br><a class="small muted" href="{{ p.docs }}" target="_blank" rel="noopener">docs</a>{% endif %}
+      </td>
+      <td>{% if p.ready %}<span class="pill ok">ready</span>
+          {% else %}<span class="pill warn">missing</span>{% endif %}</td>
+      <td class="small"><code>{{ p.needs }}</code></td>
+      <td class="small muted">{{ p.note }}</td>
+    </tr>
+    {% endfor %}
+  </table></div>
+</div>
+{% endfor %}
+
+<h2>Google Sheets</h2>
+<div class="panel">
+  {% if sheets.ok %}
+    <p><span class="pill ok">ready</span> {{ sheets.message }}</p>
+  {% else %}
+    <p><span class="pill warn">not configured</span> {{ sheets.message }}</p>
+  {% endif %}
+  {% if sheets.service_account_email %}
+  <p class="small">Share your spreadsheet with
+     <code>{{ sheets.service_account_email }}</code> as an <strong>Editor</strong>.
+     Forgetting this share is the usual cause of a 403.</p>
+  {% endif %}
+</div>
+{% endblock %}

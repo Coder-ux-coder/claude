@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>{{ title or "That file could not be used" }}</h1>
+<p class="sub">{{ message }}</p>
+{% if details %}
+<div class="panel"><ul class="small">{% for d in details %}<li>{{ d }}</li>{% endfor %}</ul></div>
+{% endif %}
+<a class="btn primary" href="{{ back or url_for('index') }}">{{ back_label or "Try another file" }}</a>
+{% endblock %}
