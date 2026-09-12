@@ -1,0 +1,244 @@
+#!/usr/bin/env bash
+#
+# screenrec — a plain screen recorder for macOS. Screen only, no microphone.
+#
+# Records the display to a timestamped video file you can upload straight to
+# YouTube. It captures the screen and the mouse cursor; it never touches the
+# microphone or any other audio input.
+#
+#   screenrec                 start recording the main display
+#   screenrec --fps 60        smoother motion (60 frames/second)
+#   screenrec --display 1     record the second display
+#   screenrec --list          show which displays can be recorded
+#   screenrec --out ~/x.mp4   choose the output file
+#   screenrec --help
+#
+# Stop a recording by pressing  q  (with ffmpeg) or  Ctrl+C  (built-in engine).
+
+# The functions below are written to be sourced by the test suite, so the file
+# is split into "pure logic" (no side effects) and a main() that does the work.
+
+# ----------------------------------------------------------------------------
+# Pure logic — no recording, no filesystem writes. Covered by test/run.sh.
+# ----------------------------------------------------------------------------
+
+# Read `ffmpeg -f avfoundation -list_devices true -i ""` output on stdin and
+# print one "AVINDEX<TAB>label" line per screen-capture device. The avfoundation
+# device index (the number ffmpeg wants after -i) is not the same as the screen
+# number, so both are surfaced.
+parse_screen_devices() {
+  awk '
+    /AVFoundation video devices:/ { invideo = 1; next }
+    /AVFoundation audio devices:/ { invideo = 0; next }
+    invideo {
+      line = $0
+      sub(/^\[[^]]*\] /, "", line)            # strip the "[AVFoundation indev @ 0x..] " tag
+      if (match(line, /^\[[0-9]+\] /)) {
+        idx = substr(line, 2, RLENGTH - 3)     # the number between [ and ]
+        label = substr(line, RLENGTH + 1)
+        if (label ~ /[Cc]apture screen/) print idx "\t" label
+      }
+    }
+  '
+}
+
+# Given parsed "idx<TAB>label" lines on stdin and an optional selector, print the
+# avfoundation index to record. Selector matches the screen number first
+# ("Capture screen 1"), then falls back to an ordinal position, then to the first
+# screen found.
+pick_device_index() {
+  local sel="${1:-}"
+  local -a idxs=() labels=()
+  local idx label
+  while IFS=$'\t' read -r idx label; do
+    [ -z "$idx" ] && continue
+    idxs+=("$idx"); labels+=("$label")
+  done
+  [ "${#idxs[@]}" -eq 0 ] && return 1
+  if [ -n "$sel" ]; then
+    local i
+    for i in "${!labels[@]}"; do
+      case "${labels[$i]}" in *"screen $sel") echo "${idxs[$i]}"; return 0 ;; esac
+    done
+    if [[ "$sel" =~ ^[0-9]+$ ]] && [ "$sel" -lt "${#idxs[@]}" ]; then
+      echo "${idxs[$sel]}"; return 0
+    fi
+  fi
+  echo "${idxs[0]}"
+}
+
+# Compose a filesystem-safe output path from a directory, a timestamp and an
+# extension. No directory is created here.
+output_path() {
+  local dir="$1" stamp="$2" ext="$3"
+  printf '%s/screen-%s.%s\n' "${dir%/}" "$stamp" "$ext"
+}
+
+# Build the ffmpeg argument list, one argument per line, so a test can assert on
+# it without ffmpeg being installed. Screen only: the input is "IDX:none", where
+# ":none" is ffmpeg's way of saying "no audio device".
+build_ffmpeg_cmd() {
+  local idx="$1" fps="$2" out="$3" enc="$4" cursor="$5" bitrate="${6:-12M}" crf="${7:-20}"
+  local -a cmd=(ffmpeg -hide_banner -y -f avfoundation)
+  cmd+=(-capture_cursor "$cursor")
+  cmd+=(-framerate "$fps")
+  cmd+=(-i "${idx}:none")
+  if [ "$enc" = "videotoolbox" ]; then
+    cmd+=(-c:v h264_videotoolbox -b:v "$bitrate")   # hardware encoder: low CPU while capturing
+  else
+    cmd+=(-c:v libx264 -preset veryfast -crf "$crf")
+  fi
+  cmd+=(-pix_fmt yuv420p -movflags +faststart "$out")   # faststart: ready for web/YouTube
+  printf '%s\n' "${cmd[@]}"
+}
+
+# ----------------------------------------------------------------------------
+# Impure — talks to the OS. Not exercised by the unit tests.
+# ----------------------------------------------------------------------------
+
+FPS=30
+DISPLAY_SEL=""
+OUT=""
+OUTDIR="${HOME}/Movies/ScreenRecordings"
+ENGINE=""
+DO_LIST=0
+
+_c() { [ -t 1 ] && [ -z "${NO_COLOR:-}" ] && printf '%s' "$1" || true; }
+B="$(_c $'\033[1m')"; DIM="$(_c $'\033[2m')"; G="$(_c $'\033[32m')"
+Y="$(_c $'\033[33m')"; R="$(_c $'\033[31m')"; Z="$(_c $'\033[0m')"
+say()  { printf '%s\n' "$*"; }
+die()  { printf '%s✗ %s%s\n' "$R" "$*" "$Z" >&2; exit 1; }
+
+usage() { awk 'NR==1{next} /^#/{sub(/^# ?/,""); print; next} {exit}' "$0"; }
+
+parse_args() {
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --fps)     FPS="${2:?--fps needs a number}"; shift 2 ;;
+      --display) DISPLAY_SEL="${2:?--display needs a number}"; shift 2 ;;
+      --out)     OUT="${2:?--out needs a path}"; shift 2 ;;
+      --dir)     OUTDIR="${2:?--dir needs a path}"; shift 2 ;;
+      --list)    DO_LIST=1; shift ;;
+      -h|--help) usage; exit 0 ;;
+      *)         die "Unknown option: $1  (try --help)" ;;
+    esac
+  done
+  [[ "$FPS" =~ ^[0-9]+$ ]] || die "--fps must be a whole number, got: $FPS"
+}
+
+require_macos() {
+  [ "$(uname -s)" = "Darwin" ] || die "screenrec records the macOS screen and only runs on macOS."
+}
+
+choose_engine() {
+  if command -v ffmpeg >/dev/null 2>&1; then ENGINE="ffmpeg"
+  elif command -v screencapture >/dev/null 2>&1; then ENGINE="screencapture"
+  else die "No recorder available. Install ffmpeg with:  brew install ffmpeg"
+  fi
+}
+
+detect_encoder() {
+  if ffmpeg -hide_banner -encoders 2>/dev/null | grep -q h264_videotoolbox; then
+    echo "videotoolbox"
+  else
+    echo "x264"
+  fi
+}
+
+list_devices_raw() { ffmpeg -f avfoundation -list_devices true -i "" 2>&1 || true; }
+
+do_list() {
+  if [ "$ENGINE" = "ffmpeg" ]; then
+    local devs; devs="$(list_devices_raw | parse_screen_devices)"
+    [ -z "$devs" ] && die "No screen-capture devices found. Grant Screen Recording permission (see README) and try again."
+    say "${B}Recordable displays:${Z}"
+    printf '%s\n' "$devs" | while IFS=$'\t' read -r idx label; do
+      say "  --display ${label##*screen } ${DIM}(${label})${Z}"
+    done
+  else
+    say "Built-in engine records the main display. Install ffmpeg for multi-display selection."
+  fi
+}
+
+permission_hint() {
+  cat >&2 <<HINT
+
+${Y}If the recording is black or empty, macOS has not granted Screen Recording
+permission to your terminal yet.${Z}
+
+  1. Open  System Settings → Privacy & Security → Screen & System Audio Recording
+  2. Turn it on for your terminal app (Terminal or iTerm)
+  3. Quit the terminal completely and reopen it, then run screenrec again
+
+This is a one-time macOS step and applies to any screen recorder.
+HINT
+}
+
+record_ffmpeg() {
+  local out="$1"
+  local enc idx
+  enc="$(detect_encoder)"
+  idx="$(list_devices_raw | parse_screen_devices | pick_device_index "$DISPLAY_SEL")" \
+    || die "Could not find a screen to record."
+  [ -z "$idx" ] && die "Could not find a screen to record."
+
+  say "${G}● Recording${Z} display ${DISPLAY_SEL:-0} at ${FPS} fps ${DIM}(${enc}, screen only — no microphone)${Z}"
+  say "  → ${B}${out}${Z}"
+  say "  Press ${B}q${Z} to stop and save."
+  say ""
+
+  local -a cmd
+  mapfile -t cmd < <(build_ffmpeg_cmd "$idx" "$FPS" "$out" "$enc" 1)
+  if ! "${cmd[@]}"; then
+    permission_hint
+    die "Recording failed."
+  fi
+}
+
+record_screencapture() {
+  local out="$1"
+  say "${G}● Recording${Z} ${DIM}(built-in engine, screen only — no microphone)${Z}"
+  say "  → ${B}${out}${Z}"
+  say "  Press ${B}Ctrl+C${Z} to stop and save."
+  say ""
+  local -a cmd=(screencapture -v)
+  [ -n "$DISPLAY_SEL" ] && cmd+=(-D "$((DISPLAY_SEL + 1))")   # screencapture numbers displays from 1
+  cmd+=("$out")
+  "${cmd[@]}" || { permission_hint; die "Recording failed."; }
+}
+
+main() {
+  set -euo pipefail
+  parse_args "$@"
+  require_macos
+  choose_engine
+
+  if [ "$DO_LIST" -eq 1 ]; then do_list; exit 0; fi
+
+  local out ext stamp
+  if [ -n "$OUT" ]; then
+    out="$OUT"
+    mkdir -p "$(dirname "$out")"
+  else
+    [ "$ENGINE" = "ffmpeg" ] && ext="mp4" || ext="mov"
+    mkdir -p "$OUTDIR"
+    stamp="$(date +%Y-%m-%d_%H-%M-%S)"
+    out="$(output_path "$OUTDIR" "$stamp" "$ext")"
+  fi
+
+  if [ "$ENGINE" = "ffmpeg" ]; then record_ffmpeg "$out"; else record_screencapture "$out"; fi
+
+  if [ -f "$out" ] && [ "$(stat -f%z "$out" 2>/dev/null || echo 0)" -gt 1000 ]; then
+    say ""
+    say "${G}✓ Saved${Z} ${B}${out}${Z} ${DIM}($(du -h "$out" 2>/dev/null | cut -f1))${Z}"
+    command -v open >/dev/null 2>&1 && open -R "$out" >/dev/null 2>&1 || true
+  else
+    permission_hint
+    die "The recording came out empty — almost always the Screen Recording permission."
+  fi
+}
+
+# Run main only when executed, not when sourced by the test suite.
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  main "$@"
+fi
