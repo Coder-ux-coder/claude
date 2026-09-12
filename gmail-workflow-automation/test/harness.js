@@ -17,6 +17,11 @@ const FILES = [
   'Prompt.gs', 'Classifier.gs', 'Digest.gs', 'Store.gs'
 ];
 
+// GWA_BUNDLE=1 loads dist/Bundle.gs instead of src/*.gs, so the same suite
+// proves the single-file build is a faithful concatenation rather than a
+// separately-maintained copy that has drifted.
+const USE_BUNDLE = process.env.GWA_BUNDLE === '1';
+
 function loadSandbox() {
   const sandbox = {
     console,
@@ -43,12 +48,15 @@ function loadSandbox() {
     __props: { ANTHROPIC_API_KEY: 'test-key' }
   };
   vm.createContext(sandbox);
-  for (const f of FILES) {
-    const code = fs.readFileSync(path.join(SRC, f), 'utf8');
+  const sources = USE_BUNDLE
+    ? [[path.join(__dirname, '..', 'dist', 'Bundle.gs'), 'Bundle.gs']]
+    : FILES.map((f) => [path.join(SRC, f), f]);
+  for (const [file, label] of sources) {
+    const code = fs.readFileSync(file, 'utf8');
     try {
-      vm.runInContext(code, sandbox, { filename: f });
+      vm.runInContext(code, sandbox, { filename: label });
     } catch (e) {
-      throw new Error(`loading ${f}: ${e.message}`);
+      throw new Error(`loading ${label}: ${e.message}`);
     }
   }
   return sandbox;

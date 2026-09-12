@@ -209,7 +209,8 @@ no developer involved.
 ## Testing
 
 ```bash
-node test/run.js      # 126 assertions, no Google account required
+npm test              # 126 assertions, no Google account required
+npm run test:all      # the same suite against src/ and against dist/Bundle.gs
 ```
 
 The `.gs` sources are loaded into a Node sandbox with the Apps Script services
@@ -219,6 +220,10 @@ evenings, every state transition, the refusal to close on low confidence, label
 diffing, quote stripping, HTML escaping of hostile subject lines, API retry
 behaviour, and the exact JSON body sent to the API.
 
+`npm run test:all` runs everything twice — once against `src/`, once against the
+generated `dist/Bundle.gs` — so the single-file build cannot quietly drift from
+the sources.
+
 After installing, run `selfTest()` in the Apps Script editor. It re-checks the
 clock through Apps Script's own date handling rather than Node's, because a
 one-hour disagreement between the two would silently move every deadline.
@@ -227,6 +232,25 @@ one-hour disagreement between the two would silently move every deadline.
 
 ## Install
 
-See [INSTALL.md](INSTALL.md) — about fifteen minutes, no developer required.
+One command, on any Mac, Linux box, or Windows with WSL:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/Coder-ux-coder/claude/refs/heads/claude/sleepy-newton-7a6g09/gmail-workflow-automation/install.sh)
+```
+
+It downloads the source, detects your timezone, installs Google's Apps Script
+CLI locally (no administrator rights, nothing added to your system), signs you
+in, creates the script project in your Google account and uploads it — then
+hands you three browser steps: paste an API key, click Run once to authorise,
+and preview before trusting it.
+
+No terminal? Paste [`dist/Bundle.gs`](dist/Bundle.gs) — the whole system as one
+file — into a new Apps Script project instead. Both routes are written out in
+[INSTALL.md](INSTALL.md).
+
+Note that the installer runs on the machine you *deploy from*, once. It is not
+needed on the devices that use the system: those need nothing at all, because
+the labels arrive from Google's servers.
+
 The commercial and technical proposal the specification asks for is in
 [PROPOSAL.md](PROPOSAL.md).

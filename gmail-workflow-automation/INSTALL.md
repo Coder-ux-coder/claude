@@ -1,7 +1,8 @@
 # Installation
 
-Fifteen minutes. No developer required, no software installed on any device.
-Do this once, on a laptop, signed in to the mailbox you want automated.
+About five minutes. No developer required, and nothing is installed on any of
+the devices that will *use* the system — it runs on Google's servers. Do this
+once, on any laptop, signed in to the mailbox you want automated.
 
 ---
 
@@ -17,39 +18,79 @@ You need two things:
 
 ---
 
-## Step 1 — Create the script project
+## Choose one of two routes
+
+Both end in the same place. **A** is one command in a terminal. **B** needs no
+terminal at all.
+
+---
+
+## Route A — one command
+
+On any Mac, Linux machine, or Windows with WSL, paste this into a terminal:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/Coder-ux-coder/claude/refs/heads/claude/sleepy-newton-7a6g09/gmail-workflow-automation/install.sh)
+```
+
+It checks prerequisites, downloads the source, detects your machine's timezone
+and writes it into the manifest, installs Google's Apps Script CLI *locally*
+(no administrator rights, nothing added to your system), signs you in to
+Google, creates the script project in your account and uploads all twelve
+files. Then it opens the project in your browser and prints the three steps
+below.
+
+Useful options:
+
+| Option | Effect |
+|---|---|
+| `--no-localhost` | For SSH or a machine with no browser — paste a code instead |
+| `--timezone Europe/London` | Override the detected timezone |
+| `--dir ~/somewhere` | Keep the local copy elsewhere |
+| `--title "Mailbox Bot"` | Name the Apps Script project |
+| `--update` | Re-upload code to the existing project, changing nothing else |
+
+**If it stops and says the Apps Script API is switched off**, open
+<https://script.google.com/home/usersettings>, turn on *Google Apps Script API*,
+and run the command again. Google requires this one switch before any script can
+be created from a command line.
+
+**If you would rather read the script before running it** — a reasonable habit
+with any `curl | bash` — download it first:
+
+```bash
+curl -fsSL -o install.sh https://raw.githubusercontent.com/Coder-ux-coder/claude/refs/heads/claude/sleepy-newton-7a6g09/gmail-workflow-automation/install.sh
+less install.sh
+bash install.sh
+```
+
+Now go to **Step 4**.
+
+---
+
+## Route B — one paste, no terminal
 
 1. Go to <https://script.google.com> and click **New project**.
-2. Click the project name (top left, "Untitled project") and rename it
-   **Gmail Workflow Automation**.
-
-## Step 2 — Add the code
-
-For each file in the `src/` folder of this repository:
-
-1. In the left sidebar, next to **Files**, click **+** → **Script**.
-2. Name it exactly as the file is named, **without the `.gs`** — Apps Script adds
-   that itself. So `Config.gs` is entered as `Config`.
-3. Delete whatever is in the editor and paste the file's contents.
-4. Repeat for: `Config`, `Store`, `Workflow`, `Transcript`, `Prompt`,
-   `Classifier`, `Labels`, `Scanner`, `Digest`, `Main`, `Tests`.
-
-Then delete the empty `Code.gs` the project was created with.
-
-The order does not matter — Apps Script loads every file into one shared scope.
-
-## Step 3 — Add the manifest
-
-1. Click the gear icon (**Project Settings**) in the left sidebar.
-2. Tick **Show "appsscript.json" manifest file in editor**.
-3. Return to the editor, open `appsscript.json`, and replace its contents with
-   `src/appsscript.json` from this repository.
-4. **Change `timeZone`** to your own if it is not `Asia/Karachi`. Use an IANA
+2. Click the project name (top left) and rename it **Gmail Workflow
+   Automation**.
+3. Open [`dist/Bundle.gs`](dist/Bundle.gs) from this repository, select all of
+   it, and paste it over whatever is in the editor. That single file is the
+   whole system — all eleven source files concatenated, and it is built from
+   the same sources the test suite runs against.
+4. Click the gear icon (**Project Settings**) → tick **Show "appsscript.json"
+   manifest file in editor**.
+5. Back in the editor, open `appsscript.json` and replace its contents with
+   [`src/appsscript.json`](src/appsscript.json).
+6. **Change `timeZone`** to your own if it is not `Asia/Karachi`. Use an IANA
    name: `Europe/London`, `America/New_York`, `Asia/Dubai`.
 
-This file declares which permissions the script will ask for. It requests the
-minimum the specification needs and nothing else — no ability to delete mail, no
-access to Drive beyond the one spreadsheet it creates.
+The manifest declares which permissions the script will ask for. It requests the
+minimum this system needs and nothing more — no ability to delete mail, and no
+access to Drive beyond the one spreadsheet it creates for itself.
+
+Now go to **Step 4**.
+
+---
 
 ## Step 4 — Store the API key
 
@@ -191,6 +232,11 @@ key is present, and the local time the system believes it is.
 | `HTTP 401` in the log | Bad or revoked API key | Issue a new key in the Anthropic console |
 | `HTTP 429` in the log | Rate limited | Harmless — it retries. Lower `maxClassificationsPerScan` if persistent. |
 | Nothing runs at all | Authorisation lapsed | Run any function manually and re-authorise |
+| Installer: "Apps Script API is switched off" | Google's default | Turn it on at <https://script.google.com/home/usersettings>, re-run |
+| Installer: "Google sign-in has expired" | Stale clasp credentials | Re-run the installer; it clears them and signs in again |
+| Installer: "Node.js is required" | Node not installed | `brew install node` (Mac), `sudo apt install nodejs npm` (Ubuntu), or <https://nodejs.org> |
+| Installer opens no browser | SSH or headless machine | Re-run with `--no-localhost` and paste the code |
+| Want to push a code change | — | `bash ~/gmail-workflow-automation/install.sh --update` |
 
 Every error is written to the `log` tab with the thread it happened on. A thread
 that fails to classify is labelled *Needs Review* and retried on the next run —

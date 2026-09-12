@@ -2,9 +2,12 @@
   "name": "gmail-workflow-automation",
   "version": "1.0.0",
   "private": true,
-  "description": "AI Gmail workflow classifier on Google Apps Script — labels conversations by whose move it is, and keeps unfinished matters visible on every device.",
+  "description": "AI Gmail workflow classifier on Google Apps Script \u2014 labels conversations by whose move it is, and keeps unfinished matters visible on every device.",
   "scripts": {
-    "test": "node test/run.js"
+    "test": "node test/run.js",
+    "test:bundle": "GWA_BUNDLE=1 node test/run.js",
+    "test:all": "npm run test && npm run test:bundle",
+    "bundle": "node tools/bundle.js"
   },
   "license": "MIT"
 }
