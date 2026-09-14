@@ -15,3 +15,11 @@ package-lock.json
 
 # Screenshots
 /shots/
+
+# Credentials -- never commit these
+.env
+.env.local
+
+# Generated media from the Higgsfield skill (/out/ is covered above)
+*.mp4
+*.mov
