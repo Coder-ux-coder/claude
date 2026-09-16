@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Node
+node_modules/
+frontend/dist/
+
+# Runtime state — regenerate with scripts/generate_concepts.py
+tmp/
+*.db
+*.db-wal
+*.db-shm
+
+# Generated project assets. The committed concept renders live in
+# deliverables/, which is tracked; per-version working assets are not.
+projects/*/versions/
+projects/*/models/
+projects/*/renders/
+
+# Bundles built by the export centre
+deliverables/*.zip
+frontend/tsconfig.tsbuildinfo
