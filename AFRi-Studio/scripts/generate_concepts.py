@@ -27,21 +27,21 @@ CONCEPTS = [
         "description": "A clear, near-symmetric division. The dividing line reads "
                        "as a single confident stroke across the rosette.",
         "split": dict(type=SplitType.BALANCED, position=0.0, amplitude=0.18,
-                      smoothness=0.7, orientation_deg=0.0, separation_mm=16.0),
+                      smoothness=0.7, orientation_deg=0.0, separation_mm=18.0),
     },
     {
         "name": "Concept B S River Split",
         "description": "The client's priority concept: a flowing S-shaped, "
                        "river-inspired separation with an editable curve.",
         "split": dict(type=SplitType.S_RIVER, position=0.0, amplitude=0.34,
-                      smoothness=0.72, orientation_deg=12.0, separation_mm=16.0),
+                      smoothness=0.72, orientation_deg=12.0, separation_mm=18.0),
     },
     {
         "name": "Concept C Organic Asymmetric",
         "description": "An expressive, irregular division that wanders with the "
                        "petal arrangement. The two pieces are deliberately unequal.",
         "split": dict(type=SplitType.ORGANIC, position=0.10, amplitude=0.40,
-                      smoothness=0.55, orientation_deg=-28.0, separation_mm=16.0,
+                      smoothness=0.55, orientation_deg=-28.0, separation_mm=18.0,
                       organic_octaves=3, organic_roughness=0.55, organic_seed=11),
     },
 ]
@@ -51,7 +51,9 @@ SHOTS = [
     {"name": "02_separated_components", "camera": "three_quarter", "separated": True},
     {"name": "03_top_view", "camera": "top", "separated": False},
     {"name": "04_three_quarter_view", "camera": "hero", "separated": False},
-    {"name": "05_split_closeup", "camera": "closeup", "separated": False},
+    # A small deliberate gap so the dividing line reads as a design feature
+    # rather than disappearing into the petal mass.
+    {"name": "05_split_closeup", "camera": "closeup", "separated": True},
     {"name": "06_side_view", "camera": "side", "separated": False},
 ]
 
@@ -75,7 +77,10 @@ def main():
     base.render.quality = RenderQuality(args.quality)
     if args.resolution:
         base.render.resolution = args.resolution
-    base.material.piece_tint = 0.30      # so the division reads in presentation shots
+    # Piece B is mixed a third of the way toward the deeper saffron so the two
+    # halves can be told apart at a glance. Both pieces are the same material;
+    # this is a presentation aid, and it is stated as such in the deliverables.
+    base.material.piece_tint = 0.34
 
     existing = {c["name"]: c for c in store.list_concepts(project["id"], True)}
     results = []

@@ -2,11 +2,10 @@
 from __future__ import annotations
 
 import json
-import shutil
 import zipfile
 from pathlib import Path
 
-from fastapi import APIRouter, Body, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from backend.app.agents import refine

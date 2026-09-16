@@ -59,15 +59,25 @@ def mesh_from_arrays(name, verts, faces):
     return ob
 
 
-def make_material(name, base_hex, preset, roughness, metallic, sheen, tint=0.0):
+def make_material(name, base_hex, preset, roughness, metallic, sheen, tint=0.0,
+                  tint_hex=None):
+    """Build a Principled BSDF.
+
+    ``tint`` mixes the base colour toward ``tint_hex`` (the configuration's
+    secondary colour). This is what lets the two pieces be told apart in a
+    presentation image: with both halves in the identical colour the assembled
+    flower is, correctly but unhelpfully, indistinguishable from a one-piece
+    flower.
+    """
     mat = bpy.data.materials.new(name)
     mat.use_nodes = True
     bsdf = mat.node_tree.nodes.get("Principled BSDF")
     p = MATERIALS.get(preset, MATERIALS["satin_silk"])
     col = list(hex_to_rgb(base_hex))
     if tint:
-        col = [c * (1.0 - 0.45 * tint) + 0.45 * tint * d
-               for c, d in zip(col, (0.55, 0.16, 0.05, 1.0))]
+        other = list(hex_to_rgb(tint_hex or "#C9500A"))
+        t = max(0.0, min(1.0, tint))
+        col = [c * (1.0 - t) + o * t for c, o in zip(col, other)]
     bsdf.inputs["Base Color"].default_value = col
     bsdf.inputs["Roughness"].default_value = float(roughness if roughness is not None
                                                    else p["roughness"])
@@ -160,7 +170,8 @@ def main():
                           mat_cfg.get("sheen"))
     mat_b = make_material("AFRi_PieceB", mat_cfg.get("base_color", "#F2A007"), preset,
                           mat_cfg.get("roughness"), mat_cfg.get("metallic"),
-                          mat_cfg.get("sheen"), tint=mat_cfg.get("piece_tint", 0.0))
+                          mat_cfg.get("sheen"), tint=mat_cfg.get("piece_tint", 0.0),
+                          tint_hex=mat_cfg.get("secondary_color"))
     mat_m = make_material("AFRi_Master", mat_cfg.get("base_color", "#F2A007"), preset,
                           mat_cfg.get("roughness"), mat_cfg.get("metallic"),
                           mat_cfg.get("sheen"))

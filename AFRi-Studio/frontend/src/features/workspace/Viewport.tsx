@@ -1,6 +1,6 @@
 import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Grid, OrbitControls, useGLTF, Environment } from '@react-three/drei'
+import { Canvas, useThree } from '@react-three/fiber'
+import { Grid, OrbitControls, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { useStore, activeVersion } from '../../state/store'
 import { api } from '../../services/api'

@@ -37,7 +37,9 @@ CAMERAS = {
     "front":         (0.0,    6.0, 1.16, 85.0),
     "side":          (90.0,   8.0, 1.16, 85.0),
     "three_quarter": (38.0,  30.0, 1.15, 85.0),
-    "closeup":       (26.0,  20.0, 0.62, 110.0),
+    # High angle, tight framing: the dividing line runs across the flower in
+    # plan, so a low three-quarter view cannot show it.
+    "closeup":       (22.0,  62.0, 0.66, 100.0),
     "hero":          (-32.0, 24.0, 1.08, 100.0),
 }
 

@@ -5,19 +5,15 @@ import json
 import os
 import platform
 import shutil
-import time
-from pathlib import Path
 
-from fastapi import APIRouter, Body, HTTPException, Query, UploadFile, File
+from fastapi import APIRouter, Body, HTTPException, Query
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
 from backend.app.agents import designer
-from backend.app.agents.commands import (Command, CommandPlan, CommandType,
-                                         apply_command)
+from backend.app.agents.commands import CommandType, apply_command
 from backend.app.agents.providers import ProviderError, provider_report
-from backend.app.core.config import (MAX_CONCURRENT_JOBS, PROJECTS_DIR, ROOT,
-                                     find_blender)
+from backend.app.core.config import MAX_CONCURRENT_JOBS, ROOT, find_blender
 from backend.app.core.security import UnsafePath, safe_asset_path, safe_name
 from backend.app.database.db import get_conn, new_id, now, tx
 from backend.app.events.bus import bus
@@ -33,7 +29,7 @@ CONCEPT_SHOTS = [
     {"name": "02_separated_components", "camera": "three_quarter", "separated": True},
     {"name": "03_top_view", "camera": "top", "separated": False},
     {"name": "04_three_quarter_view", "camera": "hero", "separated": False},
-    {"name": "05_split_closeup", "camera": "closeup", "separated": False},
+    {"name": "05_split_closeup", "camera": "closeup", "separated": True},
     {"name": "06_side_view", "camera": "side", "separated": False},
 ]
 
@@ -92,6 +88,11 @@ def project_detail(pid: str):
             "milestones": _milestones(concepts, jobs), "jobs": jobs}
 
 
+def _has_deliverables() -> bool:
+    d = ROOT / "deliverables"
+    return d.is_dir() and any(p.is_file() for p in d.iterdir())
+
+
 def _milestones(concepts, jobs):
     """Milestone state derived from what actually exists, never hardcoded."""
     b = find_blender()
@@ -127,9 +128,7 @@ def _milestones(concepts, jobs):
                      for v in store.list_versions(c["id"])),
          "detail": "iteration history"},
         {"key": "EXPORT", "label": "Export",
-         "done": (ROOT / "deliverables").exists()
-         and any((ROOT / "deliverables").iterdir()) if (ROOT / "deliverables").exists() else False,
-         "detail": "deliverables folder"},
+         "done": _has_deliverables(), "detail": "deliverables folder"},
         {"key": "USER_REVIEW", "label": "User review",
          "done": approved, "detail": "a version has been approved"},
     ]
@@ -466,7 +465,6 @@ def _apply_plan(concept, version, cfg, plan, rejected, provider, auto_run,
                   if c.type == CommandType.GENERATE_VARIATION]
     variation_versions = []
     if variations and auto_run:
-        import random
         count = variations[0].count or 3
         for i in range(count):
             vc = DesignConfig(**target["config"])

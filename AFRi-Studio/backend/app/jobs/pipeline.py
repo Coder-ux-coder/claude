@@ -39,6 +39,7 @@ class PipelineResult:
     seconds: float = 0.0
 
 
+#: Pipeline stages, in order. The UI uses this to show what is left to do.
 STAGES = ["CONFIG", "MASTER_FLOWER", "SPLIT", "VALIDATE", "BUNDLE",
           "SCENE", "MATERIALS", "EXPORT", "RENDER", "VERIFY", "PUBLISH"]
 
