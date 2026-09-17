@@ -60,6 +60,31 @@ class LightingPreset(str, Enum):
     FLAT_CATALOG = "flat_catalog"
 
 
+class HatStyle(str, Enum):
+    FEDORA = "fedora"
+    BOATER = "boater"
+    WIDE_BRIM = "wide_brim"
+    CLOCHE = "cloche"
+    BUCKET = "bucket"
+
+
+class HatMaterial(str, Enum):
+    FELT = "felt"
+    STRAW = "straw"
+    WOOL = "wool"
+    CANVAS = "canvas"
+
+
+class ConformMode(str, Enum):
+    RIGID = "rigid"
+    SURFACE_CONFORM = "surface_conform"
+
+
+class AttachmentType(str, Enum):
+    NONE = "none"
+    PIN = "pin"
+
+
 class MaterialPreset(str, Enum):
     MATTE_FELT = "matte_felt"
     SATIN_SILK = "satin_silk"
@@ -198,6 +223,98 @@ class SplitConfig(BaseModel):
         return v
 
 
+
+# --------------------------------------------------------------------------
+# Hat (stage two)
+# --------------------------------------------------------------------------
+class HatConfig(BaseModel):
+    """The hat the accessory is worn on.
+
+    Head circumference is the one dimension a hat cannot get wrong, so the
+    geometry is derived from it rather than from a guessed radius. Defaults are
+    a standard adult 58 cm fedora; like everything else here they are studio
+    assumptions, not AFRi specifications.
+    """
+    model_config = {"extra": "forbid"}
+
+    style: HatStyle = Field(HatStyle.FEDORA, json_schema_extra={
+        "ui": {"description": "Hat silhouette. Sets crown taper, dome, flare and edge softness.",
+               "group": "hat"}})
+    head_circumference_mm: float = P(580.0, 520.0, 640.0, 5.0, "mm",
+                                     "Inside head circumference. 58 cm is the commonest adult size.", "hat")
+    crown_height_mm: float = P(112.0, 40.0, 200.0, 1.0, "mm",
+                               "Height of the crown above the brim plane.", "hat")
+    crown_taper: float = P(0.0, 0.0, 1.1, 0.01, "x",
+                           "Crown top radius as a fraction of head radius. 0 uses the style default.", "hat")
+    crown_crease: float = P(1.0, 0.0, 1.5, 0.01, "x",
+                            "Depth of the centre crease and finger dents. 0 leaves a smooth crown.", "hat")
+
+    brim_width_mm: float = P(68.0, 10.0, 180.0, 1.0, "mm",
+                             "Brim reach beyond the head radius.", "brim")
+    brim_droop_deg: float = P(9.0, -10.0, 45.0, 0.5, "deg",
+                              "How far the brim falls from horizontal.", "brim")
+    brim_curl: float = P(0.10, 0.0, 0.6, 0.01, "x",
+                         "Upward curl at the outer edge.", "brim")
+    thickness_mm: float = P(1.6, 0.4, 6.0, 0.1, "mm",
+                            "Material thickness of the hat body.", "brim")
+
+    band_depth_mm: float = P(2.2, 0.0, 12.0, 0.1, "mm",
+                             "How far the ribbon band stands off the crown. 0 omits the band.", "band")
+    band_height_mm: float = P(34.0, 0.0, 90.0, 1.0, "mm",
+                              "Height of the ribbon band.", "band")
+    band_z_mm: float = P(3.0, 0.0, 60.0, 0.5, "mm",
+                         "Height of the band's lower edge above the brim plane.", "band")
+
+    material: HatMaterial = Field(HatMaterial.FELT, json_schema_extra={
+        "ui": {"description": "Hat material. Drives roughness and sheen at render time.",
+               "group": "hat"}})
+    base_color: str = Field("#2C2A27", pattern=r"^#[0-9a-fA-F]{6}$",
+                            description="Provisional charcoal felt. NOT an AFRi brand colour.")
+    band_color: str = Field("#171513", pattern=r"^#[0-9a-fA-F]{6}$",
+                            description="Ribbon band colour.")
+
+    profile_segments: int = P(200, 60, 400, 10, "segs",
+                              "Samples along the meridian. Affects fidelity and cost, not shape.", "quality")
+    revolve_segments: int = P(128, 32, 320, 8, "segs",
+                              "Samples around the axis.", "quality")
+
+
+class PlacementConfig(BaseModel):
+    """Where the flower sits on the hat, and how it is held there."""
+    model_config = {"extra": "forbid"}
+
+    show_hat: bool = Field(True, json_schema_extra={
+        "ui": {"description": "Include the hat. Off renders the accessory alone, as in stage one.",
+               "group": "placement"}})
+    azimuth_deg: float = P(-52.0, -180.0, 180.0, 1.0, "deg",
+                           "Position around the crown. 0 is the front of the hat.", "placement")
+    radial_position: float = P(0.10, 0.0, 1.0, 0.01, "x",
+                               "0 seats the flower against the band at the crown foot; "
+                               "1 puts it at the brim edge.", "placement")
+    surface_offset_mm: float = P(0.0, -5.0, 30.0, 0.1, "mm",
+                                 "Lift off the hat surface. Negative presses into it.", "placement")
+    tilt_deg: float = P(0.0, -60.0, 60.0, 1.0, "deg",
+                        "Tip the flower outward (+) or inward (-) from the local surface.", "placement")
+    roll_deg: float = P(0.0, -180.0, 180.0, 1.0, "deg",
+                        "Spin the flower in its own plane. Rotates where the split line points.", "placement")
+    conform: ConformMode = Field(ConformMode.RIGID, json_schema_extra={
+        "ui": {"description": "Rigid keeps the flower flat and takes up the gap in the fixing. "
+                              "Surface conform is not implemented; see the contact report.",
+               "group": "placement"}})
+
+    attachment: AttachmentType = Field(AttachmentType.PIN, json_schema_extra={
+        "ui": {"description": "Fixing between each piece and the hat.", "group": "attachment"}})
+    pin_count: int = P(2, 1, 4, 1, "pins",
+                       "Pins per piece. Two stop a piece rotating about a single pin.", "attachment")
+    pin_diameter_mm: float = P(1.6, 0.6, 5.0, 0.1, "mm",
+                               "Pin shank diameter.", "attachment")
+    pin_length_mm: float = P(9.0, 3.0, 25.0, 0.5, "mm",
+                             "Pin length below the base disc. Must exceed the hat thickness.", "attachment")
+
+    contact_tolerance_mm: float = P(0.6, 0.05, 5.0, 0.05, "mm",
+                                    "Gap below which the base disc counts as touching the hat.", "validation")
+
+
 # --------------------------------------------------------------------------
 # Material / Render
 # --------------------------------------------------------------------------
@@ -239,6 +356,8 @@ class DesignConfig(BaseModel):
 
     flower: FlowerConfig = Field(default_factory=FlowerConfig)
     split: SplitConfig = Field(default_factory=SplitConfig)
+    hat: HatConfig = Field(default_factory=HatConfig)
+    placement: PlacementConfig = Field(default_factory=PlacementConfig)
     material: MaterialConfig = Field(default_factory=MaterialConfig)
     render: RenderConfig = Field(default_factory=RenderConfig)
 
@@ -254,14 +373,29 @@ class DesignConfig(BaseModel):
         return self._hash([self.flower.model_dump(mode="json"),
                            self.split.model_dump(mode="json")])
 
+    def hash_hat(self) -> str:
+        """The hat depends on nothing else, so it caches independently of the
+        flower -- restyling the flower must not rebuild the hat."""
+        return self._hash([self.hat.model_dump(mode="json")])
+
+    def hash_assembly(self) -> str:
+        return self._hash([self.flower.model_dump(mode="json"),
+                           self.split.model_dump(mode="json"),
+                           self.hat.model_dump(mode="json"),
+                           self.placement.model_dump(mode="json")])
+
     def hash_scene(self) -> str:
         return self._hash([self.flower.model_dump(mode="json"),
                            self.split.model_dump(mode="json"),
+                           self.hat.model_dump(mode="json"),
+                           self.placement.model_dump(mode="json"),
                            self.material.model_dump(mode="json")])
 
     def hash_render(self) -> str:
         return self._hash([self.flower.model_dump(mode="json"),
                            self.split.model_dump(mode="json"),
+                           self.hat.model_dump(mode="json"),
+                           self.placement.model_dump(mode="json"),
                            self.material.model_dump(mode="json"),
                            self.render.model_dump(mode="json")])
 
@@ -283,6 +417,7 @@ def ui_schema() -> dict:
     """Flatten the model metadata into what the parameter editor needs."""
     out: dict[str, Any] = {"engine_version": ENGINE_VERSION, "sections": {}}
     for name, model in (("flower", FlowerConfig), ("split", SplitConfig),
+                        ("hat", HatConfig), ("placement", PlacementConfig),
                         ("material", MaterialConfig), ("render", RenderConfig)):
         js = model.model_json_schema()
         fields: list[dict] = []

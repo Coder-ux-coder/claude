@@ -16,6 +16,11 @@ PART_BASE = 1_000_000
 PART_CENTER = 2_000_000
 PART_PETAL = 3_000_000  # + layer*10_000 + index
 PART_BOUNDARY = 4_000_000  # generated cut wall
+# Stage two. The hat is never fed to the split kernel, but it shares the Mesh
+# type and the part-provenance channel, so it needs ids of its own.
+PART_HAT = 5_000_000       # crown + brim shell
+PART_HATBAND = 6_000_000   # ribbon band around the crown foot
+PART_MOUNT = 7_000_000     # attachment hardware
 
 
 def petal_part_id(layer: int, index: int) -> int:
@@ -23,6 +28,12 @@ def petal_part_id(layer: int, index: int) -> int:
 
 
 def part_kind(pid: int) -> str:
+    if pid >= PART_MOUNT:
+        return "mount"
+    if pid >= PART_HATBAND:
+        return "hatband"
+    if pid >= PART_HAT:
+        return "hat"
     if pid >= PART_BOUNDARY:
         return "boundary"
     if pid >= PART_PETAL:
@@ -30,6 +41,11 @@ def part_kind(pid: int) -> str:
     if pid >= PART_CENTER:
         return "center"
     return "base"
+
+
+def is_flower_part(pid: int) -> bool:
+    """True for geometry that belongs to the flower itself, cut wall included."""
+    return pid < PART_HAT
 
 
 @dataclass
