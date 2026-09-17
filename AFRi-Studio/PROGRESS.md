@@ -155,3 +155,62 @@ tests/end_to_end     8 passed   (~30 s, full pipeline to verified files)
 
 Stage Two is planned in `future/HAT_INTEGRATION_PLAN.md` and **will not be
 started without your explicit authorisation**.
+
+## M14-M16 - Blender reinstated, and the studio in the browser (2026-09-17)
+
+**M14 - Blender 4.5 verified end to end.** Blender 4.5.14 LTS is installed at
+`/opt/blender` and linked onto `PATH`. The archive's MD5 matches the official
+release manifest (`cf7210700afac122e16942dbbbe6c879`). Verified by execution,
+not assumption: background mode, the `bpy` API, mesh generation from raw
+`from_pydata` arrays (watertight, 0 open edges), node-based materials, camera
+and lights, `.blend` save (407 KB), glTF export, and a Cycles CPU render whose
+output was measured for content (std 57.26, not a blank frame).
+
+**M15 - the geometry and split engines ported to JavaScript.** `web_studio/`
+carries a hand port of `design_engine/` to typed arrays: the layer schedule,
+the closed-solid petal, the base disc and centre boss, the three split path
+families, and the exact per-triangle clipping kernel with per-body splitting
+and developable-surface capping.
+
+Measured against Python on the same configuration: identical vertex count
+(65,976), identical triangle count (131,316), volume agreeing to 2 parts in
+10^8 - which is precisely the float32 vertex store in the Python `Mesh` against
+float64 in JavaScript. `tests/integration/test_js_parity.py` asserts this as a
+regression guard.
+
+Two honest limits, both documented in `web_studio/README.md`:
+
+* numpy's PCG64 cannot be reproduced in JavaScript, so parity is asserted with
+  the random draws switched off (`organic_variation = 0` and
+  `petal_ruffle_amp = 0` - the ruffle phase is drawn regardless of the jitter
+  setting). At the shipped defaults the two engines give the same design with
+  individual petals seated at slightly different angles.
+* The engines can disagree on the A:B volume balance by up to about one
+  percentage point. This is not a porting defect: a boundary loop through a
+  petal is non-planar because the path curves across the petal's width, so
+  ear-clipping it is under-determined and several valid triangulations exist.
+  Both engines still produce closed pieces that reconstruct the master to
+  machine precision. The fix, if it is ever needed, is to subdivide each loop
+  at the path's own sample points; that would change the production kernel and
+  has not been done.
+
+**M16 - the browser studio shipped.** A single page with a live three.js
+viewport, the full parameter editor built from the schema groups, concept
+presets A/B/C matching `scripts/generate_concepts.py` exactly, assembled and
+separated views, per-piece isolation, the cut wall drawn as its own material,
+the dividing curve as an overlay, live verification, and STL export.
+
+Verified in real Chromium, not asserted: all five verification checks green
+through concept switches and live slider edits; 62-157 ms flower build and
+67-221 ms split at 50k-195k triangles; no horizontal scroll at 390 px; one
+console error, a 404 for a favicon the page does not request.
+
+Three defects were found by that run and fixed: the page carried raw UTF-8
+characters and mojibaked without a charset header (now pure ASCII source); the
+progress chip relied on the host's `[hidden]` reset and never cleared (the page
+now carries its own rule); and the phone layout put the flower below the fold
+(the viewport now comes first). A guard was also added for the case where the
+3D library fails to load, which previously left a silent black rectangle.
+
+Stage Two - the hat - remains not started, and still requires explicit
+authorisation.

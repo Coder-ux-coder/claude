@@ -110,6 +110,23 @@ Blender-dependent tests skip themselves cleanly when Blender is absent.
 | **Claude Designer** | Plain-language instructions become validated design commands. |
 | **Jobs / Refinement / Event log** | Live SSE stream of what is actually happening. |
 
+## The browser build
+
+`web_studio/` is the whole geometry pipeline ported to JavaScript: it generates
+the master flower and performs the real two-piece split live in a browser, with
+no server, no Python and no Blender. Open it from any static server:
+
+```bash
+cd web_studio && python3 -m http.server 8777
+# then open http://127.0.0.1:8777/
+```
+
+It carries the parameter editor, concept presets, assembled/separated views,
+per-piece isolation, live split verification and STL export. Rendering stays in
+Blender on the desktop build. `tests/integration/test_js_parity.py` asserts the
+port has not drifted from `design_engine/`; see `web_studio/README.md` for the
+measured parity figures and two documented limits.
+
 ## The design assistant
 
 Plain language in, real design changes out:
