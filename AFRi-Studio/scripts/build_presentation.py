@@ -77,12 +77,33 @@ def collect() -> list[dict]:
     return out
 
 
+_JPEG_CACHE: dict[Path, Path] = {}
+
+
+def _as_jpeg(path: Path) -> Path:
+    """Re-encode a render as JPEG for embedding.
+
+    ReportLab embeds PNGs losslessly, which makes a deck of eighteen renders
+    over 20 MB -- too big to email, for no visible gain at print size.
+    """
+    if path in _JPEG_CACHE:
+        return _JPEG_CACHE[path]
+    from PIL import Image as PILImage
+    out = DELIVERABLES / "_pdf_cache" / (path.stem + ".jpg")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with PILImage.open(path) as im:
+        im.convert("RGB").save(out, "JPEG", quality=88, optimize=True,
+                               progressive=True)
+    _JPEG_CACHE[path] = out
+    return out
+
+
 def fit(path: Path, max_w: float, max_h: float) -> RLImage:
     from PIL import Image as PILImage
     with PILImage.open(path) as im:
         w, h = im.size
     scale = min(max_w / w, max_h / h)
-    return RLImage(str(path), width=w * scale, height=h * scale)
+    return RLImage(str(_as_jpeg(Path(path))), width=w * scale, height=h * scale)
 
 
 def build_pdf(data: list[dict], out_path: Path) -> dict:
@@ -208,12 +229,14 @@ def build_pdf(data: list[dict], out_path: Path) -> dict:
         story.append(Paragraph("The three concepts side by side", s["H"]))
         story.append(Paragraph(
             "Rendered at matched scale, framing and lighting, from the same "
-            "master flower.", s["Body"]))
-        story.append(Spacer(1, 4 * mm))
-        cells = [fit(e["shots"]["01_complete_flower"], W / len(comp) - 8 * mm, 82 * mm)
-                 for e in comp]
+            "master flower. Assembled above, separated below.", s["Small"]))
+        story.append(Spacer(1, 2 * mm))
+        # Sized so the heading and both rows fit one landscape page: overflowing
+        # leaves the heading stranded alone on the page before.
+        cw = W / len(comp) - 8 * mm
+        cells = [fit(e["shots"]["01_complete_flower"], cw, 68 * mm) for e in comp]
         caps = [Paragraph(e["concept"]["name"], s["Caption"]) for e in comp]
-        sep = [fit(e["shots"]["02_separated_components"], W / len(comp) - 8 * mm, 72 * mm)
+        sep = [fit(e["shots"]["02_separated_components"], cw, 62 * mm)
                if "02_separated_components" in e["shots"] else
                Paragraph("(not rendered)", s["Caption"]) for e in comp]
         g = Table([cells, caps, sep], colWidths=[W / len(comp)] * len(comp))
@@ -339,6 +362,8 @@ def main():
                           "error": "no concepts with renders were found"}))
         return 1
     pdf = build_pdf(data, DELIVERABLES / "AFRi_Marigold_Initial_Concepts.pdf")
+    import shutil as _shutil
+    _shutil.rmtree(DELIVERABLES / "_pdf_cache", ignore_errors=True)
     pptx = build_pptx(data, DELIVERABLES / "AFRi_Marigold_Initial_Concepts.pptx")
     report = {"ok": pdf["bytes"] > 0, **pdf, **pptx,
               "shots_per_concept": {e["concept"]["name"]: len(e["shots"])

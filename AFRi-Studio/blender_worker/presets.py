@@ -32,15 +32,18 @@ RENDER_PRESETS = {
 # (azimuth_deg, elevation_deg, framing_margin, focal_mm)
 # The margin is how much bigger than the subject the frame should be; the actual
 # camera distance is derived from the focal length below, not guessed.
+# Margins leave real breathing room around the subject. Framing the bounding
+# sphere exactly puts the outermost petals on the frame edge, which reads as a
+# crop rather than a composition.
 CAMERAS = {
-    "top":           (0.0,   89.0, 1.14, 85.0),
-    "front":         (0.0,    6.0, 1.16, 85.0),
-    "side":          (90.0,   8.0, 1.16, 85.0),
-    "three_quarter": (38.0,  30.0, 1.15, 85.0),
-    # High angle, tight framing: the dividing line runs across the flower in
+    "top":           (0.0,   89.0, 1.22, 85.0),
+    "front":         (0.0,    6.0, 1.30, 85.0),
+    "side":          (90.0,   8.0, 1.30, 85.0),
+    "three_quarter": (38.0,  30.0, 1.32, 85.0),
+    # High angle, tighter framing: the dividing line runs across the flower in
     # plan, so a low three-quarter view cannot show it.
-    "closeup":       (22.0,  62.0, 0.66, 100.0),
-    "hero":          (-32.0, 24.0, 1.08, 100.0),
+    "closeup":       (22.0,  62.0, 0.84, 100.0),
+    "hero":          (-32.0, 24.0, 1.24, 100.0),
 }
 
 SENSOR_MM = 36.0

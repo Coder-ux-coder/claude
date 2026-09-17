@@ -86,6 +86,48 @@ function Model({ url, shading, visible, selected, onSelect, exploded,
   )
 }
 
+/** The dividing curve, drawn from the path the split engine actually used. */
+function SplitPathOverlay({ points, orientationDeg, height, visible }: {
+  points: [number, number][]
+  orientationDeg: number
+  height: number
+  visible: boolean
+}) {
+  // Built as a THREE.Line and mounted through <primitive>: in JSX, a bare
+  // <line> resolves to the SVG element, not three.js'.
+  const line = useMemo(() => {
+    const t = (orientationDeg * Math.PI) / 180
+    const c = Math.cos(t), sn = Math.sin(t)
+    const v: number[] = []
+    for (const [x, y] of points) {
+      // The path is stored in the split frame; rotate it into world space, and
+      // convert Blender Z-up to the viewer's Y-up.
+      const wx = x * c - y * sn
+      const wy = x * sn + y * c
+      v.push(wx, height, -wy)
+    }
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(v, 3))
+    const mat = new THREE.LineBasicMaterial({
+      color: 0x5ba8f5, transparent: true, opacity: 0.95,
+      depthTest: false, depthWrite: false, toneMapped: false,
+    })
+    const obj = new THREE.Line(geo, mat)
+    // Without an explicit render order, disabling the depth test is not enough:
+    // the flower is drawn afterwards and paints straight over the curve.
+    obj.renderOrder = 999
+    return obj
+  }, [points, orientationDeg, height])
+
+  useEffect(() => () => {
+    line.geometry.dispose()
+    ;(line.material as THREE.Material).dispose()
+  }, [line])
+
+  if (!visible || points.length < 2) return null
+  return <primitive object={line} />
+}
+
 function CameraRig({ view, fit, tick }:
   { view: ViewName; fit: number; tick: number }) {
   const { camera } = useThree()
@@ -112,6 +154,9 @@ export function Viewport() {
   const [exploded, setExploded] = useState(false)
   const [showGrid, setShowGrid] = useState(true)
   const [showMaster, setShowMaster] = useState(false)
+  const [hidden, setHidden] = useState<Record<string, boolean>>({})
+  const [showPath, setShowPath] = useState(true)
+  const [isolated, setIsolated] = useState<string | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
   const [info, setInfo] = useState<any>(null)
   const [tick, setTick] = useState(0)
@@ -128,9 +173,21 @@ export function Viewport() {
   const busy = jobs.some((j) => (j.status === 'running' || j.status === 'claimed') &&
                                 j.version_id === version?.id)
 
-  const visible = useMemo(() => ({
-    master: showMaster, piece_a: !showMaster, piece_b: !showMaster,
-  }), [showMaster])
+  const visible = useMemo(() => {
+    const base: Record<string, boolean> = {
+      master: showMaster, piece_a: !showMaster, piece_b: !showMaster,
+    }
+    for (const k of Object.keys(base)) {
+      if (hidden[k]) base[k] = false
+      if (isolated && k !== isolated) base[k] = false
+      if (isolated && k === isolated) base[k] = true
+    }
+    return base
+  }, [showMaster, hidden, isolated])
+
+  const splitPath = (version?.stats as any)?.split_path
+  const splitOrientation = (version?.stats as any)?.split?.orientation_deg ?? 0
+  const reliefHeight = ((version?.config?.flower?.relief_depth_mm ?? 18) * 0.1) * 0.55
 
   const separation = version?.config?.split?.separation_mm ?? 14
 
@@ -187,6 +244,23 @@ export function Viewport() {
             <button onClick={() => setShowMaster(!showMaster)}
               className={`btn-ghost shrink-0 ${showMaster ? 'text-marigold-300' : ''}`}>
               <Icon name="eye" /> {showMaster ? 'Master' : 'Pieces'}
+            </button>
+            {!showMaster && (['piece_a', 'piece_b'] as const).map((k) => (
+              <button key={k} title={`Toggle ${k}. Shift-click to isolate.`}
+                onClick={(e) => {
+                  if (e.shiftKey) setIsolated(isolated === k ? null : k)
+                  else setHidden((h) => ({ ...h, [k]: !h[k] }))
+                }}
+                className={`btn-ghost shrink-0 ${
+                  isolated === k ? 'text-sky-400'
+                  : hidden[k] ? 'text-ink-500 line-through' : 'text-mute-400'}`}>
+                {k === 'piece_a' ? 'A' : 'B'}
+              </button>
+            ))}
+            <button onClick={() => setShowPath(!showPath)}
+              title="Highlight the dividing curve the split engine used"
+              className={`btn-ghost shrink-0 ${showPath ? 'text-sky-400' : ''}`}>
+              <Icon name="split" /> Boundary
             </button>
             <button onClick={() => setShowGrid(!showGrid)}
               className={`btn-ghost shrink-0 ${showGrid ? 'text-marigold-300' : ''}`}>
@@ -254,6 +328,11 @@ export function Viewport() {
                      selected={selected} onSelect={setSelected}
                      exploded={exploded} separation={separation} onInfo={setInfo} />
             </Suspense>
+            {splitPath?.points && (
+              <SplitPathOverlay points={splitPath.points}
+                                orientationDeg={splitOrientation}
+                                height={reliefHeight} visible={showPath} />
+            )}
             {showGrid && (
               <Grid args={[40, 40]} cellSize={1} cellColor="#1F252C"
                     sectionSize={5} sectionColor="#2A323B" fadeDistance={45}
@@ -283,6 +362,9 @@ export function Viewport() {
                 {info.bounds_mm[0].toFixed(1)} × {info.bounds_mm[2].toFixed(1)} ×{' '}
                 {info.bounds_mm[1].toFixed(1)} mm
               </div>
+            )}
+            {isolated && (
+              <div className="text-sky-400 mt-0.5">isolated: {isolated}</div>
             )}
           </div>
         )}

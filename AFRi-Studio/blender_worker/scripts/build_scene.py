@@ -234,7 +234,9 @@ def main():
     build_world(scene, rnd_cfg.get("background", "#14161A"), world_s)
 
     # ---- cameras -------------------------------------------------------
-    frame_r = radius * (1.0 + (sep / (2 * radius) if sep else 0.0))
+    # When the pieces are parted they occupy the flower's radius plus half the
+    # gap, in the separation direction. Frame for that, not for the flower alone.
+    frame_r = radius + (sep * 0.5 if sep else 0.0)
     active = rnd_cfg.get("camera", "three_quarter")
     for name in CAMERAS:
         cd = bpy.data.cameras.new(f"cam_{name}")

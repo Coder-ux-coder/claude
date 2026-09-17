@@ -22,10 +22,10 @@ Where something is incomplete or constrained, it says so.
 | 7 | Workflow monitoring | **done** | Persistent SQLite queue, SSE stream, cancel, retry, restart recovery. |
 | 8 | AI integration | **done** | Claude Code CLI headless mode, verified live. Local-model and manual-handoff fallbacks. |
 | 9 | Recursive improvement | **done** | Bounded, hypothesis-driven, measured. |
-| 10 | Concept generation | **done** | Concepts A, B and C, all from one master flower. |
-| 11 | Final rendering | **done** | 6 views per concept plus a comparison image. |
-| 12 | Client delivery | **done** | PDF, editable PPTX, delivery notes, exportable bundles. |
-| 13 | Application testing | **done** | Unit, integration and end-to-end suites executed. |
+| 10 | Concept generation | **done** | Concepts A, B and C, all from one master flower. Each 17/17 checks, 14 assets, ~200 s. |
+| 11 | Final rendering | **done** | 18 renders (6 views x 3 concepts), zero missing, plus a 1648x1778 comparison sheet. |
+| 12 | Client delivery | **done** | 10-page PDF (580 KB), 6-slide editable PPTX, delivery notes, exportable bundles. |
+| 13 | Application testing | **done** | 112 tests executed and passing: 81 unit, 23 integration, 8 end-to-end. |
 | 14 | User review | **awaiting you** | Concepts are ready to look at. Stage Two needs your explicit go-ahead. |
 
 ---
@@ -119,6 +119,37 @@ Recorded because they shaped the design:
   `scripts/generate_concepts.py --quality high --resolution 1800` produces
   presentation-grade output; it takes substantially longer on a CPU-only box.
 - **Concurrency is 1.** Deliberate on four cores with CPU-only Cycles.
+
+---
+
+## Verified artefacts
+
+Everything below was inspected on disk, not merely reported by a log line.
+
+| Artefact | Verified |
+|---|---|
+| Three concepts | 17/17 validation checks each; 14 assets each |
+| Renders | 18 PNGs at 900x900, each opened, sized and checked for a blank frame |
+| Browser models | 3 GLB files, each starting with the `glTF` magic number |
+| Blender projects | 3 `.blend` files, each starting with `BLENDER` |
+| Component meshes | `piece_a` and `piece_b` as STL and OBJ per concept, each re-imported as a real mesh with distinct bounds |
+| Comparison sheet | `deliverables/comparison_all_concepts.png`, 1648x1778 |
+| Presentation | 10-page PDF, page structure confirmed by text extraction and two pages rendered and inspected |
+| Editable deck | 6-slide PPTX, 12 embedded images |
+| Interface | Screenshotted in a real Chromium session; zero console errors |
+| Component toggles | Hiding piece B measurably removed 27.5% of rendered pixels; re-showing restored the exact original pixel count |
+
+### Test suite
+
+```
+tests/unit          81 passed   (~22 s, no Blender)
+tests/integration   23 passed   (~10 s, includes real Blender scene build + render)
+tests/end_to_end     8 passed   (~30 s, full pipeline to verified files)
+                   ---
+                   112 passed
+```
+
+---
 
 ## Next
 
