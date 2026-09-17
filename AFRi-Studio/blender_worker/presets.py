@@ -44,6 +44,16 @@ CAMERAS = {
     # plan, so a low three-quarter view cannot show it.
     "closeup":       (22.0,  62.0, 0.84, 100.0),
     "hero":          (-32.0, 24.0, 1.24, 100.0),
+    # Stage two. A hat is three times the flower's size and is read from nearer
+    # eye level, so these sit lower and frame tighter than the flower cameras.
+    "hat_three_quarter": (38.0,  24.0, 1.14, 85.0),
+    "hat_front":         (0.0,    9.0, 1.20, 85.0),
+    "hat_side":          (90.0,   7.0, 1.20, 85.0),
+    "hat_top":           (0.0,   78.0, 1.08, 85.0),
+    "hat_worn":          (26.0,   5.0, 1.16, 100.0),
+    # Used with an explicit target on the flower and a matching frame radius,
+    # so it reads as a detail of the accessory rather than of the hat.
+    "hat_detail":        (24.0,  30.0, 1.05, 100.0),
 }
 
 SENSOR_MM = 36.0
@@ -56,7 +66,7 @@ LIGHTING = {
 }
 
 
-def camera_transform(preset: str, radius: float):
+def camera_transform(preset: str, radius: float, target=(0.0, 0.0, 0.0)):
     """World position and rotation framing a sphere of the given radius.
 
     Distance is derived from the focal length and sensor size rather than being
@@ -70,7 +80,20 @@ def camera_transform(preset: str, radius: float):
     x = d * math.cos(e) * math.sin(a)
     y = -d * math.cos(e) * math.cos(a)
     z = d * math.sin(e)
-    # Point at the origin.
     rot_x = math.radians(90.0) - e
     rot_z = a
-    return (x, y, z), (rot_x, 0.0, rot_z), focal
+    # Translating both the orbit centre and the eye leaves the viewing
+    # direction unchanged, so a detail shot can frame a flower sitting out on a
+    # brim with no look-at maths.
+    return (target[0] + x, target[1] + y, target[2] + z), (rot_x, 0.0, rot_z), focal
+
+
+# Hat materials. Felt is matte and slightly fuzzy, straw coarser and brighter,
+# canvas between them. Roughness and sheen only -- no textures, because at this
+# scale the silhouette and the band carry the read, not surface detail.
+HAT_MATERIALS = {
+    "felt":   dict(roughness=0.88, sheen=0.42, metallic=0.0),
+    "straw":  dict(roughness=0.74, sheen=0.18, metallic=0.0),
+    "wool":   dict(roughness=0.92, sheen=0.55, metallic=0.0),
+    "canvas": dict(roughness=0.82, sheen=0.12, metallic=0.0),
+}

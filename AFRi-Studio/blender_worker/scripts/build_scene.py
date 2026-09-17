@@ -21,7 +21,7 @@ import bpy  # noqa: E402
 import numpy as np  # noqa: E402
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from presets import (CAMERAS, LIGHTING, MATERIALS, RENDER_PRESETS,  # noqa: E402
+from presets import (CAMERAS, HAT_MATERIALS, LIGHTING, MATERIALS, RENDER_PRESETS,  # noqa: E402
                      camera_transform, hex_to_rgb)
 
 _T0 = time.time()
@@ -157,7 +157,7 @@ def main():
 
     # ---- collections --------------------------------------------------
     colls = {}
-    for name in ("MASTER_FLOWER", "PIECE_A", "PIECE_B", "LIGHTING",
+    for name in ("MASTER_FLOWER", "PIECE_A", "PIECE_B", "HAT", "LIGHTING",
                  "CAMERAS", "BACKGROUND"):
         c = bpy.data.collections.new(name)
         scene.collection.children.link(c)
@@ -176,6 +176,13 @@ def main():
                           mat_cfg.get("roughness"), mat_cfg.get("metallic"),
                           mat_cfg.get("sheen"))
 
+    hat_cfg = spec.get("hat_material") or {}
+    hm = HAT_MATERIALS.get(hat_cfg.get("material", "felt"), HAT_MATERIALS["felt"])
+    mat_hat = make_material("AFRi_Hat", hat_cfg.get("base_color", "#2C2A27"),
+                            "matte_felt", hm["roughness"], hm["metallic"], hm["sheen"])
+    mat_band = make_material("AFRi_HatBand", hat_cfg.get("band_color", "#171513"),
+                             "satin_silk", 0.58, 0.0, 0.30)
+
     # ---- geometry -----------------------------------------------------
     event("SCENE", "building objects")
     separated = bool(rnd_cfg.get("separated", False))
@@ -185,15 +192,26 @@ def main():
     created = {}
     for key, coll_name, mat in (("master", "MASTER_FLOWER", mat_m),
                                 ("piece_a", "PIECE_A", mat_a),
-                                ("piece_b", "PIECE_B", mat_b)):
+                                ("piece_b", "PIECE_B", mat_b),
+                                ("hat", "HAT", mat_hat)):
         vk, fk = f"{key}_verts", f"{key}_faces"
         if vk not in data:
             continue
         ob = mesh_from_arrays(key, data[vk], data[fk])
         ob.data.materials.append(mat)
+        pk = f"{key}_parts"
+        if key == "hat" and pk in data:
+            # The ribbon band is a separate body inside the same mesh; give it
+            # its own slot so it does not read as moulded felt.
+            ob.data.materials.append(mat_band)
+            parts = data[pk]
+            for i, poly in enumerate(ob.data.polygons):
+                if i < len(parts) and parts[i] >= 6_000_000:
+                    poly.material_index = 1
         if sep and key in ("piece_a", "piece_b"):
             s = 0.5 * sep * (1.0 if key == "piece_a" else -1.0)
-            ob.location = (normal[0] * s, normal[1] * s, 0.0)
+            nz = normal[2] if len(normal) > 2 else 0.0
+            ob.location = (normal[0] * s, normal[1] * s, nz * s)
         colls[coll_name].objects.link(ob)
         created[key] = ob
         event("SCENE", f"{key}: {len(ob.data.vertices)} verts, "
@@ -236,7 +254,7 @@ def main():
     # ---- cameras -------------------------------------------------------
     # When the pieces are parted they occupy the flower's radius plus half the
     # gap, in the separation direction. Frame for that, not for the flower alone.
-    frame_r = radius + (sep * 0.5 if sep else 0.0)
+    frame_r = float(spec.get("frame_radius") or 0.0) or (radius + (sep * 0.5 if sep else 0.0))
     active = rnd_cfg.get("camera", "three_quarter")
     for name in CAMERAS:
         cd = bpy.data.cameras.new(f"cam_{name}")
@@ -341,7 +359,28 @@ def main():
     for shot in spec.get("shots", []):
         name = shot.get("name", "render")
         cam = shot.get("camera", active)
-        cam_ob = bpy.data.objects.get(f"cam_{cam}")
+        if shot.get("detail") and spec.get("flower_target"):
+            # A detail shot frames the accessory, not the hat it sits on.
+            shot = dict(shot)
+            shot.setdefault("target", spec["flower_target"])
+            shot.setdefault("frame_radius",
+                            float(spec.get("flower_radius") or 0.0)
+                            + (float(spec.get("separation", 0.0)) * 0.5
+                               if shot.get("separated") else 0.0))
+        if shot.get("frame_radius") or shot.get("target"):
+            # A detail shot frames something other than the whole subject, so it
+            # gets its own camera rather than sharing the scene-wide one.
+            cd = bpy.data.cameras.new(f"cam_shot_{name}")
+            loc, rot, focal = camera_transform(
+                cam, float(shot.get("frame_radius") or frame_r),
+                tuple(shot.get("target") or (0.0, 0.0, 0.0)))
+            cd.lens = focal
+            cam_ob = bpy.data.objects.new(f"cam_shot_{name}", cd)
+            cam_ob.location = loc
+            cam_ob.rotation_euler = rot
+            colls["CAMERAS"].objects.link(cam_ob)
+        else:
+            cam_ob = bpy.data.objects.get(f"cam_{cam}")
         if cam_ob is None:
             event("WARNING", f"unknown camera {cam}, skipping shot {name}")
             continue
@@ -357,7 +396,10 @@ def main():
                     created[key].hide_render = sm
                     s = 0.5 * float(spec.get("separation", 0.0)) * \
                         (1.0 if key == "piece_a" else -1.0) if sep_shot else 0.0
-                    created[key].location = (normal[0] * s, normal[1] * s, 0.0)
+                    nz = normal[2] if len(normal) > 2 else 0.0
+                    created[key].location = (normal[0] * s, normal[1] * s, nz * s)
+        if "hat" in created and "show_hat" in shot:
+            created["hat"].hide_render = not bool(shot["show_hat"])
 
         if shot.get("resolution"):
             scene.render.resolution_x = scene.render.resolution_y = int(shot["resolution"])

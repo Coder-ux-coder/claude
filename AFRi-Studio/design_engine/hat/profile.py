@@ -133,9 +133,11 @@ def brim_span(prof: np.ndarray, rh: float) -> tuple[int, int]:
     Found by radius rather than assumed by index, because smoothing and
     arclength resampling both move the section boundaries.
     """
-    # The LAST point at or inside the head radius is the crown foot. Taking the
-    # nearest one instead breaks on a boater, whose crown side sits at exactly
-    # rh for its whole height.
-    inside = np.nonzero(prof[:, 0] <= rh + 1e-6)[0]
-    start = int(inside[-1]) if len(inside) else 0
+    # The crown foot is the construction corner (rh, 0), so find the sample
+    # nearest it. Radius tests alone are fragile here: a boater's crown side
+    # sits at exactly rh for its whole height, so "nearest radius" picks the top
+    # of the crown, and "last at or inside rh" is defeated by the smoothing
+    # pass nudging that side three microns outside it.
+    d = prof - np.array([rh, 0.0])
+    start = int(np.argmin(np.einsum("ij,ij->i", d, d)))
     return start, len(prof) - 1

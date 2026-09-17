@@ -24,6 +24,9 @@ from design_engine.flower.marigold import MM, build_master_flower
 from design_engine.geometry.mesh import PART_BASE
 from design_engine.geometry.consolidate import (clean_piece, consolidate,
                                                 fragment_report, restore_provenance)
+from design_engine.assembly.contact import contact_report, summarise
+from design_engine.assembly.placement import place_on_hat
+from design_engine.hat.hat import build_hat
 from design_engine.splitting.splitter import split_flower
 from design_engine.splitting.validate import validate_split
 
@@ -43,7 +46,8 @@ class PipelineResult:
 
 
 #: Pipeline stages, in order. The UI uses this to show what is left to do.
-STAGES = ["CONFIG", "MASTER_FLOWER", "CONSOLIDATE", "SPLIT", "VALIDATE", "BUNDLE",
+STAGES = ["CONFIG", "MASTER_FLOWER", "CONSOLIDATE", "SPLIT", "VALIDATE", "HAT",
+          "ASSEMBLY", "BUNDLE",
           "SCENE", "MATERIALS", "EXPORT", "RENDER", "VERIFY", "PUBLISH"]
 
 
@@ -145,6 +149,49 @@ def run_pipeline(config: DesignConfig, outdir: Path, *, shots=None,
                   if not c["passed"] and c["severity"] == "error"]
         raise PipelineError("geometry validation failed: " + ", ".join(failed))
 
+    # ---- stage two: the hat, and putting the flower on it ---------------
+    hat = None
+    assembly = None
+    placed = {"piece_a": sr.piece_a, "piece_b": sr.piece_b}
+    sep_normal = sr.split_path.mean_normal()
+    theta = np.deg2rad(sr.split_path.orientation_deg)
+    cw, sw = np.cos(theta), np.sin(theta)
+    sep_world = np.array([sep_normal[0] * cw - sep_normal[1] * sw,
+                          sep_normal[0] * sw + sep_normal[1] * cw, 0.0])
+
+    if config.placement.show_hat:
+        check_cancel()
+        emit("HAT", f"building the {config.hat.style.value}")
+        hat = build_hat(config.hat,
+                        progress=lambda msg, i, n: emit("HAT", msg, index=i, total=n))
+        emit("HAT", f"hat complete: {hat.stats['overall_diameter_mm']:.0f} mm across, "
+                    f"{hat.mesh.n_faces} triangles", **{
+                        k: hat.stats[k] for k in ("style", "head_radius_mm",
+                                                  "brim_width_mm", "overall_height_mm")})
+
+        check_cancel()
+        emit("ASSEMBLY", "placing the accessory on the hat")
+        local = {"piece_a": sr.piece_a, "piece_b": sr.piece_b}
+        placed, frame, R, t = place_on_hat(local, hat, config.hat, config.placement)
+        reports = {k: contact_report(m, R, t, hat, config.hat, config.placement)
+                   for k, m in local.items()}
+        assembly = {"frame": {"radius_mm": frame.radius_mm,
+                              "surface_z_mm": frame.surface_z_mm,
+                              "profile_index": frame.profile_index},
+                    "pieces": reports,
+                    "summary": summarise(reports, config.placement)}
+        sep_world = R @ np.array([sep_world[0], sep_world[1], 0.0])
+        a = assembly["summary"]
+        emit("ASSEMBLY",
+             f"seated at r={frame.radius_mm:.0f} mm: "
+             f"{a['worst_interference_mm']:.2f} mm interference, "
+             f"gap up to {a['worst_gap_mm']:.2f} mm, "
+             f"{a['total_mass_g']:.0f} g on the brim", **a)
+        if a["worst_interference_mm"] > config.placement.contact_tolerance_mm:
+            emit("ASSEMBLY",
+                 f"WARNING the accessory passes {a['worst_interference_mm']:.2f} mm "
+                 f"into the hat; raise placement.surface_offset_mm or move it outboard")
+
     # ---- hand off to Blender ------------------------------------------
     check_cancel()
     work = TMP_DIR / f"pipe_{os.getpid()}_{int(time.time() * 1000)}"
@@ -152,21 +199,22 @@ def run_pipeline(config: DesignConfig, outdir: Path, *, shots=None,
     try:
         emit("BUNDLE", "writing mesh bundle")
         bundle = work / "bundle.npz"
-        np.savez_compressed(
-            bundle,
+        arrays = {
             **master.to_npz_dict("master"),
-            **sr.piece_a.to_npz_dict("piece_a"),
-            **sr.piece_b.to_npz_dict("piece_b"),
-        )
+            **placed["piece_a"].to_npz_dict("piece_a"),
+            **placed["piece_b"].to_npz_dict("piece_b"),
+        }
+        if hat is not None:
+            arrays.update(hat.mesh.to_npz_dict("hat"))
+        np.savez_compressed(bundle, **arrays)
         emit("BUNDLE", f"bundle written ({bundle.stat().st_size // 1024} KiB)")
 
-        normal = sr.split_path.mean_normal()
         spec = {
             "bundle": str(bundle),
             "outdir": str(work / "out"),
             "radius": radius,
             "separation": config.split.separation_mm * MM,
-            "separation_normal": [float(normal[0]), float(normal[1])],
+            "separation_normal": [float(x) for x in sep_world],
             "show_master": show_master,
             "material": config.material.model_dump(mode="json"),
             "render": config.render.model_dump(mode="json"),
@@ -176,6 +224,20 @@ def run_pipeline(config: DesignConfig, outdir: Path, *, shots=None,
             "save_blend": save_blend,
             "export_glb": export_glb,
         }
+        if hat is not None:
+            # The hat is three times the flower across, so it, not the flower,
+            # decides the framing.
+            spec["frame_radius"] = float(hat.stats["overall_diameter_mm"] * 0.5 * MM)
+            spec["hat_material"] = {
+                "material": config.hat.material.value,
+                "base_color": config.hat.base_color,
+                "band_color": config.hat.band_color,
+            }
+            # Where a detail shot should aim, and how tightly to frame it.
+            spec["flower_target"] = [float(x) for x in (
+                np.asarray(placed["piece_a"].verts, dtype=np.float64).mean(axis=0) * 0.5
+                + np.asarray(placed["piece_b"].verts, dtype=np.float64).mean(axis=0) * 0.5)]
+            spec["flower_radius"] = float(config.flower.diameter_mm * 0.5 * MM)
         spec_path = work / "job.json"
         spec_path.write_text(json.dumps(spec, indent=1))
 

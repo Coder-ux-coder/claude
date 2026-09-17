@@ -27,8 +27,16 @@ from design_engine.hat.profile import (MM, STYLE_PRESETS, brim_span,
 class HatResult:
     mesh: Mesh
     profile: np.ndarray        # (N,2) mid-surface meridian, (r, z)
+    surface: np.ndarray        # (N,M,3) mid-surface grid, dent included
+    normals: np.ndarray        # (N,M,3) outward unit normals of that grid
+    thickness: float           # scene units, so the outer skin can be derived
     stats: dict
     build_seconds: float
+
+    def outer_surface(self) -> np.ndarray:
+        """The skin a flower actually rests on: mid-surface plus half the
+        material thickness, along the normal."""
+        return self.surface + self.normals * (self.thickness * 0.5)
 
 
 def _crown_dent(mid: np.ndarray, prof: np.ndarray, rt: float, H: float,
@@ -232,4 +240,5 @@ def build_hat(cfg, progress=None) -> HatResult:
     }
     if progress:
         progress(f"hat complete: {mesh.n_faces} triangles", 3, 3)
-    return HatResult(mesh=mesh, profile=prof, stats=stats, build_seconds=dt)
+    return HatResult(mesh=mesh, profile=prof, surface=mid, normals=normals,
+                     thickness=cfg.thickness_mm * MM, stats=stats, build_seconds=dt)
