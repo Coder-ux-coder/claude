@@ -227,10 +227,22 @@ def main():
             created[key].hide_viewport = show_master
 
     # ---- backdrop ------------------------------------------------------
-    bpy.ops.mesh.primitive_plane_add(size=radius * 40)
+    # Sit the backdrop under the LOWEST piece of geometry, not at a fixed
+    # -0.02. A hat brim droops several millimetres below the plane the flower
+    # is built on, so a fixed floor cuts straight through it and the hat
+    # renders as though it is sinking into the ground.
+    lowest = 0.0
+    for ob in created.values():
+        if ob.hide_render:
+            continue
+        for v in ob.data.vertices:
+            z = v.co.z + ob.location[2]
+            if z < lowest:
+                lowest = z
+    bpy.ops.mesh.primitive_plane_add(size=max(radius, float(spec.get("frame_radius") or 0.0)) * 40)
     floor = bpy.context.active_object
     floor.name = "Backdrop"
-    floor.location = (0, 0, -0.02)
+    floor.location = (0, 0, lowest - 0.02)
     fmat = make_material("AFRi_Backdrop", rnd_cfg.get("background", "#14161A"),
                          "matte_felt", 0.85, 0.0, 0.0)
     floor.data.materials.append(fmat)
@@ -242,13 +254,23 @@ def main():
     event("LIGHTING", f"rig: {rnd_cfg.get('lighting', 'studio_soft')}")
     key_e, fill_e, rim_e, key_size, world_s = LIGHTING.get(
         rnd_cfg.get("lighting", "studio_soft"), LIGHTING["studio_soft"])
-    d = radius * 3.0
+    # Light the whole subject, not just the flower. On a hat the subject is
+    # four times the flower's radius, and a rig scaled to the flower puts every
+    # lamp INSIDE the brim: the crown is lit from point-blank range and the
+    # brim edges stay black. Energy follows the inverse square of the new
+    # distance, so the exposure holds as the subject changes size.
+    lit_r = float(spec.get("frame_radius") or 0.0) or radius
+    d = lit_r * 3.0
+    gain = (lit_r / radius) ** 2 if radius > 1e-9 else 1.0
     add_area_light(colls["LIGHTING"], "Key", (-d * 0.8, -d * 0.9, d * 1.25),
-                   (0.72, 0.0, -0.72), key_e, key_size, (1.0, 0.97, 0.93))
+                   (0.72, 0.0, -0.72), key_e * gain, key_size * gain ** 0.5,
+                   (1.0, 0.97, 0.93))
     add_area_light(colls["LIGHTING"], "Fill", (d * 1.15, -d * 0.55, d * 0.55),
-                   (1.15, 0.0, 1.10), fill_e, key_size * 1.5, (0.90, 0.94, 1.0))
+                   (1.15, 0.0, 1.10), fill_e * gain, key_size * 1.5 * gain ** 0.5,
+                   (0.90, 0.94, 1.0))
     add_area_light(colls["LIGHTING"], "Rim", (d * 0.15, d * 1.3, d * 0.95),
-                   (-0.95, 0.0, 0.12), rim_e, key_size * 0.8, (1.0, 0.99, 0.96))
+                   (-0.95, 0.0, 0.12), rim_e * gain, key_size * 0.8 * gain ** 0.5,
+                   (1.0, 0.99, 0.96))
     build_world(scene, rnd_cfg.get("background", "#14161A"), world_s)
 
     # ---- cameras -------------------------------------------------------
