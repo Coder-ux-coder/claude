@@ -1,13 +1,257 @@
 {
-  "v2": {
-    "version_id": "ver_95b1c7aad6474df2",
-    "dir": "/home/user/claude/AFRi-Studio/projects/afri_marigold/versions/cpt_03319d607a734fdd/ver_95b1c7aad6474df2",
+  "v1": {
+    "version_id": "ver_fdf9af712e5e4644",
+    "dir": "/home/user/claude/AFRi-Studio/projects/afri_marigold/versions/cpt_03319d607a734fdd/ver_fdf9af712e5e4644",
     "assets": {
-      "glb": "projects/afri_marigold/versions/cpt_03319d607a734fdd/ver_95b1c7aad6474df2/viewer.glb",
-      "piece_a_stl": "projects/afri_marigold/versions/cpt_03319d607a734fdd/ver_95b1c7aad6474df2/piece_a.stl",
-      "piece_b_stl": "projects/afri_marigold/versions/cpt_03319d607a734fdd/ver_95b1c7aad6474df2/piece_b.stl",
-      "master_stl": "projects/afri_marigold/versions/cpt_03319d607a734fdd/ver_95b1c7aad6474df2/master.stl",
-      "blend": "projects/afri_marigold/versions/cpt_03319d607a734fdd/ver_95b1c7aad6474df2/scene.blend"
+      "glb": "projects/afri_marigold/versions/cpt_03319d607a734fdd/ver_fdf9af712e5e4644/viewer.glb",
+      "piece_a_stl": "projects/afri_marigold/versions/cpt_03319d607a734fdd/ver_fdf9af712e5e4644/piece_a.stl",
+      "piece_b_stl": "projects/afri_marigold/versions/cpt_03319d607a734fdd/ver_fdf9af712e5e4644/piece_b.stl",
+      "master_stl": "projects/afri_marigold/versions/cpt_03319d607a734fdd/ver_fdf9af712e5e4644/master.stl",
+      "blend": "projects/afri_marigold/versions/cpt_03319d607a734fdd/ver_fdf9af712e5e4644/scene.blend",
+      "01_assembled_three_quarter": "projects/afri_marigold/versions/cpt_03319d607a734fdd/ver_fdf9af712e5e4644/01_assembled_three_quarter.png",
+      "02_exploded": "projects/afri_marigold/versions/cpt_03319d607a734fdd/ver_fdf9af712e5e4644/02_exploded.png",
+      "03_top": "projects/afri_marigold/versions/cpt_03319d607a734fdd/ver_fdf9af712e5e4644/03_top.png",
+      "04_side": "projects/afri_marigold/versions/cpt_03319d607a734fdd/ver_fdf9af712e5e4644/04_side.png",
+      "05_three_quarter_hero": "projects/afri_marigold/versions/cpt_03319d607a734fdd/ver_fdf9af712e5e4644/05_three_quarter_hero.png"
+    },
+    "stats": {
+      "verts": 67512,
+      "faces": 134388,
+      "area": 454.941707,
+      "volume": 22.948073,
+      "bounds_min": [
+        -4.6092,
+        -4.683,
+        -0.0822
+      ],
+      "bounds_max": [
+        4.6073,
+        4.682,
+        1.8361
+      ],
+      "petal_count": 157,
+      "layer_count": 7,
+      "diameter_mm": 93.65,
+      "height_mm": 19.18,
+      "build_seconds": 1.304,
+      "radius": 4.5,
+      "as_built_triangles": 134388,
+      "master_triangles": 134388,
+      "piece_a_triangles": 68150,
+      "piece_b_triangles": 70130,
+      "pieces_triangles_total": 138280,
+      "triangles_added_by_split": 3892,
+      "cut_wall_triangles": 1912,
+      "consolidated": false
+    },
+    "validation": {
+      "checks": [
+        {
+          "name": "master_nonempty",
+          "passed": true,
+          "detail": "master has 67512 vertices, 134388 triangles",
+          "value": 134388,
+          "tolerance": null,
+          "severity": "info"
+        },
+        {
+          "name": "pieces_nonempty",
+          "passed": true,
+          "detail": "piece A 68150 tris, piece B 70130 tris",
+          "value": [
+            68150,
+            70130
+          ],
+          "tolerance": null,
+          "severity": "info"
+        },
+        {
+          "name": "split_is_geometric",
+          "passed": true,
+          "detail": "two independent meshes; 13 bodies were physically divided between them",
+          "value": 13,
+          "tolerance": null,
+          "severity": "info"
+        },
+        {
+          "name": "outward_normals",
+          "passed": true,
+          "detail": "every body that carries volume encloses it outward; 1 sub-threshold slivers ignored",
+          "value": 0,
+          "tolerance": null,
+          "severity": "info"
+        },
+        {
+          "name": "volume_conservation",
+          "passed": true,
+          "detail": "|V(A)+V(B) - V(master)| / V(master) = 0.000000%",
+          "value": 1.3e-09,
+          "tolerance": 0.01,
+          "severity": "info"
+        },
+        {
+          "name": "area_conservation",
+          "passed": true,
+          "detail": "surface area matches to 0.0000% once the two new cut walls (9.257 sq units) are discounted",
+          "value": 0.0,
+          "tolerance": 0.02,
+          "severity": "info"
+        },
+        {
+          "name": "no_cross_contamination",
+          "passed": true,
+          "detail": "0 vertices of A past the boundary into B's side, 0 the other way. Worst excursion 0.1814 mm against a 0.3877 mm allowance (chord of the curved cut across the widest 6.507 mm edge span).",
+          "value": [
+            0,
+            0
+          ],
+          "tolerance": 0.03876645,
+          "severity": "info"
+        },
+        {
+          "name": "no_bridging_geometry",
+          "passed": true,
+          "detail": "0 connected components straddle the split line",
+          "value": 0,
+          "tolerance": null,
+          "severity": "info"
+        },
+        {
+          "name": "piece_a_closed",
+          "passed": true,
+          "detail": "piece A is a closed solid",
+          "value": 0,
+          "tolerance": null,
+          "severity": "info"
+        },
+        {
+          "name": "piece_a_manifold",
+          "passed": true,
+          "detail": "piece A is edge-manifold",
+          "value": 0,
+          "tolerance": null,
+          "severity": "info"
+        },
+        {
+          "name": "piece_b_closed",
+          "passed": true,
+          "detail": "piece B is a closed solid",
+          "value": 0,
+          "tolerance": null,
+          "severity": "info"
+        },
+        {
+          "name": "piece_b_manifold",
+          "passed": true,
+          "detail": "piece B is edge-manifold",
+          "value": 0,
+          "tolerance": null,
+          "severity": "info"
+        },
+        {
+          "name": "piece_a_has_boundary_surface",
+          "passed": true,
+          "detail": "piece A carries 956 intentional boundary-wall triangles",
+          "value": 956,
+          "tolerance": null,
+          "severity": "info"
+        },
+        {
+          "name": "piece_b_has_boundary_surface",
+          "passed": true,
+          "detail": "piece B carries 956 intentional boundary-wall triangles",
+          "value": 956,
+          "tolerance": null,
+          "severity": "info"
+        },
+        {
+          "name": "components_addressable",
+          "passed": true,
+          "detail": "both pieces have finite coordinates and can be exported independently",
+          "value": null,
+          "tolerance": null,
+          "severity": "info"
+        },
+        {
+          "name": "footprint_reconstruction",
+          "passed": true,
+          "detail": "A union B covers the master footprint to within 0.414% of cells on a 384x384 grid (415 differing of 100192)",
+          "value": 0.004142,
+          "tolerance": 0.02,
+          "severity": "info"
+        },
+        {
+          "name": "piece_a_degenerate_faces",
+          "passed": true,
+          "detail": "0 zero-area triangles (retained deliberately: removing one would re-open the surface it belongs to)",
+          "value": 0,
+          "tolerance": null,
+          "severity": "info"
+        },
+        {
+          "name": "piece_b_degenerate_faces",
+          "passed": true,
+          "detail": "0 zero-area triangles (retained deliberately: removing one would re-open the surface it belongs to)",
+          "value": 0,
+          "tolerance": null,
+          "severity": "info"
+        }
+      ],
+      "passed": 18,
+      "total": 18,
+      "errors": 0,
+      "warnings": 0,
+      "ok": true,
+      "seconds": 2.309,
+      "measurements": {
+        "boundary_chord_mm": 0.38766,
+        "max_edge_span_mm": 6.5066,
+        "worst_excursion_mm": 0.18145,
+        "master_volume": 22.948073,
+        "piece_a_volume": 11.340123,
+        "piece_b_volume": 11.607949,
+        "volume_balance": 0.4942,
+        "master_faces": 134388,
+        "piece_a_faces": 68150,
+        "piece_b_faces": 70130,
+        "boundary_area": 9.257408
+      },
+      "coherence": {
+        "piece_a": {
+          "bodies": 86,
+          "coherent": false,
+          "main_body_volume_mm3": 4393.73,
+          "main_body_fraction": 0.38745,
+          "loose_fragments": 81,
+          "loose_fragment_volume_mm3": 6946.159,
+          "dust_bodies": 4
+        },
+        "piece_b": {
+          "bodies": 90,
+          "coherent": false,
+          "main_body_volume_mm3": 4401.277,
+          "main_body_fraction": 0.379156,
+          "loose_fragments": 85,
+          "loose_fragment_volume_mm3": 7206.6988,
+          "dust_bodies": 4
+        }
+      }
+    }
+  },
+  "v2": {
+    "version_id": "ver_a6321526c34341bb",
+    "dir": "/home/user/claude/AFRi-Studio/projects/afri_marigold/versions/cpt_03319d607a734fdd/ver_a6321526c34341bb",
+    "assets": {
+      "glb": "projects/afri_marigold/versions/cpt_03319d607a734fdd/ver_a6321526c34341bb/viewer.glb",
+      "piece_a_stl": "projects/afri_marigold/versions/cpt_03319d607a734fdd/ver_a6321526c34341bb/piece_a.stl",
+      "piece_b_stl": "projects/afri_marigold/versions/cpt_03319d607a734fdd/ver_a6321526c34341bb/piece_b.stl",
+      "master_stl": "projects/afri_marigold/versions/cpt_03319d607a734fdd/ver_a6321526c34341bb/master.stl",
+      "blend": "projects/afri_marigold/versions/cpt_03319d607a734fdd/ver_a6321526c34341bb/scene.blend",
+      "01_assembled_three_quarter": "projects/afri_marigold/versions/cpt_03319d607a734fdd/ver_a6321526c34341bb/01_assembled_three_quarter.png",
+      "02_exploded": "projects/afri_marigold/versions/cpt_03319d607a734fdd/ver_a6321526c34341bb/02_exploded.png",
+      "03_top": "projects/afri_marigold/versions/cpt_03319d607a734fdd/ver_a6321526c34341bb/03_top.png",
+      "04_side": "projects/afri_marigold/versions/cpt_03319d607a734fdd/ver_a6321526c34341bb/04_side.png",
+      "05_three_quarter_hero": "projects/afri_marigold/versions/cpt_03319d607a734fdd/ver_a6321526c34341bb/05_three_quarter_hero.png"
     },
     "stats": {
       "verts": 130080,
@@ -28,7 +272,7 @@
       "layer_count": 9,
       "diameter_mm": 95.45,
       "height_mm": 33.61,
-      "build_seconds": 2.418,
+      "build_seconds": 2.431,
       "radius": 4.5,
       "as_built_triangles": 258892,
       "master_triangles": 453368,
@@ -50,7 +294,7 @@
         "fragment_volume_mm3": 0.841769,
         "watertight": true,
         "winding_consistent": true,
-        "seconds": 4.34
+        "seconds": 4.67
       }
     },
     "validation": {
@@ -211,7 +455,7 @@
       "errors": 0,
       "warnings": 0,
       "ok": true,
-      "seconds": 6.632,
+      "seconds": 6.588,
       "measurements": {
         "boundary_chord_mm": 0.31036,
         "max_edge_span_mm": 5.7779,
@@ -256,7 +500,7 @@
           "fragment_volume_mm3": 0.841769,
           "watertight": true,
           "winding_consistent": true,
-          "seconds": 4.34
+          "seconds": 4.67
         },
         "debris_removed": {
           "piece_a": {
