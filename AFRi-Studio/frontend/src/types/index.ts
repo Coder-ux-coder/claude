@@ -49,7 +49,7 @@ export interface SchemaField {
 }
 export interface UiSchema {
   engine_version: string
-  sections: Record<'flower' | 'split' | 'material' | 'render', SchemaField[]>
+  sections: Record<'flower' | 'split' | 'hat' | 'placement' | 'material' | 'render', SchemaField[]>
 }
 
 export interface SystemInfo {

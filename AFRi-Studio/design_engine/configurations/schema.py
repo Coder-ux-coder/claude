@@ -134,6 +134,10 @@ class FlowerConfig(BaseModel):
                            "Depth of the notch at the petal tip.", "shape")
     layer_tilt_gain: float = P(0.62, 0.0, 1.4, 0.01, "x",
                                "How much more upright each inner row stands.", "shape")
+    dome_gain: float = P(0.40, 0.10, 1.20, 0.01, "x",
+                         "How steeply the petal rows climb toward the centre, as a fraction "
+                         "of relief depth. Higher lifts the flower into a pompon; lower "
+                         "leaves it a flat rosette.", "shape")
 
     center_diameter_ratio: float = P(0.22, 0.08, 0.6, 0.01, "x",
                                      "Centre boss diameter as a fraction of flower diameter.", "center")
@@ -147,6 +151,15 @@ class FlowerConfig(BaseModel):
                                "This is what physically carries each half.", "structure")
     base_thickness_mm: float = P(1.8, 0.5, 6.0, 0.1, "mm",
                                  "Thickness of the structural base disc.", "structure")
+
+    consolidate: bool = Field(True, json_schema_extra={
+        "ui": {"description": "Boolean-union the petals, base and centre into one solid before "
+                              "splitting. Off leaves the flower as overlapping shells, which "
+                              "renders identically but is not a manufacturable part.",
+               "group": "structure"}})
+    dust_volume_mm3: float = P(0.5, 0.0, 50.0, 0.1, "mm3",
+                               "Bodies smaller than this are discarded as boolean debris.",
+                               "structure")
 
     organic_variation: float = P(0.35, 0.0, 1.0, 0.01, "x",
                                  "Per-petal random jitter in angle, length, width and tilt.", "variation")

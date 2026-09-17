@@ -308,6 +308,12 @@ def main():
             if key not in created:
                 continue
             bpy.ops.object.select_all(action="DESELECT")
+            # A hidden object cannot be selected, and the exporter then writes a
+            # valid file containing nothing: master.stl came out at 84 bytes,
+            # a header with a triangle count of zero. Unhide for the export and
+            # put the visibility back afterwards.
+            was_hidden = created[key].hide_viewport
+            created[key].hide_viewport = False
             created[key].select_set(True)
             view_layer.objects.active = created[key]
             path = os.path.join(outdir, f"{key}.{fmt}")
@@ -320,6 +326,8 @@ def main():
                     outputs[f"{key}_{fmt}"] = path
             except Exception as exc:
                 event("WARNING", f"{fmt} export of {key} failed: {exc!r}")
+            finally:
+                created[key].hide_viewport = was_hidden
 
     # ---- save the editable project -------------------------------------
     if spec.get("save_blend", True):

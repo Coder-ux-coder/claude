@@ -27,9 +27,19 @@ Ported, and running live in the page:
 | `splitting/paths.py` | `buildSplitPath` - balanced, s_river, organic |
 | `splitting/splitter.py` | `splitFlower` - exact per-triangle clipping, per-body, with capping |
 
-Not ported, and deliberately so: Blender. Materials, lighting, Cycles
-rendering, `.blend` and glTF export stay in `blender_worker/` on the desktop
-build. The page uses three.js for a working viewport, not for photoreal output.
+Not ported, and deliberately so:
+
+* **Blender.** Materials, lighting, Cycles rendering, `.blend` and glTF export
+  stay in `blender_worker/` on the desktop build. The page uses three.js for a
+  working viewport, not for photoreal output.
+* **The boolean union.** The desktop pipeline fuses the petals, base and centre
+  into a single manifold with manifold3d before splitting, so each half exports
+  as one solid. manifold3d is a WASM module that fetches its own `.wasm` at
+  runtime, and the Artifact CSP blocks a library's runtime fetches, so the page
+  cannot run it. The browser build therefore ships the flower *as built* -
+  overlapping closed shells, one per petal plus the base and centre. It renders
+  identically; it is not a manufacturable part. The page says so, and reports
+  the real body count rather than implying one solid.
 
 ## Parity
 

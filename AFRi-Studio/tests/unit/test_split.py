@@ -5,7 +5,7 @@ import pytest
 from design_engine.configurations.schema import (FlowerConfig, SplitConfig,
                                                  SplitType)
 from design_engine.flower.marigold import MM, build_master_flower
-from design_engine.geometry.mesh import PART_BOUNDARY
+from design_engine.geometry.mesh import PART_BOUNDARY, Mesh
 from design_engine.splitting.paths import build_split_path
 from design_engine.splitting.splitter import (boundary_edges, earclip,
                                               split_flower)
@@ -190,3 +190,65 @@ def test_signed_field_matches_the_frame(flower):
     sb = r.split_path.signed(r.piece_b.verts)
     assert sa.max() > 0 and sb.min() < 0
     assert sa.min() > -0.05 and sb.max() < 0.05
+
+
+# ---------------------------------------------------------------------------
+# Cut-wall orientation
+# ---------------------------------------------------------------------------
+def test_cut_caps_are_wound_outward():
+    """Every body of every piece must enclose positive volume.
+
+    This guards a bug that shipped: cut caps were triangulated in whatever
+    rotational direction the undirected boundary walk produced, so some were
+    wound inside-out. Volume conservation could not see it, because the two
+    pieces' caps are exact negatives and the error cancels in the A + B sum.
+    """
+    from design_engine.configurations.schema import FlowerConfig
+    from design_engine.flower.marigold import MM, build_master_flower
+
+    cfg = FlowerConfig(layer_count=3, petal_count_base=9, petal_density=0.8,
+                       petal_segments_u=8, petal_segments_v=5)
+    master = build_master_flower(cfg).mesh
+    for kind in (SplitType.BALANCED, SplitType.S_RIVER, SplitType.ORGANIC):
+        res = split_flower(master, SplitConfig(type=kind, amplitude=0.35),
+                           cfg.diameter_mm * 0.5 * MM)
+        for name, piece in (("A", res.piece_a), ("B", res.piece_b)):
+            labels = piece.component_labels()
+            floor = abs(piece.volume()) * 1e-5
+            bad = []
+            for u in np.unique(labels):
+                sub = Mesh(piece.verts, piece.faces[labels == u])
+                v = sub.volume()
+                if v < 0 and abs(v) >= floor:
+                    bad.append(float(v))
+            assert not bad, f"{kind.value} piece {name}: {len(bad)} inside-out bodies"
+
+
+def test_validator_detects_inverted_bodies():
+    """The check has to fail on bad input, or it is not a check."""
+    from design_engine.configurations.schema import FlowerConfig
+    from design_engine.flower.marigold import MM, build_master_flower
+    from design_engine.splitting.validate import validate_split
+
+    cfg = FlowerConfig(layer_count=2, petal_count_base=7, petal_density=0.7,
+                       petal_segments_u=7, petal_segments_v=5)
+    master = build_master_flower(cfg).mesh
+    res = split_flower(master, SplitConfig(type=SplitType.BALANCED),
+                       cfg.diameter_mm * 0.5 * MM)
+    ok = validate_split(master, res.piece_a, res.piece_b, res.split_path)
+    assert next(c for c in ok["checks"] if c["name"] == "outward_normals")["passed"]
+
+    # Turn one body inside-out and confirm the validator says so.
+    labels = res.piece_a.component_labels()
+    # Invert the LARGEST body, so the test is about a real defect rather than
+    # a sliver the check is entitled to ignore.
+    target = max(np.unique(labels),
+                 key=lambda u: abs(Mesh(res.piece_a.verts,
+                                        res.piece_a.faces[labels == u]).volume()))
+    faces = res.piece_a.faces.copy()
+    faces[labels == target] = faces[labels == target][:, ::-1]
+    broken = Mesh(res.piece_a.verts, faces, res.piece_a.parts)
+    bad = validate_split(master, broken, res.piece_b, res.split_path)
+    check = next(c for c in bad["checks"] if c["name"] == "outward_normals")
+    assert not check["passed"], "validator missed an inside-out body"
+    assert check["value"] >= 1

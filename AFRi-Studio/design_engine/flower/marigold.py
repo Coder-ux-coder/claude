@@ -70,7 +70,7 @@ def _layer_schedule(cfg: FlowerConfig) -> list[dict]:
         tilt = np.deg2rad(4.0) + cfg.layer_tilt_gain * np.deg2rad(62.0) * f ** 0.95
         curl = cfg.petal_curvature * (0.28 + 0.72 * f ** 0.85)
 
-        z = relief * 0.40 * (f ** 1.15)
+        z = relief * cfg.dome_gain * (f ** 1.15)
 
         # Stagger each row into the gaps of the one outside it, with a golden
         # increment so rows never re-align at any depth.
@@ -98,8 +98,13 @@ def build_master_flower(cfg: FlowerConfig, progress=None) -> FlowerResult:
     # row is physically unattached and each half would fall apart.
     outer_root = max(l["radius"] for l in layers)
     base_r = max(cfg.base_disc_ratio * R, outer_root * 1.07)
+    # Hand the disc the petal-root profile so the dome rises to meet every row.
+    # Without it the inner rows float clear of the structure.
+    root_r = np.array([l["radius"] for l in layers][::-1], dtype=np.float64)
+    root_z = np.array([l["z"] for l in layers][::-1], dtype=np.float64)
     base = build_base_disc(base_r, cfg.base_thickness_mm * MM,
-                           relief * 0.16, segments=96, rings=10)
+                           relief * 0.16, segments=96, rings=18,
+                           root_profile=(root_r, root_z))
     parts.append(base)
     if progress:
         progress("base disc built", 1, len(layers) + 3)
@@ -151,7 +156,7 @@ def build_master_flower(cfg: FlowerConfig, progress=None) -> FlowerResult:
         centre = build_center(center_r, relief * cfg.center_dome_height,
                               floret_rings=cfg.center_floret_rings,
                               segments=56, seed=cfg.seed)
-        centre = centre.translated((0, 0, relief * 0.40))
+        centre = centre.translated((0, 0, relief * cfg.dome_gain))
         parts.append(centre)
     if progress:
         progress("centre built", len(layers) + 2, len(layers) + 3)

@@ -12,8 +12,21 @@ from design_engine.geometry.mesh import PART_BASE, PART_CENTER, Mesh, grid_faces
 
 
 def build_base_disc(radius: float, thickness: float, dome_height: float,
-                    segments: int = 64, rings: int = 10) -> Mesh:
-    """A shallow domed disc, closed, centred at the origin, sitting on z=0."""
+                    segments: int = 64, rings: int = 10,
+                    root_profile: tuple[np.ndarray, np.ndarray] | None = None) -> Mesh:
+    """A domed disc, closed, centred at the origin, sitting on z=0.
+
+    ``root_profile`` is ``(radius_ascending, root_z)`` sampled from the petal
+    layer schedule. When given, the dome is built to *follow the petal roots*
+    rather than to an arbitrary height, so every row is physically embedded in
+    the structure.
+
+    This matters more than it looks. With a plain shallow dome the inner rows
+    end up floating above the base with nothing holding them: measured on the
+    shipped defaults, rows 4 and 5 sat 0.64 mm and 1.61 mm clear of it. They
+    render perfectly well -- and are not attached to anything. A receptacle
+    that rises to meet each root is also what a real composite flower has.
+    """
     segments = max(12, int(segments))
     rings = max(3, int(rings))
     theta = np.linspace(0, 2 * np.pi, segments, endpoint=False)
@@ -22,8 +35,15 @@ def build_base_disc(radius: float, thickness: float, dome_height: float,
     R, T = np.meshgrid(rr, theta, indexing="ij")
     x = R * radius * np.cos(T)
     y = R * radius * np.sin(T)
-    # Dome falls off toward the rim.
-    z_top = dome_height * np.cos(np.clip(R, 0, 1) * np.pi * 0.5) ** 1.5 + thickness
+    if root_profile is None:
+        # Dome falls off toward the rim.
+        z_top = dome_height * np.cos(np.clip(R, 0, 1) * np.pi * 0.5) ** 1.5 + thickness
+    else:
+        r_asc, z_asc = root_profile
+        z_root = np.interp((R * radius).ravel(), r_asc, z_asc).reshape(R.shape)
+        # The disc keeps its flat thickness out at the rim, where there are no
+        # roots left to reach.
+        z_top = np.maximum(thickness, z_root)
     z_bot = np.zeros_like(x)
 
     top = np.stack([x, y, z_top], -1).reshape(-1, 3)

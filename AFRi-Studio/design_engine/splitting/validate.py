@@ -132,6 +132,37 @@ def validate_split(master: Mesh, piece_a: Mesh, piece_b: Mesh,
         f"two independent meshes; {len(shared_parts)} bodies were physically divided "
         f"between them", value=len(shared_parts)))
 
+    # ---- every body faces outward ---------------------------------------
+    # This check exists because its absence hid a real bug. Cut caps were being
+    # triangulated in whatever rotational direction the undirected boundary
+    # walk happened to produce, leaving 9 bodies in piece A and 10 in piece B
+    # wound inside-out. Volume conservation could not see it: the two pieces'
+    # caps are exact negatives of each other, so an inverted cap cancels in the
+    # A + B sum and the total still matched the master to eight decimals.
+    # Judged only on bodies that carry meaningful volume. A clipped petal tip
+    # can leave a sliver of a few triangles enclosing ~1e-6 of a cubic unit,
+    # and the sign of a volume that small is numerical noise, not a defect.
+    inverted, specks = [], 0
+    for nm, piece in (("A", piece_a), ("B", piece_b)):
+        lab = piece.component_labels()
+        floor = abs(piece.volume()) * 1e-5
+        for u in np.unique(lab):
+            sub = Mesh(piece.verts, piece.faces[lab == u])
+            v = sub.volume()
+            if v >= 0:
+                continue
+            if abs(v) < floor:
+                specks += 1
+            else:
+                inverted.append((nm, float(v)))
+    detail = ("every body that carries volume encloses it outward"
+              if not inverted else
+              f"{len(inverted)} bodies are wound inside-out "
+              f"(worst {min(v for _, v in inverted):.3e})")
+    if specks:
+        detail += f"; {specks} sub-threshold slivers ignored"
+    checks.append(_check("outward_normals", not inverted, detail, value=len(inverted)))
+
     # ---- exact reconstruction -------------------------------------------
     vm, va, vb = master.volume(), piece_a.volume(), piece_b.volume()
     rel = abs(va + vb - vm) / max(abs(vm), 1e-12)

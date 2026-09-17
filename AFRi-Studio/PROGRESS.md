@@ -214,3 +214,65 @@ now carries its own rule); and the phone layout put the flower below the fold
 
 Stage Two - the hat - remains not started, and still requires explicit
 authorisation.
+
+## C1-C4 - Concept C refined, and three defects fixed (2026-09-17)
+
+Raised from review of the exported meshes. All three reports were real; one
+was worse than reported.
+
+**Face winding.** Cut caps were triangulated in whatever rotational direction
+the undirected boundary walk happened to produce, so some were wound
+inside-out: measured, 9 bodies in piece A and 10 in piece B. Volume
+conservation could not see it, because the two pieces' caps are exact
+negatives of one another and an inverted cap cancels in the A + B sum - the
+total still matched the master to eight decimals. Fixed at source: each cap
+loop is now oriented from its area-weighted normal against the direction that
+piece's material faces at the cut. A new `outward_normals` validation check
+asserts it, and a test deliberately inverts a body to prove the check fails on
+bad input. The check is scoped to bodies carrying meaningful volume, because a
+clipped petal tip can leave a sliver enclosing ~1e-6 of a cubic unit whose
+sign is numerical noise.
+
+**Disconnected bodies.** Each half was ~90 overlapping closed shells rather
+than one part. Two causes, both fixed:
+
+* Rows 4 and 5 were *genuinely unattached*, floating 0.64 mm and 1.61 mm above
+  the base disc with nothing holding them. The structural base now follows the
+  petal-root profile, so every row is embedded, with 0.41-2.35 mm of overlap.
+* The petals were only ever intersecting the base, never joined to it. A new
+  CONSOLIDATE stage boolean-unions them with manifold3d (Apache-2.0) before the
+  split. Blender's edit-mode self-intersect was tried first and made the mesh
+  worse - 88 bodies in, 176 bodies and 14,105 non-manifold edges out - so it is
+  not used.
+
+Union-first then split beats split-then-union, measured: 0 open edges, 0 cap
+failures, 2.6e-07% volume error and 0 inverted bodies, against 0.0019% error
+for the other order. The kernel has to be grouped by connected component in
+that case, not by part id; grouping a consolidated mesh by part id hands it 159
+open patches and produces 6,475 open edges and a 15% volume error.
+
+Concept C v2 now ships **one coherent solid per half**, after removing 19
+debris specks totalling 1.06 mm3 - 0.002% of volume.
+
+**Triangle counts.** The build report printed the master count beside the
+per-piece counts as though they summed. They do not, and should not: the split
+subdivides every triangle the curve crosses and then builds two cut walls that
+did not exist. Now reported explicitly, with the delta and the reason.
+
+**The flower.** v1 read as a daisy. v2 is a marigold: florets shorter (0.46 ->
+0.33 of radius) and broader, denser (7 -> 9 rows, 157 -> 315 florets), with
+deeper, finer edge crenulation. A new `dome_gain` parameter - default 0.40, so
+v1 reproduces bit-exactly - lifts the rows into a pompon: height-to-diameter
+went 0.205 -> 0.352. Two intermediate settings were rejected on inspection: at
+width 1.28 with a deep tip notch each floret read as a clover leaf, and at
+curl 0.78 with dome_gain 0.72 the rows terraced into a stepped cone with the
+receptacle showing through between them.
+
+**The curve.** The organic split added fractal noise at up to 0.7 of amplitude
+across the whole span, which read as jitter. It is now one dominant sweep
+answered by a shorter counter-curve, with wander subordinate and enveloped to
+nothing at both ends so the curve meets the silhouette at two clean points -
+two direction changes inside the flower, not a wander.
+
+v1 is preserved and regenerated from its own recorded parameters, so the two
+were photographed under identical cameras and light.

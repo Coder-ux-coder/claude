@@ -45,7 +45,8 @@ def test_system_reports_real_environment(client):
 
 def test_schema_drives_the_parameter_editor(client):
     d = client.get("/api/schema").json()
-    assert set(d["sections"]) == {"flower", "split", "material", "render"}
+    assert set(d["sections"]) == {"flower", "split", "hat", "placement",
+                                  "material", "render"}
     flower = {f["name"]: f for f in d["sections"]["flower"]}
     assert "petal_density" in flower
     f = flower["petal_density"]

@@ -149,17 +149,29 @@ def build_split_path(cfg: SplitConfig, radius: float) -> SplitPath:
         kind = "s_river"
 
     elif cfg.type == SplitType.ORGANIC:
-        # A gentler spine, plus seeded fractal wander that makes the division
-        # irregular and asymmetric rather than merely wavy.
+        # A deliberate gesture first, texture second.
+        #
+        # The earlier version added fractal noise at up to 0.7 of the amplitude
+        # across the whole span, which read as jitter rather than as a decision:
+        # the curve wandered, changed its mind repeatedly, and frayed where it
+        # crossed the flower's outline. The two boundaries are complementary
+        # whatever the curve does, so the only thing that makes the division
+        # look composed is the shape of the curve itself.
+        #
+        # So: one long dominant sweep answered by a shorter counter-curve,
+        # placed off-centre so the halves are unequal on purpose; and wander
+        # that is subordinate to that gesture and enveloped to nothing at both
+        # ends, so the curve meets the silhouette at two clean points.
         amp = cfg.amplitude * radius
-        cys = np.array([-1.0, -0.42, 0.18, 1.0]) * extent
-        cxs = pos + np.array([0.35, -0.75, 0.30, -0.55]) * amp
+        cys = np.array([-1.0, -0.52, 0.06, 0.62, 1.0]) * extent
+        cxs = pos + np.array([0.28, -0.92, -0.10, 0.74, 0.30]) * amp
         spine = _catmull_rom_1d(cys, cxs, y, tension)
-        noise = value_noise_1d(yn * 1.6 + 3.0, seed=cfg.organic_seed,
-                               octaves=cfg.organic_octaves,
-                               roughness=0.35 + 0.5 * cfg.organic_roughness,
-                               base_freq=1.5)
-        x = spine + noise * amp * (0.30 + 0.70 * cfg.organic_roughness)
+        envelope = np.sin(np.clip((yn + 1.0) * 0.5, 0.0, 1.0) * np.pi) ** 0.75
+        noise = value_noise_1d(yn * 1.15 + 3.0, seed=cfg.organic_seed,
+                               octaves=max(1, cfg.organic_octaves - 1),
+                               roughness=0.28 + 0.34 * cfg.organic_roughness,
+                               base_freq=1.15)
+        x = spine + noise * amp * envelope * (0.16 + 0.30 * cfg.organic_roughness)
         kind = "organic"
     else:
         raise ValueError(f"unknown split type {cfg.type}")

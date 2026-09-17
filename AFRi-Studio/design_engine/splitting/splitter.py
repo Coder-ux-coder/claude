@@ -268,12 +268,23 @@ def earclip(poly: np.ndarray) -> list[tuple[int, int, int]]:
     return tris
 
 
-def cap_faces(verts: np.ndarray, faces: list, path: SplitPath) -> tuple[list, dict]:
+def cap_faces(verts: np.ndarray, faces: list, path: SplitPath,
+              outward_sign: float) -> tuple[list, dict]:
     """Triangulate the open boundary of a clipped body on the flattened cut wall.
 
     The cut runs along the ruled vertical surface swept by the path. That
     surface is developable, so it flattens exactly to 2-D as (arclength, z):
     triangulate there, then map straight back to 3-D.
+
+    ``outward_sign`` is the sign the cap normal's split-frame x component must
+    carry: -1 for the piece on the +s side, +1 for the other. It has to be
+    supplied rather than inferred, because :func:`chain_loops` walks the
+    boundary *undirected* and so hands back loops in an arbitrary rotational
+    direction. Triangulating those as they come leaves some caps wound
+    backwards -- an inverted cap renders as a black hole and makes the piece's
+    measured volume wrong, and it is invisible to a check that only compares
+    ``volume(A) + volume(B)`` against the master, because the two pieces' caps
+    are exact negatives of one another and the error cancels in the sum.
     """
     edges = boundary_edges(np.asarray(faces, dtype=np.int64)) if faces else []
     if not edges:
@@ -291,6 +302,14 @@ def cap_faces(verts: np.ndarray, faces: list, path: SplitPath) -> tuple[list, di
         if not tris:
             open_chains += 1
             continue
+        # Decide the loop's facing once, from the area-weighted normal of the
+        # whole cap: individual slivers are too noisy to trust one at a time.
+        nx = 0.0
+        for (a, b, c) in tris:
+            pa, pb, pc = pts[a], pts[b], pts[c]
+            nx += float(np.cross(pb - pa, pc - pa)[0])
+        if nx * outward_sign < 0:
+            tris = [(c, b, a) for (a, b, c) in tris]
         for (a, b, c) in tris:
             new_faces.append([loop[a], loop[b], loop[c]])
         capped += 1
@@ -302,8 +321,18 @@ def cap_faces(verts: np.ndarray, faces: list, path: SplitPath) -> tuple[list, di
 # Public entry point
 # ---------------------------------------------------------------------------
 def split_flower(master: Mesh, cfg: SplitConfig, radius: float,
-                 progress=None, eps: float = 1e-9) -> SplitResult:
-    """Divide the master flower into two independent, complementary pieces."""
+                 progress=None, eps: float = 1e-9,
+                 body_labels: np.ndarray | None = None) -> SplitResult:
+    """Divide the master flower into two independent, complementary pieces.
+
+    ``body_labels`` gives the per-face grouping into closed bodies. It defaults
+    to the part-provenance channel, which is exactly right for the as-built
+    flower: one petal, one part id, one closed solid. A *consolidated* flower
+    is a single manifold whose faces still carry per-petal ids, and grouping
+    that by part id would hand the kernel 159 open patches instead of one
+    closed body -- measured, that produces 6,475 open edges and a 15% volume
+    error. Pass connected-component labels in that case.
+    """
     t0 = time.perf_counter()
 
     # An angled split is handled by rotating into the split's own frame, cutting
@@ -329,7 +358,7 @@ def split_flower(master: Mesh, cfg: SplitConfig, radius: float,
         nudge = 1.3e-5 * (attempt + 1)
     s_all = s_all - nudge
 
-    parts = work.parts
+    parts = work.parts if body_labels is None else np.asarray(body_labels)
     unique_parts = np.unique(parts)
     if progress:
         progress(f"clipping {work.n_faces} triangles across "
@@ -350,29 +379,31 @@ def split_flower(master: Mesh, cfg: SplitConfig, radius: float,
         bs = s_all[used]
         bf = remap[bfaces]
 
+        # A body that is not cut keeps its faces' own provenance exactly.
+        own_parts = work.parts[sel].astype(np.int32)
         if (bs > eps).all():
-            meshes_a.append(Mesh(bverts.astype(np.float32), bf.astype(np.int32),
-                                 np.full(len(bf), pid, np.int32)))
+            meshes_a.append(Mesh(bverts.astype(np.float32), bf.astype(np.int32), own_parts))
             continue
         if (bs < -eps).all():
-            meshes_b.append(Mesh(bverts.astype(np.float32), bf.astype(np.int32),
-                                 np.full(len(bf), pid, np.int32)))
+            meshes_b.append(Mesh(bverts.astype(np.float32), bf.astype(np.int32), own_parts))
             continue
 
         n_clipped_bodies += 1
         pool, fa, fb, ntri = _clip_body(bverts, bf, bs, eps)
         n_clipped_tris += ntri
 
-        for faces, bucket, flip in ((fa, meshes_a, False), (fb, meshes_b, True)):
+        # Piece A is the region s > 0, so at the cut its material faces toward
+        # -x in the split frame; piece B is the mirror of that.
+        for faces, bucket, outward in ((fa, meshes_a, -1.0), (fb, meshes_b, 1.0)):
             if not faces:
                 continue
-            pid_list = [int(pid)] * len(faces)
+            pid_list = [int(own_parts[0])] * len(faces)
             if cfg.cap_boundary:
-                caps, st = cap_faces(pool, faces, path)
+                caps, st = cap_faces(pool, faces, path, outward)
                 for k in ("caps", "cap_triangles", "open_chains", "loops"):
                     cap_stats[k] += st[k]
                 if caps:
-                    faces = faces + [c[::-1] for c in caps] if flip else faces + caps
+                    faces = faces + caps
                     pid_list = pid_list + [PART_BOUNDARY] * len(caps)
             f = np.asarray(faces, dtype=np.int64)
             u = np.unique(f)

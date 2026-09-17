@@ -304,6 +304,33 @@ export function orient(m) {
   return mesh(V, F, P, m.name);
 }
 
+/* Connected-component label per face, by union-find over shared vertices.
+ * Reported rather than fixed: the browser cannot run the boolean that fuses
+ * the flower into one solid, so it says how many bodies there actually are. */
+export function componentLabels(m) {
+  const nv = m.nVerts;
+  const parent = new Int32Array(nv);
+  for (let i = 0; i < nv; i++) parent[i] = i;
+  const find = (x) => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+  const F = m.faces;
+  for (let f = 0; f < F.length; f += 3) {
+    const ra = find(F[f]), rb = find(F[f + 1]), rc = find(F[f + 2]);
+    if (ra !== rb) parent[rb] = ra;
+    const r2 = find(ra);
+    if (r2 !== rc) parent[rc] = r2;
+  }
+  const out = new Int32Array(m.nFaces);
+  for (let i = 0; i < m.nFaces; i++) out[i] = find(F[i * 3]);
+  return out;
+}
+
+export function countBodies(m) {
+  const lab = componentLabels(m);
+  const seen = new Set();
+  for (let i = 0; i < lab.length; i++) seen.add(lab[i]);
+  return seen.size;
+}
+
 export function translated(m, vec) {
   const V = m.verts, out = new Float64Array(V.length);
   for (let i = 0; i < V.length; i += 3) {
@@ -562,14 +589,22 @@ function ringFaces(rings, segments, offset, flip) {
   return out;
 }
 
-export function buildBaseDisc(radius, thickness, domeHeight, segments = 64, rings = 10) {
+/* rootProfile is [radiusAscending, rootZ] from the layer schedule. With it the
+ * dome is built to follow the petal roots, so every row is physically embedded
+ * in the structure. Without it the inner rows float clear of the base with
+ * nothing holding them -- measured on the old defaults, rows 4 and 5 sat
+ * 0.64 mm and 1.61 mm above it. */
+export function buildBaseDisc(radius, thickness, domeHeight, segments = 64, rings = 10,
+                              rootProfile = null) {
   segments = Math.max(12, segments | 0);
   rings = Math.max(3, rings | 0);
   const n = rings * segments;
   const verts = new Float64Array(n * 2 * 3);
   for (let i = 0; i < rings; i++) {
     const R = rings === 1 ? 0 : i / (rings - 1);
-    const zTop = domeHeight * Math.pow(Math.cos(clamp(R, 0, 1) * Math.PI * 0.5), 1.5) + thickness;
+    const zTop = rootProfile
+      ? Math.max(thickness, interpSorted(R * radius, rootProfile[0], rootProfile[1]))
+      : domeHeight * Math.pow(Math.cos(clamp(R, 0, 1) * Math.PI * 0.5), 1.5) + thickness;
     for (let j = 0; j < segments; j++) {
       const T = 2 * Math.PI * j / segments;
       const idx = i * segments + j;
@@ -636,7 +671,7 @@ export const FLOWER_DEFAULTS = {
   diameter_mm: 90.0, relief_depth_mm: 18.0, thickness_mm: 1.1,
   layer_count: 7, petal_count_base: 21, petal_density: 1.25,
   petal_length_ratio: 0.46, petal_width_ratio: 1.02, petal_overlap: 0.34,
-  petal_curvature: 0.62, petal_cup: 0.45, petal_ruffle_amp: 0.24,
+  petal_curvature: 0.62, petal_cup: 0.45, petal_ruffle_amp: 0.24, dome_gain: 0.40,
   petal_ruffle_freq: 3.6, petal_notch: 0.16, layer_tilt_gain: 0.62,
   center_diameter_ratio: 0.22, center_dome_height: 0.30, center_floret_rings: 5,
   base_disc_ratio: 0.40, base_thickness_mm: 1.8,
@@ -675,7 +710,7 @@ export function layerSchedule(cfg) {
     // turns the flower into a bowl.
     const tilt = (4.0 * Math.PI / 180) + cfg.layer_tilt_gain * (62.0 * Math.PI / 180) * Math.pow(f, 0.95);
     const curl = cfg.petal_curvature * (0.28 + 0.72 * Math.pow(f, 0.85));
-    const z = relief * 0.40 * Math.pow(f, 1.15);
+    const z = relief * cfg.dome_gain * Math.pow(f, 1.15);
     // Golden increment so rows never re-align at any depth.
     const phase = (Math.PI / count) * (i % 2) + i * 2 * Math.PI * 0.381966 / Math.max(count, 1);
     layers.push({ index: i, radius: r, count, length, width, tilt, curl, z, phase, f });
@@ -696,7 +731,10 @@ export function buildMasterFlower(cfg, onProgress) {
   // row is physically unattached and each half falls apart.
   const outerRoot = Math.max(...layers.map((l) => l.radius));
   const baseR = Math.max(cfg.base_disc_ratio * R, outerRoot * 1.07);
-  parts.push(buildBaseDisc(baseR, cfg.base_thickness_mm * MM, relief * 0.16, 96, 10));
+  const rootR = Float64Array.from(layers.map((l) => l.radius).reverse());
+  const rootZ = Float64Array.from(layers.map((l) => l.z).reverse());
+  parts.push(buildBaseDisc(baseR, cfg.base_thickness_mm * MM, relief * 0.16, 96, 18,
+                           [rootR, rootZ]));
   if (onProgress) onProgress('base disc built', 1, layers.length + 3);
 
   let totalPetals = 0;
@@ -740,7 +778,7 @@ export function buildMasterFlower(cfg, onProgress) {
   const centerR = cfg.center_diameter_ratio * R;
   if (centerR > 1e-4) {
     let centre = buildCenter(centerR, relief * cfg.center_dome_height, cfg.center_floret_rings, 56);
-    parts.push(translated(centre, [0, 0, relief * 0.40]));
+    parts.push(translated(centre, [0, 0, relief * cfg.dome_gain]));
   }
   if (onProgress) onProgress('centre built', layers.length + 2, layers.length + 3);
 
@@ -832,15 +870,23 @@ export function buildSplitPath(cfg, radius) {
   } else if (cfg.type === 'organic') {
     // A gentler spine, plus seeded fractal wander that makes the division
     // irregular and asymmetric rather than merely wavy.
+    // A deliberate gesture first, texture second: one long dominant sweep
+    // answered by a shorter counter-curve, placed off-centre so the halves are
+    // unequal on purpose. The wander is subordinate to that and enveloped to
+    // nothing at both ends, so the curve meets the silhouette at two clean
+    // points instead of fraying across it.
     const amp = cfg.amplitude * radius;
-    const cys = Float64Array.from([-1.0, -0.42, 0.18, 1.0], (v) => v * extent);
-    const cxs = Float64Array.from([0.35, -0.75, 0.30, -0.55], (v) => pos + v * amp);
+    const cys = Float64Array.from([-1.0, -0.52, 0.06, 0.62, 1.0], (v) => v * extent);
+    const cxs = Float64Array.from([0.28, -0.92, -0.10, 0.74, 0.30], (v) => pos + v * amp);
     const spine = catmullRom1D(cys, cxs, y, tension);
     x = new Float64Array(PATH_SAMPLES);
     for (let i = 0; i < PATH_SAMPLES; i++) {
-      const noise = valueNoise1D((y[i] / extent) * 1.6 + 3.0, cfg.organic_seed,
-        cfg.organic_octaves, 0.35 + 0.5 * cfg.organic_roughness, 1.5);
-      x[i] = spine[i] + noise * amp * (0.30 + 0.70 * cfg.organic_roughness);
+      const yn = y[i] / extent;
+      const envelope = Math.pow(Math.sin(clamp((yn + 1) * 0.5, 0, 1) * Math.PI), 0.75);
+      const noise = valueNoise1D(yn * 1.15 + 3.0, cfg.organic_seed,
+        Math.max(1, cfg.organic_octaves - 1),
+        0.28 + 0.34 * cfg.organic_roughness, 1.15);
+      x[i] = spine[i] + noise * amp * envelope * (0.16 + 0.30 * cfg.organic_roughness);
     }
     kind = 'organic';
   } else {
@@ -1082,7 +1128,7 @@ export function earclip(poly) {
 /* Triangulate the open boundary of a clipped body on the flattened cut wall.
  * The cut runs along a ruled vertical surface, which is developable, so it
  * flattens exactly to 2-D as (arclength, z). */
-function capFaces(pool, faces, path) {
+function capFaces(pool, faces, path, outwardSign) {
   const stats = { caps: 0, cap_triangles: 0, open_chains: 0, loops: 0 };
   if (!faces.length) return [[], stats];
   const edges = boundaryEdges(faces, 1);
@@ -1097,8 +1143,23 @@ function capFaces(pool, faces, path) {
       poly2[i * 2] = path.tOfY(pool[loop[i] * 3 + 1]);
       poly2[i * 2 + 1] = pool[loop[i] * 3 + 2];
     }
-    const tris = earclip(poly2);
+    let tris = earclip(poly2);
     if (!tris.length) { stats.open_chains++; continue; }
+    // chainLoops walks the boundary undirected, so a loop comes back in an
+    // arbitrary rotational direction and some caps would be wound backwards.
+    // Decide the facing once per cap from its area-weighted normal: a single
+    // sliver is too noisy to trust. An inverted cap renders as a hole and makes
+    // the piece's volume wrong, and it is invisible to a check that only tests
+    // volume(A) + volume(B) against the master, because the two pieces' caps
+    // are exact negatives and the error cancels in the sum.
+    let nx = 0;
+    for (const [a, b, c] of tris) {
+      const ia = loop[a] * 3, ib = loop[b] * 3, ic = loop[c] * 3;
+      const uy = pool[ib + 1] - pool[ia + 1], uz = pool[ib + 2] - pool[ia + 2];
+      const vy = pool[ic + 1] - pool[ia + 1], vz = pool[ic + 2] - pool[ia + 2];
+      nx += uy * vz - uz * vy;
+    }
+    if (nx * outwardSign < 0) tris = tris.map(([a, b, c]) => [c, b, a]);
     for (const [a, b, c] of tris) newFaces.push([loop[a], loop[b], loop[c]]);
     stats.caps++;
   }
@@ -1197,15 +1258,17 @@ export function splitFlower(master, bodies, cfg, radius, onProgress, eps = 1e-9)
     }
     const poolArr = Float64Array.from(pool);
 
-    for (const [faceList, bucket, flip] of [[facesA, meshesA, false], [facesB, meshesB, true]]) {
+    // Piece A is the region s > 0, so at the cut its material faces toward -x
+    // in the split frame; piece B is the mirror of that.
+    for (const [faceList, bucket, outward] of [[facesA, meshesA, -1], [facesB, meshesB, 1]]) {
       if (!faceList.length) continue;
       let faces = faceList;
       const pidList = new Array(faceList.length).fill(body.partId);
       if (cfg.cap_boundary) {
-        const [caps, st] = capFaces(poolArr, faceList, path);
+        const [caps, st] = capFaces(poolArr, faceList, path, outward);
         for (const k of ['caps', 'cap_triangles', 'open_chains', 'loops']) capStats[k] += st[k];
         if (caps.length) {
-          faces = faceList.concat(flip ? caps.map((c) => [c[2], c[1], c[0]]) : caps);
+          faces = faceList.concat(caps);
           for (let i = 0; i < caps.length; i++) pidList.push(PART_BOUNDARY);
         }
       }
@@ -1329,6 +1392,8 @@ export function generateDesign(flower, split, onProgress) {
     diameter_mm: r.stats.diameter_mm, height_mm: r.stats.height_mm,
     triangles: r.mesh.nFaces, triangles_a: A.faces, triangles_b: B.faces,
     volume_master: masterVol, volume_a: A.volume, volume_b: B.volume,
+    bodies_a: countBodies(s.pieceA), bodies_b: countBodies(s.pieceB),
+    bodies_master: r.bodies.length,
     volume_error_pct: Math.abs(A.volume + B.volume - masterVol) / Math.abs(masterVol) * 100,
     balance: A.volume / (A.volume + B.volume),
     open_edges_a: s.metadata.residual_open_edges_a,

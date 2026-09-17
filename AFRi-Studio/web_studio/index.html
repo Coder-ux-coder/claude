@@ -295,7 +295,10 @@
     <div class="caveat">
       <b>What this is.</b> The real geometry engine, ported to JavaScript and running live on
       this page &mdash; same layer schedule, same closed-solid petals, same exact-clipping split
-      kernel. Photoreal rendering stays in Blender on the desktop build.
+      kernel. Two things stay on the desktop build: photoreal rendering in Blender, and the
+      boolean union that fuses the petals, base and centre into a single manufacturable solid.
+      What you see here is the flower as built &mdash; overlapping closed shells, identical in
+      render, but a body count rather than one part.
     </div>
   </aside>
 </div>
@@ -321,6 +324,7 @@ const FLOWER_GROUPS = [
   ]],
   ['Petal shape', false, [
     ['petal_curvature', 0, 1, 0.01, '\u00d7', 'Lengthwise curl. 0 is flat, 1 curls strongly inward.'],
+    ['dome_gain', 0.1, 1.2, 0.01, '\u00d7', 'How steeply the rows climb toward the centre. This is what turns a flat rosette into a pompon.'],
     ['petal_cup', 0, 1, 0.01, '\u00d7', 'Crosswise cupping, the channel along the petal.'],
     ['petal_ruffle_amp', 0, 1, 0.01, '\u00d7', 'Amplitude of the ruffled petal edge.'],
     ['petal_ruffle_freq', 1, 10, 0.1, 'cycles', 'Number of ruffle waves across the petal edge.'],
@@ -360,13 +364,28 @@ const CONCEPTS = [
   { key: 'C', name: 'Organic Asymmetric',
     desc: 'An expressive, irregular division that wanders with the petal arrangement.',
     split: { type: 'organic', position: 0.10, amplitude: 0.40, smoothness: 0.55, orientation_deg: -28,
-             separation_mm: 18, organic_octaves: 3, organic_roughness: 0.55, organic_seed: 11 } },
+             separation_mm: 55, organic_octaves: 3, organic_roughness: 0.55, organic_seed: 11 } },
 ];
+
+/* The refined marigold (Concept C v2 review). One master flower serves all
+ * three concepts -- only the dividing curve differs -- so the refinement
+ * applies to every concept, not just C. ENGINE.FLOWER_DEFAULTS is left alone:
+ * it is the engine's own baseline and what the Python parity test compares
+ * against. */
+const REFINED = {
+  layer_count: 9, petal_count_base: 26, petal_density: 1.65, petal_overlap: 0.56,
+  petal_length_ratio: 0.37, petal_width_ratio: 1.12,
+  petal_curvature: 0.64, petal_cup: 0.58, layer_tilt_gain: 0.80,
+  relief_depth_mm: 40.0, dome_gain: 0.56,
+  petal_ruffle_amp: 0.42, petal_ruffle_freq: 4.6, petal_notch: 0.10,
+  center_diameter_ratio: 0.14, center_dome_height: 0.16, center_floret_rings: 3,
+  organic_variation: 0.52,
+};
 
 /* ================== state ================== */
 const state = {
   concept: 'B',
-  flower: { ...ENGINE.FLOWER_DEFAULTS },
+  flower: { ...ENGINE.FLOWER_DEFAULTS, ...REFINED },
   split: { ...ENGINE.SPLIT_DEFAULTS, ...CONCEPTS[1].split },
   quality: 'draft',
   mode: 'assembled',
@@ -582,8 +601,11 @@ function renderReadout() {
 
   const kv = (k, v) => '<div class="kv"><span>' + k + '</span><b>' + v + '</b></div>';
   $('detail').innerHTML =
-    kv('Closed bodies in master', m.bodies_total) +
+    kv('Bodies in master', m.bodies_master) +
+    kv('Bodies in piece A / B', m.bodies_a + ' / ' + m.bodies_b) +
+    kv('Closed bodies cut', m.bodies_total) +
     kv('Bodies the curve divides', m.bodies_divided) +
+    kv('Triangles added by split', (m.triangles_a + m.triangles_b - m.triangles)) +
     kv('Triangles clipped', m.triangles_clipped) +
     kv('Cut-wall triangles', m.cap_triangles) +
     kv('Boundary caps built', m.caps_built) +
@@ -891,7 +913,28 @@ function buildReport() {
     '  diameter          ' + fmt(m.diameter_mm, 2) + ' mm',
     '  height            ' + fmt(m.height_mm, 2) + ' mm',
     '  petals            ' + m.petals + ' in ' + m.rows + ' rows',
-    '  triangles         ' + m.triangles + ' (A ' + m.triangles_a + ' / B ' + m.triangles_b + ')',
+    '',
+    'TRIANGLE COUNT',
+    '  master            ' + m.triangles,
+    '  piece A           ' + m.triangles_a,
+    '  piece B           ' + m.triangles_b,
+    '  A + B             ' + (m.triangles_a + m.triangles_b),
+    '  added by split    ' + (m.triangles_a + m.triangles_b - m.triangles),
+    '  of which cut wall ' + m.cap_triangles + ' (both walls)',
+    '',
+    '  The pieces do not sum to the master, and should not. Every triangle the',
+    '  curve crosses is subdivided into several, and each piece is then given a',
+    '  cut wall of its own that did not exist before.',
+    '',
+    'COMPONENTS',
+    '  master bodies     ' + m.bodies_master,
+    '  piece A bodies    ' + m.bodies_a,
+    '  piece B bodies    ' + m.bodies_b,
+    '',
+    '  This browser build ships the flower as built: overlapping closed shells,',
+    '  one per petal plus the base and centre. It renders identically to the',
+    '  consolidated solid but is not a manufacturable part. The desktop pipeline',
+    '  boolean-unions them into one body per piece before export.',
     '',
     'SPLIT VERIFICATION',
     '  open edges A      ' + m.open_edges_a,

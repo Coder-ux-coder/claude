@@ -13,9 +13,10 @@ a purchased asset. The application runs fully offline once installed.
 | Uvicorn | BSD-3-Clause | ASGI server |
 | Pydantic | MIT | Configuration schema and validation |
 | NumPy | BSD-3-Clause | All geometry maths |
-| SciPy | BSD-3-Clause | Used by trimesh for connectivity queries |
+| SciPy | BSD-3-Clause | Connectivity queries; nearest-face provenance after the boolean |
 | Shapely | BSD-3-Clause | 2-D footprint helpers |
-| trimesh | MIT | Independent mesh verification in tests |
+| trimesh | MIT | Independent mesh verification; boolean front end |
+| manifold3d | Apache-2.0 | Exact boolean union that fuses the flower into one solid |
 | Pillow | MIT-CMU | Render verification, comparison image |
 | ReportLab | BSD-3-Clause | Client PDF |
 | python-pptx | MIT | Editable PPTX, and PowerPoint reference import |
