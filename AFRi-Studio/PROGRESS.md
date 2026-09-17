@@ -276,3 +276,57 @@ two direction changes inside the flower, not a wander.
 
 v1 is preserved and regenerated from its own recorded parameters, so the two
 were photographed under identical cameras and light.
+
+## S2 - Stage two: the accessory on the hat (2026-09-17)
+
+Authorised by the client, so the plan in `future/HAT_INTEGRATION_PLAN.md` was
+executed. Not all of it: attachment geometry and surface conforming were
+evaluated and deliberately left, and both are stated as not done rather than
+quietly skipped.
+
+**The hat.** Five styles as closed solids of revolution, built the same way as
+a petal: sweep a meridian, offset it both ways by half the material thickness,
+stitch the brim edge. A fedora is not a surface of revolution -- it has a
+lengthwise centre crease and two finger dents -- so those are applied to the
+mid-surface before it is thickened, which keeps the shell closed and the
+normals correct. The dent is angle-independent at r = 0, which is what keeps
+the apex a single point rather than a ring around a hole; there is a test for
+exactly that. Head circumference drives everything, because it is the one
+dimension a hat cannot get wrong: 58 cm gives a 92.31 mm radius.
+
+Two bugs the tests caught. The crown top edge was being smoothed with a kernel
+spanning 11% of the profile, which rounds a fedora into a bowler -- visible in
+the first render, fixed by dropping edge softness to 0.013 and below. And
+`brim_span` located the crown foot by radius, which picks the *top* of a
+boater's crown, since its side sits at exactly the head radius for its whole
+height; the fallback of "last point at or inside rh" was then defeated by the
+smoothing pass nudging that side three microns outside it. It now finds the
+sample nearest the construction corner.
+
+**The assembly.** Rigid placement onto a tangent frame of the hat's outer skin,
+with contact, interference and brim load measured. Distance is analytic against
+the meridian rather than nearest-neighbour over the sampled skin: that skin is
+sampled at 5.9 mm circumferentially, so a search carries millimetres of error
+and the whole question is sub-millimetre. The meridian is an *open* curve, so a
+point out past the brim edge clamps onto its last vertex and reads as inside
+the hat while sitting in open air -- handled explicitly, and tested, because
+the first sweep produced 40 mm "interference" figures that were nothing of the
+kind.
+
+**The finding.** The refined 90 mm flower is 96.6 mm across its outermost
+petals. A 58 cm fedora with a 68 mm brim offers 67.2 mm of radial room between
+the crown foot and the brim edge. Swept across every radial position and tilts
+from 0 to 40 degrees: there is no collision-free placement. The flower either
+rides up the crown or hangs off the edge. Either the hat needs a wide brim, or
+the accessory comes down to about 58-62 mm. Both are generated.
+
+**Rigid or conforming**, which the plan said to evaluate rather than assume: a
+flat back on a curved brim leaves 2.91 mm of conformance error across the
+footprint, 12% of it seated within 0.6 mm. Measured from closest approach, so
+it is independent of standoff. Recommendation is rigid, because a pin through
+felt absorbs 3 mm and conforming means lifting the split path onto a curved
+base -- the path is a function of y in a plane, and that is precisely what
+guarantees it divides the flower into two regions and nothing else.
+
+`GET /api/system` now reports stage two as started, with a per-feature
+breakdown, so nothing claims to exist that does not.

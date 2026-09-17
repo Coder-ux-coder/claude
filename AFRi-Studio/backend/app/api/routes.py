@@ -62,7 +62,17 @@ def system_info():
                             "OpenImageDenoise is used for every render preset."},
         "ai_providers": provider_report(),
         "max_concurrent_jobs": MAX_CONCURRENT_JOBS,
-        "hat_stage_two_started": False,
+        # Stage two was authorised on 2026-09-17. The hat and the assembly
+        # stage are built; attachment geometry and surface conforming are not.
+        # See deliverables/STAGE_TWO_ASSEMBLY.md.
+        "hat_stage_two_started": True,
+        "hat_stage_two": {
+            "hat_geometry": True,
+            "placement_rigid": True,
+            "surface_conform": False,
+            "attachment_geometry": False,
+            "manufacturing_review": False,
+        },
     }
 
 

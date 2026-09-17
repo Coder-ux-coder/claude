@@ -1,14 +1,24 @@
 # Stage Two — Hat integration plan
 
-**Status: PLANNING ONLY. NOT IMPLEMENTED.**
+**Status: IMPLEMENTED, in part. Authorised 2026-09-17.**
 
-No hat geometry exists in this repository. Nothing in `design_engine/`,
-`blender_worker/` or the UI models, renders or references a hat, and
-`GET /api/system` reports `hat_stage_two_started: false`. Stage Two begins only
-when the client explicitly authorises it.
+What this document proposed has largely been built. See
+`deliverables/STAGE_TWO_ASSEMBLY.md` for the measured results and the one
+finding that matters: the refined 90 mm accessory has no collision-free
+placement on a standard fedora brim, because it is 96.6 mm across and the brim
+offers 67.2 mm of radial room.
 
-This document records how it would be built, so that the Stage One architecture
-can be judged against what comes next.
+| Section | Status |
+|---|---|
+| 3. Parametric hat | **Built** — `design_engine/hat/`, five styles, closed solids |
+| 4. Placement | **Built, rigid only** — `design_engine/assembly/placement.py` |
+| 4. Surface conform | **Not built.** Evaluated and deferred; 2.91 mm conformance error measured |
+| 5. Attachment | **Not built.** Parameters exist and validate; no geometry generated |
+| 6. Visualisation | **Built** — `HAT` collection, felt/straw materials, six hat cameras |
+| 7. Manufacturing | **Not assessed.** Mass and brim moment are reported; nothing reviewed by a maker |
+
+The plan below is kept as written, because the reasoning it records is what
+the implementation was judged against.
 
 ---
 

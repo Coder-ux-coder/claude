@@ -38,7 +38,15 @@ def test_system_reports_real_environment(client):
     assert d["app"] == "AFRi Studio"
     assert d["cpu_count"] >= 1
     assert isinstance(d["blender"]["available"], bool)
-    assert d["hat_stage_two_started"] is False, "Stage Two must not have started"
+    # Stage two was authorised on 2026-09-17. What matters now is that the
+    # status is honest about which parts exist: claiming attachment geometry or
+    # surface conforming would misrepresent the deliverable.
+    assert d["hat_stage_two_started"] is True
+    s2 = d["hat_stage_two"]
+    assert s2["hat_geometry"] is True and s2["placement_rigid"] is True
+    assert s2["surface_conform"] is False, "surface conforming is not implemented"
+    assert s2["attachment_geometry"] is False, "attachment geometry is not implemented"
+    assert s2["manufacturing_review"] is False, "no maker has reviewed this"
     assert any(p["name"] == "manual_handoff" and p["available"]
                for p in d["ai_providers"]), "manual fallback must always be available"
 

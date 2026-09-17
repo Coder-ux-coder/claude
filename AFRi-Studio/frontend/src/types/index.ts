@@ -62,6 +62,13 @@ export interface SystemInfo {
                   detail: string; supports_vision: boolean; extra: any }[]
   max_concurrent_jobs: number
   hat_stage_two_started: boolean
+  hat_stage_two: {
+    hat_geometry: boolean
+    placement_rigid: boolean
+    surface_conform: boolean
+    attachment_geometry: boolean
+    manufacturing_review: boolean
+  }
 }
 
 export interface Milestone { key: string; label: string; done: boolean; detail: string }
