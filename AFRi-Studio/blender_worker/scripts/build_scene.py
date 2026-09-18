@@ -271,6 +271,15 @@ def main():
     add_area_light(colls["LIGHTING"], "Rim", (d * 0.15, d * 1.3, d * 0.95),
                    (-0.95, 0.0, 0.12), rim_e * gain, key_size * 0.8 * gain ** 0.5,
                    (1.0, 0.99, 0.96))
+    # A fill from below, off unless a shot asks for it. An underside view hides
+    # the hat and the backdrop, which takes away every bounce surface in the
+    # scene, and the whole rig is above the subject -- so the fixing it exists
+    # to show comes out as a silhouette.
+    under = add_area_light(colls["LIGHTING"], "UnderFill",
+                           (-d * 0.35, -d * 0.55, -d * 0.85),
+                           (-2.5, 0.0, -0.6), key_e * gain * 0.55,
+                           key_size * 1.2 * gain ** 0.5, (1.0, 0.98, 0.94))
+    under.hide_render = True
     build_world(scene, rnd_cfg.get("background", "#14161A"), world_s)
 
     # ---- cameras -------------------------------------------------------
@@ -424,6 +433,9 @@ def main():
             created["hat"].hide_render = not bool(shot["show_hat"])
         if "show_backdrop" in shot:
             floor.hide_render = not bool(shot["show_backdrop"])
+        under_fill = bpy.data.objects.get("UnderFill")
+        if under_fill is not None:
+            under_fill.hide_render = not bool(shot.get("underside_fill", False))
 
         if shot.get("resolution"):
             scene.render.resolution_x = scene.render.resolution_y = int(shot["resolution"])

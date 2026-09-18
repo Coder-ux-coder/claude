@@ -48,7 +48,8 @@ SHOTS = [
     # Every camera above the hat sees the top of the accessory and none of the
     # pins, which point down through the brim.
     {"name": "07_fixing_underside", "camera": "hat_underside", "separated": True,
-     "detail": True, "show_hat": False, "show_backdrop": False},
+     "detail": True, "show_hat": False, "show_backdrop": False,
+     "underside_fill": True},
 ]
 
 BUILDS = {
