@@ -1,218 +1,534 @@
 <title>AFRi Marigold Studio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,400..700,0..100,0..1&family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-  :root{
-    --ground:#14110C; --panel:#1B170F; --raise:#221D14; --line:#312918;
-    --marigold:#F2A007; --marigold-dim:#B87A10; --ember:#C8541B;
-    --ink:#F4EDDF; --muted:#9C8F79; --faint:#6B6152;
-    --pass:#72A96B; --warn:#D9903A; --fail:#CF6650;
-    --ui:"Archivo",system-ui,-apple-system,sans-serif;
-    --display:"Fraunces",Georgia,serif;
-    --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+/* ====================================================================
+   AFRi Marigold Studio
+   Palette: unbleached linen and marigold. The neutrals carry a faint
+   olive bias -- the colour of undyed cloth and of a marigold leaf --
+   so the accent never sits on a dead grey.
+   ==================================================================== */
+:root{
+  color-scheme:light dark;
+  --ground:#E9EAE1; --panel:#F4F5EE; --raise:#FCFCF8; --sunk:#DFE1D5;
+  --line:#D2D4C6; --line-soft:#E2E4D9;
+  --ink:#1C1E17; --muted:#5D6154; --faint:#8A8F7E;
+  --marigold:#A96405; --marigold-hi:#8C5204; --marigold-soft:#F3E7CE; --on-marigold:#FFFFFF;
+  --ember:#8F3C14;
+  --pass:#3F6B36; --warn:#8A5D14; --fail:#A6402C;
+  --stage-1:#E3E4DA; --stage-2:#B7BAA9;
+  --shadow:0 1px 2px rgba(28,30,23,.07), 0 10px 26px -14px rgba(28,30,23,.28);
+  --lift:0 2px 6px rgba(28,30,23,.10);
+  --ui:"Archivo",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --display:"Fraunces",Georgia,"Times New Roman",serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --rail-l:300px; --rail-r:348px;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#13140F; --panel:#191B14; --raise:#20231A; --sunk:#0D0E0A;
+    --line:#2C3024; --line-soft:#23261B;
+    --ink:#EDEEE2; --muted:#979C88; --faint:#6B7060;
+    --marigold:#F2A007; --marigold-hi:#FFB633; --marigold-soft:#2E2614; --on-marigold:#17130A;
+    --ember:#D2601F;
+    --pass:#7BB06F; --warn:#D2953C; --fail:#D2694F;
+    --stage-1:#24261A; --stage-2:#0E0F0B;
+    --shadow:0 1px 2px rgba(0,0,0,.45), 0 14px 34px -16px rgba(0,0,0,.75);
+    --lift:0 2px 8px rgba(0,0,0,.5);
   }
-  *{box-sizing:border-box}
-  [hidden]{display:none!important}
-  html,body{height:100%}
-  body{
-    margin:0;background:var(--ground);color:var(--ink);
-    font-family:var(--ui);font-size:14px;line-height:1.5;
-    display:flex;flex-direction:column;overflow:hidden;
-  }
-  button,input,select,textarea{font:inherit;color:inherit}
-  :focus-visible{outline:2px solid var(--marigold);outline-offset:2px}
+}
+:root[data-theme="dark"]{
+  --ground:#13140F; --panel:#191B14; --raise:#20231A; --sunk:#0D0E0A;
+  --line:#2C3024; --line-soft:#23261B;
+  --ink:#EDEEE2; --muted:#979C88; --faint:#6B7060;
+  --marigold:#F2A007; --marigold-hi:#FFB633; --marigold-soft:#2E2614; --on-marigold:#17130A;
+  --ember:#D2601F;
+  --pass:#7BB06F; --warn:#D2953C; --fail:#D2694F;
+  --stage-1:#24261A; --stage-2:#0E0F0B;
+  --shadow:0 1px 2px rgba(0,0,0,.45), 0 14px 34px -16px rgba(0,0,0,.75);
+  --lift:0 2px 8px rgba(0,0,0,.5);
+}
 
-  /* ---------- header ---------- */
-  .top{
-    display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
-    padding:12px 20px;border-bottom:1px solid var(--line);
-    background:var(--panel);flex:0 0 auto;
-  }
-  .wordmark{font-family:var(--display);font-size:20px;font-weight:600;letter-spacing:-.01em}
-  .wordmark em{font-style:normal;color:var(--marigold)}
-  .top .sub{color:var(--muted);font-size:12.5px}
-  .stage{
-    margin-left:auto;font-family:var(--mono);font-size:10.5px;letter-spacing:.09em;
-    text-transform:uppercase;color:var(--marigold-dim);
-    border:1px solid var(--line);border-radius:999px;padding:3px 10px;white-space:nowrap;
-  }
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{
+  margin:0;background:var(--ground);color:var(--ink);
+  font-family:var(--ui);font-size:13.5px;line-height:1.5;
+  display:flex;flex-direction:column;overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--marigold);outline-offset:2px;border-radius:2px}
+.eyebrow,.lab,.who,.pgroup{font-family:var(--mono)}
 
-  /* ---------- workbench ---------- */
-  .bench{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:288px minmax(0,1fr) 340px}
-  .rail{overflow-y:auto;background:var(--panel);display:flex;flex-direction:column}
-  .rail.left{border-right:1px solid var(--line)}
-  .rail.right{border-left:1px solid var(--line)}
-  .stagearea{position:relative;min-width:0;min-height:0;background:
-    radial-gradient(120% 90% at 50% 34%, #241E14 0%, #17130D 55%, #100D08 100%)}
-  #view{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
-  #view.dragging{cursor:grabbing}
+/* ---------------- top bar ---------------- */
+.topbar{
+  flex:0 0 auto;display:flex;align-items:center;gap:14px;
+  padding:9px 16px;padding-top:calc(9px + env(safe-area-inset-top,0px));
+  background:var(--panel);border-bottom:1px solid var(--line);
+}
+.brand{display:flex;align-items:baseline;gap:9px;flex:0 0 auto}
+.wordmark{
+  font-family:var(--display);font-size:19px;font-weight:600;letter-spacing:-.015em;
+  font-variation-settings:"SOFT" 40,"WONK" 1;white-space:nowrap;
+}
+.wordmark em{font-style:normal;color:var(--marigold)}
+.stagechip{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:2px 8px;white-space:nowrap;
+}
+nav.viewnav{display:flex;gap:2px;background:var(--sunk);border-radius:4px;padding:2px}
+.vnav{
+  background:transparent;border:none;border-radius:3px;padding:5px 11px;
+  font-size:12.5px;font-weight:500;color:var(--muted);white-space:nowrap;
+}
+.vnav:hover{color:var(--ink)}
+.vnav[aria-pressed="true"]{background:var(--raise);color:var(--ink);box-shadow:var(--lift)}
+.doc{display:flex;flex-direction:column;min-width:0;flex:1 1 auto;margin-left:6px}
+.docname{
+  background:none;border:none;padding:0;text-align:left;
+  font-family:var(--display);font-size:15px;font-weight:600;color:var(--ink);
+  font-variation-settings:"SOFT" 30,"WONK" 0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:min(30vw,260px);
+}
+.docname:hover{color:var(--marigold)}
+.savestate{font-family:var(--mono);font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.savestate.warn{color:var(--warn)}
+.topacts{margin-left:auto;display:flex;align-items:center;gap:6px}
+.iconbtn{
+  background:transparent;border:1px solid var(--line);border-radius:4px;
+  width:30px;height:28px;display:grid;place-items:center;color:var(--muted);
+}
+.iconbtn:hover:not(:disabled){color:var(--ink);border-color:var(--marigold)}
+.iconbtn:disabled{opacity:.38;cursor:not-allowed}
+.iconbtn svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.6;
+  stroke-linecap:round;stroke-linejoin:round}
+.kbtn{
+  display:flex;align-items:center;gap:7px;background:var(--raise);border:1px solid var(--line);
+  border-radius:4px;padding:5px 9px;color:var(--faint);font-size:12px;
+}
+.kbtn:hover{color:var(--ink);border-color:var(--marigold)}
+.kbtn kbd{
+  font-family:var(--mono);font-size:10px;background:var(--sunk);border:1px solid var(--line);
+  border-radius:3px;padding:1px 4px;color:var(--muted);
+}
+.peers{display:flex;align-items:center;padding-left:6px}
+.peer{
+  width:24px;height:24px;border-radius:50%;display:grid;place-items:center;
+  font-family:var(--mono);font-size:9.5px;font-weight:500;color:#fff;
+  border:2px solid var(--panel);margin-left:-6px;text-shadow:0 1px 2px rgba(0,0,0,.4);
+}
+.peer.more{background:var(--line)!important;color:var(--muted);text-shadow:none}
 
-  .sec{border-bottom:1px solid var(--line);padding:14px 16px}
-  .sec h2{
-    margin:0 0 10px;font-family:var(--mono);font-size:10.5px;font-weight:500;
-    letter-spacing:.12em;text-transform:uppercase;color:var(--faint);
-  }
+/* ---------------- bench ---------------- */
+.bench{
+  flex:1 1 auto;min-height:0;display:grid;
+  grid-template-columns:var(--rail-l) minmax(0,1fr) var(--rail-r);
+}
+body[data-view="library"] .bench,
+body[data-view="spec"] .bench,
+body[data-view="compare"] .bench{grid-template-columns:minmax(0,1fr)}
+body[data-view="library"] .rail,
+body[data-view="spec"] .rail,
+body[data-view="compare"] .rail{display:none}
+.rail{overflow-y:auto;background:var(--panel);display:flex;flex-direction:column;scrollbar-width:thin}
+.rail.left{border-right:1px solid var(--line)}
+.rail.right{border-left:1px solid var(--line)}
+.stage{position:relative;min-width:0;min-height:0;display:flex;flex-direction:column;background:var(--ground)}
+.viewpane{flex:1 1 auto;min-height:0;position:relative}
+.viewpane[data-view="library"],.viewpane[data-view="spec"],.viewpane[data-view="compare"]{
+  overflow-y:auto;padding:22px 24px 48px;
+}
 
-  /* ---------- concepts ---------- */
-  .concept{
-    display:block;width:100%;text-align:left;background:var(--raise);
-    border:1px solid var(--line);border-left:3px solid transparent;
-    border-radius:3px;padding:9px 11px;margin-bottom:7px;cursor:pointer;
-    transition:border-color .15s,background .15s;
-  }
-  .concept:hover{background:#282217}
-  .concept[aria-pressed="true"]{border-left-color:var(--marigold);background:#2A2317}
-  .concept .k{font-family:var(--mono);font-size:10px;color:var(--marigold);letter-spacing:.08em}
-  .concept .n{font-family:var(--display);font-size:15px;font-weight:600;margin:1px 0 2px}
-  .concept .d{font-size:11.5px;color:var(--muted);line-height:1.35}
-  .flag{color:var(--marigold);font-size:10px;font-family:var(--mono)}
+.sec{border-bottom:1px solid var(--line-soft);padding:13px 15px}
+.sec h2,.eyebrow{
+  margin:0 0 9px;font-family:var(--mono);font-size:10px;font-weight:500;
+  letter-spacing:.13em;text-transform:uppercase;color:var(--faint);
+}
+.caveat{padding:13px 15px;font-size:11px;color:var(--faint);line-height:1.5}
+.caveat b{color:var(--muted);font-weight:600}
+.note{font-size:11px;color:var(--faint);line-height:1.45;margin:8px 0 0}
+.note strong{color:var(--muted);font-weight:600}
 
-  /* ---------- parameter groups ---------- */
-  details.grp{border-bottom:1px solid var(--line)}
-  details.grp>summary{
-    cursor:pointer;padding:11px 16px;list-style:none;display:flex;align-items:center;gap:8px;
-    font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);
-  }
-  details.grp>summary::-webkit-details-marker{display:none}
-  details.grp>summary::before{content:"+";color:var(--marigold-dim);font-size:13px;width:10px}
-  details.grp[open]>summary::before{content:"\2212"}
-  details.grp>summary:hover{color:var(--ink)}
-  .grpbody{padding:2px 16px 14px}
+/* ---------------- concepts ---------------- */
+.concept{
+  display:block;width:100%;text-align:left;background:var(--raise);
+  border:1px solid var(--line);border-left:3px solid transparent;border-radius:4px;
+  padding:9px 11px;margin-bottom:7px;transition:border-color .14s,background .14s;
+}
+.concept:hover{border-color:var(--faint)}
+.concept[aria-pressed="true"]{border-left-color:var(--marigold);background:var(--marigold-soft)}
+.concept .k{font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--marigold)}
+.concept .n{font-family:var(--display);font-size:15px;font-weight:600;margin:1px 0 2px;
+  font-variation-settings:"SOFT" 30,"WONK" 0}
+.concept .d{font-size:11.5px;color:var(--muted);line-height:1.38}
+.flag{color:var(--ember)}
 
-  .p{margin-bottom:13px}
-  .p .row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:5px}
-  .p label{font-size:12px;color:var(--ink)}
-  .p .val{font-family:var(--mono);font-size:11.5px;color:var(--marigold);font-variant-numeric:tabular-nums;white-space:nowrap}
-  .p .hint{font-size:10.5px;color:var(--faint);margin-top:4px;line-height:1.35}
-  input[type=range]{
-    -webkit-appearance:none;appearance:none;width:100%;height:16px;background:transparent;cursor:pointer;margin:0;
-  }
-  input[type=range]::-webkit-slider-runnable-track{height:2px;background:var(--line);border-radius:2px}
-  input[type=range]::-moz-range-track{height:2px;background:var(--line);border-radius:2px}
-  input[type=range]::-webkit-slider-thumb{
-    -webkit-appearance:none;width:12px;height:12px;border-radius:50%;
-    background:var(--marigold);margin-top:-5px;border:2px solid var(--panel);
-  }
-  input[type=range]::-moz-range-thumb{
-    width:12px;height:12px;border-radius:50%;background:var(--marigold);border:2px solid var(--panel);
-  }
-  select{
-    width:100%;background:var(--raise);border:1px solid var(--line);
-    border-radius:3px;padding:6px 8px;font-size:12.5px;
-  }
+/* ---------------- parameter groups ---------------- */
+details.grp{border-bottom:1px solid var(--line-soft)}
+details.grp>summary{
+  cursor:pointer;padding:10px 15px;list-style:none;display:flex;align-items:center;gap:8px;
+  font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);
+}
+details.grp>summary::-webkit-details-marker{display:none}
+details.grp>summary::before{content:"+";color:var(--marigold);font-size:13px;width:10px;font-family:var(--ui)}
+details.grp[open]>summary::before{content:"\2212"}
+details.grp>summary:hover{color:var(--ink)}
+.grpbody{padding:2px 15px 13px}
 
-  /* ---------- viewport overlays ---------- */
-  .chips{position:absolute;display:flex;gap:5px;flex-wrap:wrap;z-index:3}
-  .chips.tl{top:12px;left:12px;max-width:calc(100% - 24px)}
-  .chips.bl{bottom:12px;left:12px;max-width:calc(100% - 24px)}
-  .chip{
-    background:rgba(20,17,12,.82);border:1px solid var(--line);color:var(--muted);
-    border-radius:3px;padding:5px 9px;cursor:pointer;
-    font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;
-    backdrop-filter:blur(6px);transition:color .12s,border-color .12s,background .12s;
-  }
-  .chip:hover{color:var(--ink);border-color:var(--marigold-dim)}
-  .chip[aria-pressed="true"]{color:var(--ground);background:var(--marigold);border-color:var(--marigold);font-weight:500}
-  .gapwrap{
-    position:absolute;right:12px;bottom:12px;z-index:3;display:flex;align-items:center;gap:8px;
-    background:rgba(20,17,12,.82);border:1px solid var(--line);border-radius:3px;
-    padding:6px 10px;backdrop-filter:blur(6px);
-  }
-  .gapwrap span{font-family:var(--mono);font-size:10.5px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
-  .gapwrap input[type=range]{width:96px}
-  .gapwrap b{font-family:var(--mono);font-size:11px;color:var(--marigold);font-weight:500;min-width:42px;text-align:right;font-variant-numeric:tabular-nums}
+.p{margin-bottom:12px;border-radius:3px}
+.p.flash{animation:flash 1.4s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 3px var(--marigold-soft)}100%{box-shadow:0 0 0 3px transparent}}
+@media (prefers-reduced-motion:reduce){.p.flash{animation:none;box-shadow:0 0 0 2px var(--marigold)}}
+.prow2{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:4px}
+.p label{font-size:12px;color:var(--ink)}
+.p .val{font-family:var(--mono);font-size:11px;color:var(--marigold);font-variant-numeric:tabular-nums;white-space:nowrap}
+.p .hint{font-size:10.5px;color:var(--faint);margin-top:4px;line-height:1.38}
+input[type=range]{
+  -webkit-appearance:none;appearance:none;width:100%;height:16px;background:transparent;cursor:pointer;margin:0;
+}
+input[type=range]::-webkit-slider-runnable-track{height:2px;background:var(--line);border-radius:2px}
+input[type=range]::-moz-range-track{height:2px;background:var(--line);border-radius:2px}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:12px;height:12px;border-radius:50%;
+  background:var(--marigold);margin-top:-5px;border:2px solid var(--panel);
+}
+input[type=range]::-moz-range-thumb{
+  width:12px;height:12px;border-radius:50%;background:var(--marigold);border:2px solid var(--panel);
+}
+select,input[type=text]{
+  width:100%;background:var(--raise);border:1px solid var(--line);
+  border-radius:4px;padding:6px 8px;font-size:12.5px;
+}
+textarea{
+  width:100%;background:var(--raise);border:1px solid var(--line);border-radius:4px;
+  padding:8px 10px;font-size:12.5px;resize:vertical;min-height:60px;
+}
+textarea::placeholder{color:var(--faint)}
 
-  .busy{
-    position:absolute;top:12px;right:12px;z-index:4;display:flex;align-items:center;gap:8px;
-    background:rgba(20,17,12,.9);border:1px solid var(--line);border-radius:3px;padding:6px 11px;
-    font-family:var(--mono);font-size:10.5px;color:var(--muted);backdrop-filter:blur(6px);max-width:min(70%,360px);
-  }
-  .spin{
-    width:9px;height:9px;border-radius:50%;border:1.5px solid var(--line);
-    border-top-color:var(--marigold);animation:sp .7s linear infinite;flex:0 0 auto;
-  }
-  @keyframes sp{to{transform:rotate(360deg)}}
-  @media (prefers-reduced-motion:reduce){.spin{animation-duration:2.4s}}
-  .busy .txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* ---------------- buttons ---------------- */
+.btn{
+  background:var(--raise);border:1px solid var(--line);border-radius:4px;
+  padding:7px 13px;font-weight:500;font-size:12.5px;color:var(--ink);
+}
+.btn:hover:not(:disabled){border-color:var(--marigold)}
+.btn.primary{background:var(--marigold);border-color:var(--marigold);color:var(--on-marigold);font-weight:600}
+.btn.primary:hover:not(:disabled){background:var(--marigold-hi);border-color:var(--marigold-hi)}
+.btn.danger{background:var(--fail);border-color:var(--fail);color:#fff;font-weight:600}
+.btn.ghost{background:transparent;color:var(--muted)}
+.btn.ghost:hover:not(:disabled){color:var(--ink)}
+.btn:disabled{opacity:.42;cursor:not-allowed}
+.btnrow{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+.mini{
+  background:transparent;border:1px solid var(--line);border-radius:3px;padding:3px 7px;
+  font-size:10.5px;color:var(--muted);white-space:nowrap;
+}
+.mini:hover{color:var(--ink);border-color:var(--marigold)}
+.mini.danger:hover{color:var(--fail);border-color:var(--fail)}
 
-  /* ---------- readout ---------- */
-  .specs{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:3px;overflow:hidden}
-  .spec{background:var(--panel);padding:8px 10px}
-  .spec .lab{font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint)}
-  .spec .num{font-family:var(--display);font-size:19px;font-weight:600;line-height:1.15;font-variant-numeric:tabular-nums}
-  .spec .num small{font-family:var(--ui);font-size:11px;font-weight:400;color:var(--muted);margin-left:2px}
+/* ---------------- viewport chrome ---------------- */
+.stagearea{position:absolute;inset:0;background:
+  radial-gradient(118% 88% at 50% 32%, var(--stage-1) 0%, var(--stage-2) 100%)}
+#view{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+#view.dragging{cursor:grabbing}
+.chips{position:absolute;display:flex;gap:5px;flex-wrap:wrap;z-index:3}
+.chips.tl{top:12px;left:12px;max-width:calc(100% - 24px)}
+.chips.bl{bottom:12px;left:12px;max-width:calc(100% - 200px)}
+.chip{
+  background:color-mix(in srgb, var(--panel) 84%, transparent);
+  border:1px solid var(--line);color:var(--muted);border-radius:3px;padding:4px 9px;
+  font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;
+  backdrop-filter:blur(7px);transition:color .12s,border-color .12s,background .12s;
+}
+.chip:hover{color:var(--ink);border-color:var(--marigold)}
+.chip[aria-pressed="true"]{color:var(--on-marigold);background:var(--marigold);border-color:var(--marigold);font-weight:500}
+.gapwrap{
+  position:absolute;right:12px;bottom:12px;z-index:3;display:flex;align-items:center;gap:8px;
+  background:color-mix(in srgb, var(--panel) 88%, transparent);border:1px solid var(--line);
+  border-radius:3px;padding:5px 10px;backdrop-filter:blur(7px);
+}
+.gapwrap span{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.gapwrap input[type=range]{width:92px}
+.gapwrap b{font-family:var(--mono);font-size:10.5px;color:var(--marigold);font-weight:500;
+  min-width:44px;text-align:right;font-variant-numeric:tabular-nums}
+.scalebar{position:absolute;left:12px;bottom:56px;z-index:3;pointer-events:none;
+  display:flex;flex-direction:column;gap:3px}
+.scalebar .bar{width:var(--w,120px);height:1px;background:var(--muted);position:relative}
+.scalebar .bar::before,.scalebar .bar::after{
+  content:"";position:absolute;bottom:-3px;width:1px;height:7px;background:var(--muted);
+}
+.scalebar .bar::before{left:0}
+.scalebar .bar::after{right:0}
+.slabel{font-family:var(--mono);font-size:9.5px;letter-spacing:.07em;color:var(--muted)}
+.busy{
+  position:absolute;top:12px;right:12px;z-index:4;display:flex;align-items:center;gap:8px;
+  background:color-mix(in srgb, var(--panel) 92%, transparent);border:1px solid var(--line);
+  border-radius:3px;padding:5px 11px;font-family:var(--mono);font-size:10px;color:var(--muted);
+  backdrop-filter:blur(7px);max-width:min(70%,360px);
+}
+.spin{
+  width:9px;height:9px;border-radius:50%;border:1.5px solid var(--line);
+  border-top-color:var(--marigold);animation:sp .7s linear infinite;flex:0 0 auto;
+}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation-duration:2.4s}}
+.busy .txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fatal{position:absolute;inset:0;display:grid;place-items:center;padding:28px;text-align:center;
+  color:var(--muted);font-size:13px;line-height:1.6}
 
-  .checks{display:flex;flex-direction:column;gap:0}
-  .chk{display:flex;align-items:center;gap:9px;padding:6px 0;border-bottom:1px solid var(--line);font-size:12px}
-  .chk:last-child{border-bottom:none}
-  .chk .dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto;background:var(--faint)}
-  .chk.ok .dot{background:var(--pass)}
-  .chk.bad .dot{background:var(--fail)}
-  .chk .name{color:var(--muted);flex:1 1 auto;min-width:0}
-  .chk .v{font-family:var(--mono);font-size:11px;color:var(--ink);font-variant-numeric:tabular-nums;text-align:right}
-  .chk.ok .v{color:var(--pass)}
-  .chk.bad .v{color:var(--fail)}
+/* ---------------- readout ---------------- */
+.specs{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);
+  border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.spec{background:var(--panel);padding:8px 10px}
+.spec .lab{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+.spec .num{font-family:var(--display);font-size:20px;font-weight:600;line-height:1.15;
+  font-variant-numeric:tabular-nums;font-variation-settings:"SOFT" 20,"WONK" 0}
+.spec .num small{font-family:var(--ui);font-size:10.5px;font-weight:400;color:var(--muted);margin-left:3px}
 
-  .kv{display:flex;justify-content:space-between;gap:10px;font-size:11.5px;padding:3px 0;color:var(--muted)}
-  .kv b{font-family:var(--mono);font-weight:400;color:var(--ink);font-variant-numeric:tabular-nums}
+.chk{display:flex;align-items:center;gap:9px;padding:6px 0;border-bottom:1px solid var(--line-soft);font-size:12px}
+.chk:last-child{border-bottom:none}
+.chk .dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto;background:var(--faint)}
+.chk.ok .dot{background:var(--pass)}
+.chk.bad .dot{background:var(--fail)}
+.chk .name{color:var(--muted);flex:1 1 auto;min-width:0}
+.chk .v{font-family:var(--mono);font-size:10.5px;font-variant-numeric:tabular-nums;text-align:right}
+.chk.ok .v{color:var(--pass)}
+.chk.bad .v{color:var(--fail)}
+.kv{display:flex;justify-content:space-between;gap:10px;font-size:11.5px;padding:3px 0;color:var(--muted)}
+.kv b{font-family:var(--mono);font-weight:400;color:var(--ink);font-variant-numeric:tabular-nums}
 
-  /* ---------- assistant ---------- */
-  .chatlog{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;max-height:260px;overflow-y:auto}
-  .msg{border-radius:3px;padding:8px 10px;font-size:12.5px;line-height:1.45}
-  .msg.you{background:var(--raise);border:1px solid var(--line)}
-  .msg.cc{background:#241B0D;border:1px solid #3A2C13}
-  .msg .who{font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);margin-bottom:3px}
-  .msg.cc .who{color:var(--marigold-dim)}
-  .msg ul{margin:6px 0 0;padding-left:16px}
-  .msg li{margin:2px 0}
-  .msg code{font-family:var(--mono);font-size:11px;color:var(--marigold)}
-  textarea{
-    width:100%;background:var(--raise);border:1px solid var(--line);border-radius:3px;
-    padding:8px 10px;font-size:12.5px;resize:vertical;min-height:62px;
-  }
-  textarea::placeholder{color:var(--faint)}
-  .btn{
-    background:var(--marigold);color:#191308;border:none;border-radius:3px;
-    padding:8px 14px;font-weight:600;font-size:12.5px;cursor:pointer;
-  }
-  .btn:hover{background:#FFB020}
-  .btn:disabled{background:var(--line);color:var(--faint);cursor:not-allowed}
-  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--muted);font-weight:500}
-  .btn.ghost:hover{border-color:var(--marigold-dim);color:var(--ink);background:transparent}
-  .btnrow{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
-  .note{font-size:11px;color:var(--faint);line-height:1.4;margin-top:8px}
-  .note strong{color:var(--muted);font-weight:500}
+/* ---------------- assistant ---------------- */
+.chatlog{display:flex;flex-direction:column;gap:8px;margin-bottom:9px;max-height:280px;overflow-y:auto}
+.msg{border-radius:4px;padding:8px 10px;font-size:12.5px;line-height:1.45}
+.msg.you{background:var(--raise);border:1px solid var(--line)}
+.msg.cc{background:var(--marigold-soft);border:1px solid var(--line)}
+.msg .who{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--faint);margin-bottom:3px}
+.msg .body{white-space:pre-wrap}
+.msg .err{color:var(--fail)}
+.changes{margin:6px 0 0;padding-left:16px;white-space:normal}
+.changes li{margin:2px 0}
+.changes li.rej{color:var(--fail)}
+.msg code{font-family:var(--mono);font-size:11px;color:var(--ember)}
 
-  .caveat{padding:12px 16px;font-size:11px;color:var(--faint);line-height:1.45}
-  .caveat b{color:var(--muted);font-weight:500}
+/* ---------------- toasts ---------------- */
+.toasts{position:fixed;left:50%;transform:translateX(-50%);z-index:60;display:flex;
+  flex-direction:column;gap:7px;align-items:center;pointer-events:none;
+  bottom:calc(18px + env(safe-area-inset-bottom,0px));max-width:min(92vw,520px)}
+.toast{
+  pointer-events:auto;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--marigold);
+  border-radius:4px;padding:8px 13px;font-size:12.5px;box-shadow:var(--shadow);cursor:pointer;
+  animation:rise .18s ease-out;
+}
+.toast.good{border-left-color:var(--pass)}
+.toast.bad{border-left-color:var(--fail)}
+.toast.out{opacity:0;transition:opacity .2s}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.toast{animation:none}}
 
-  @media (max-width:1180px){
-    .bench{grid-template-columns:260px minmax(0,1fr) 300px}
+/* ---------------- dialogs ---------------- */
+.scrim{position:fixed;inset:0;z-index:70;background:rgba(10,11,8,.5);
+  display:grid;place-items:center;padding:18px;backdrop-filter:blur(2px)}
+.dialog{background:var(--panel);border:1px solid var(--line);border-radius:6px;
+  box-shadow:var(--shadow);padding:18px;width:min(420px,100%)}
+.dialog h3{margin:0 0 10px;font-family:var(--display);font-size:17px;font-weight:600;
+  font-variation-settings:"SOFT" 30,"WONK" 0}
+.dlabel{display:block;font-size:11.5px;color:var(--muted);margin-bottom:5px}
+.dbody{font-size:12.5px;color:var(--muted);margin:0 0 14px;line-height:1.5}
+.dactions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+
+/* ---------------- command palette ---------------- */
+.palette{position:fixed;inset:0;z-index:80;background:rgba(10,11,8,.42);
+  display:grid;align-items:start;justify-items:center;padding:12vh 16px 16px;backdrop-filter:blur(2px)}
+.pbox{width:min(620px,100%);background:var(--panel);border:1px solid var(--line);
+  border-radius:8px;box-shadow:var(--shadow);overflow:hidden}
+.pfield{display:flex;align-items:center;gap:8px;padding:10px 13px;border-bottom:1px solid var(--line)}
+.pfield input{flex:1 1 auto;background:transparent;border:none;font-size:15px;padding:0}
+.pfield input:focus{outline:none}
+.pfield kbd{font-family:var(--mono);font-size:10px;color:var(--faint);border:1px solid var(--line);
+  border-radius:3px;padding:2px 5px}
+.plist{max-height:min(52vh,420px);overflow-y:auto}
+.prow{display:flex;align-items:baseline;gap:10px;width:100%;text-align:left;background:transparent;
+  border:none;padding:7px 13px;font-size:13px;color:var(--ink)}
+.prow.on{background:var(--marigold-soft)}
+.pgroup{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--faint);min-width:74px;flex:0 0 auto}
+.ptitle{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.phint{font-size:11px;color:var(--faint);flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;max-width:42%}
+.pempty{padding:18px 13px;color:var(--faint);font-size:12.5px;text-align:center}
+
+/* ---------------- view headers ---------------- */
+.vhead{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap;
+  margin-bottom:18px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.vtitle{margin:0;font-family:var(--display);font-size:26px;font-weight:600;letter-spacing:-.015em;
+  font-variation-settings:"SOFT" 40,"WONK" 1;text-wrap:balance}
+.vsub{margin:4px 0 0;font-size:12.5px;color:var(--muted);max-width:62ch;line-height:1.5}
+.vacts{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.vacts select{width:auto;min-width:190px}
+.switch{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.banner{padding:9px 12px;border-radius:4px;font-size:12.5px;margin:0 0 16px}
+.banner.bad{background:var(--marigold-soft);border:1px solid var(--fail);color:var(--fail)}
+.empty{text-align:center;padding:52px 20px;color:var(--muted)}
+.empty h3{font-family:var(--display);font-size:19px;font-weight:600;margin:0 0 8px;color:var(--ink);
+  font-variation-settings:"SOFT" 30,"WONK" 0}
+.empty p{margin:0 auto 16px;max-width:52ch;font-size:12.5px;line-height:1.55}
+
+/* ---------------- library ---------------- */
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(256px,1fr))}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow:hidden;
+  display:flex;flex-direction:column}
+.card.current{border-color:var(--marigold);box-shadow:0 0 0 1px var(--marigold)}
+.cardopen{display:block;padding:0;border:none;background:var(--sunk);width:100%}
+.thumb{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;max-width:100%}
+.thumb.blank{display:grid;place-items:center;font-family:var(--mono);font-size:10px;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+.cardbody{padding:10px 12px 12px;display:flex;flex-direction:column;gap:7px;flex:1 1 auto}
+.cardtop{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.cardname{margin:0;font-family:var(--display);font-size:15px;font-weight:600;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-variation-settings:"SOFT" 30,"WONK" 0}
+.pill{font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--marigold);border:1px solid var(--line);border-radius:999px;padding:1px 7px;flex:0 0 auto}
+.cardmeta{display:flex;gap:9px;flex-wrap:wrap;font-family:var(--mono);font-size:10.5px;
+  color:var(--muted);font-variant-numeric:tabular-nums}
+.cardmeta .bad{color:var(--fail)}
+.cardfoot{display:flex;gap:6px;align-items:center;font-size:11px;color:var(--faint);margin-top:auto}
+.cardacts{display:flex;gap:5px;padding-top:2px;align-items:center}
+.cardacts .danger{margin-left:auto}
+
+/* ---------------- compare ---------------- */
+.cmpgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:22px}
+.cmppane{background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow:hidden;
+  display:flex;flex-direction:column}
+.cmphead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+  padding:8px 12px;border-bottom:1px solid var(--line)}
+.cmptitle{font-family:var(--mono);font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--faint)}
+.cmpsub{font-family:var(--mono);font-size:10.5px;color:var(--marigold);font-variant-numeric:tabular-nums}
+.cmpstage{position:relative;height:min(46vh,380px);
+  background:radial-gradient(118% 88% at 50% 32%, var(--stage-1) 0%, var(--stage-2) 100%)}
+.cmpcanvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+.cmpempty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;
+  padding:22px;font-size:12.5px;color:var(--muted);line-height:1.5}
+.cmpsec{margin-bottom:22px}
+.dtable{width:100%;border-collapse:collapse;font-size:12.5px}
+.dtable th,.dtable td{padding:6px 8px;border-bottom:1px solid var(--line-soft);text-align:right}
+.dtable thead th{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--faint);border-bottom:1px solid var(--line);font-weight:500}
+.dtable tbody th,.dtable thead th:first-child{text-align:left;font-weight:400;color:var(--muted)}
+.dtable td{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.dtable td.up{color:var(--pass)}
+.dtable td.down{color:var(--ember)}
+.scope{font-family:var(--mono);font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint)}
+
+/* ---------------- spec sheet ---------------- */
+.sheet{background:var(--panel);border:1px solid var(--line);border-radius:6px;
+  padding:26px 28px 30px;max-width:1040px}
+.viewpane[data-view="spec"] .vhead{max-width:1040px}
+.sheethead{border-bottom:2px solid var(--ink);padding-bottom:13px;margin-bottom:22px}
+.sheetmark{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--marigold)}
+.sheettitle{margin:5px 0 4px;font-family:var(--display);font-size:27px;font-weight:600;
+  font-variation-settings:"SOFT" 40,"WONK" 1;text-wrap:balance}
+.sheetmeta{display:flex;gap:16px;flex-wrap:wrap;font-family:var(--mono);font-size:10.5px;color:var(--muted)}
+.sheetcols{columns:2;column-gap:34px}
+.sheetsec{break-inside:avoid;margin-bottom:20px;-webkit-column-break-inside:avoid}
+.stable{width:100%;border-collapse:collapse;font-size:12.5px}
+.stable th{text-align:left;font-weight:400;color:var(--muted);padding:4px 0;
+  border-bottom:1px solid var(--line-soft);width:58%}
+.stable td{text-align:right;padding:4px 0;border-bottom:1px solid var(--line-soft);
+  font-family:var(--mono);font-size:11.5px;font-variant-numeric:tabular-nums}
+.stable tr.long{display:block;padding:4px 0;border-bottom:1px solid var(--line-soft)}
+.stable tr.long th,.stable tr.long td{display:block;width:auto;border:none;padding:0;text-align:left}
+.stable tr.long td{margin-top:2px;color:var(--ink)}
+.stable td.ok{color:var(--pass)}
+.stable td.bad{color:var(--fail);font-weight:500}
+.sheetnote{font-size:11.5px;color:var(--muted);border-left:3px solid var(--marigold);
+  padding-left:12px;margin:14px 0 0;line-height:1.55}
+
+/* ---------------- mobile tab bar ---------------- */
+.tabbar{display:none}
+
+@media (max-width:1220px){:root{--rail-l:272px;--rail-r:314px}}
+@media (max-width:1080px){
+  body{overflow:auto;height:auto;min-height:100%}
+  .bench,body[data-view="library"] .bench,body[data-view="spec"] .bench,
+  body[data-view="compare"] .bench{display:flex;flex-direction:column}
+  .rail{overflow:visible}
+  .rail.left,.rail.right{border:none;border-top:1px solid var(--line)}
+  .stage{order:1;min-height:0}
+  .viewpane[data-view="design"]{height:min(60vh,460px)}
+  .viewpane[data-view="library"],.viewpane[data-view="spec"],.viewpane[data-view="compare"]{
+    padding:18px 16px 40px}
+  .rail.left{order:2}
+  .rail.right{order:3}
+  .chatlog{max-height:none}
+  .cmpgrid{grid-template-columns:1fr}
+  .sheetcols{columns:1}
+  .sheet{padding:20px 18px 24px}
+}
+@media (max-width:760px){
+  .topbar{gap:9px;padding:8px 14px;padding-top:calc(8px + env(safe-area-inset-top,0px));flex-wrap:wrap}
+  nav.viewnav{display:none}
+  .stagechip{display:none}
+  .kbtn span{display:none}
+  .brand{flex:1 1 auto}
+  /* The design's name gets a line of its own rather than a few pixels
+     between the wordmark and the buttons. */
+  .doc{order:3;flex:1 1 100%;margin-left:0;margin-top:1px}
+  .docname{max-width:100%;font-size:14px}
+  .savestate{display:inline}
+  .tabbar{
+    display:flex;position:sticky;bottom:0;z-index:20;background:var(--panel);
+    border-top:1px solid var(--line);padding:5px 8px;
+    padding-bottom:calc(5px + env(safe-area-inset-bottom,0px));gap:4px;
   }
-  @media (max-width:1020px){
-    body{overflow:auto;height:auto;min-height:100%}
-    /* The flower comes first on a phone: viewport, then concepts and
-       controls, then the readout. */
-    .bench{display:flex;flex-direction:column}
-    .rail{overflow:visible}
-    .rail.left,.rail.right{border:none;border-top:1px solid var(--line)}
-    .stagearea{order:1;height:min(62vh,480px);min-height:320px}
-    .rail.left{order:2}
-    .rail.right{order:3}
-    .chatlog{max-height:none}
-  }
-  @media (max-width:620px){
-    .top{padding:10px 16px;gap:10px}
-    .top .sub{display:none}
-    .wordmark{font-size:18px}
-  }
+  .tab{flex:1 1 0;background:transparent;border:none;border-radius:4px;padding:7px 4px;
+    font-size:11.5px;font-weight:500;color:var(--muted)}
+  .tab[aria-pressed="true"]{background:var(--marigold-soft);color:var(--marigold)}
+  .chips.bl{max-width:calc(100% - 24px);bottom:58px}
+  .gapwrap{right:12px;bottom:12px}
+  .scalebar{top:50px;bottom:auto;left:12px}
+  .savestate{display:none}
+  .vtitle{font-size:22px}
+  .grid{grid-template-columns:1fr}
+}
+@media print{
+  .topbar,.rail,.tabbar,.vhead,.toasts{display:none!important}
+  body{overflow:visible;background:#fff;color:#000}
+  .viewpane[data-view="spec"]{padding:0}
+  .sheet{border:none;padding:0;max-width:none;background:#fff}
+}
 </style>
 
-<header class="top">
-  <span class="wordmark">AFR<em>i</em> Marigold Studio</span>
-  <span class="sub">Two-piece accessory &middot; live geometry, split and verification in your browser</span>
-  <span class="stage" id="stageChip">Stage One &middot; flower only</span>
+<header class="topbar">
+  <div class="brand">
+    <span class="wordmark">AFR<em>i</em> Studio</span>
+    <span class="stagechip" id="stageChip">Stage one &middot; flower only</span>
+  </div>
+  <nav class="viewnav" id="viewNav" aria-label="Views"></nav>
+  <div class="doc">
+    <button class="docname" id="docName" type="button" title="Rename this design">Untitled marigold</button>
+    <span class="savestate" id="saveState">Not saved</span>
+  </div>
+  <div class="topacts">
+    <div class="peers" id="peers" hidden aria-label="Also in the studio"></div>
+    <button class="iconbtn" id="newBtn" type="button" title="Start a new design" aria-label="New design">
+      <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+    <button class="iconbtn" id="undoBtn" type="button" title="Undo" aria-label="Undo">
+      <svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>
+    </button>
+    <button class="iconbtn" id="redoBtn" type="button" title="Redo" aria-label="Redo">
+      <svg viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/></svg>
+    </button>
+    <button class="kbtn" id="paletteBtn" type="button" title="Command palette">
+      <span>Search</span><kbd>&#8984;K</kbd>
+    </button>
+    <button class="btn primary" id="saveBtn" type="button">Save</button>
+  </div>
 </header>
 
 <div class="bench">
@@ -224,10 +540,16 @@
     </div>
     <div id="params"></div>
     <div class="sec">
+      <h2>Finish</h2>
+      <div id="finish"></div>
+      <p class="note">Finish and lighting change how the design reads, never what it measures.
+        The same geometry exports whichever is selected.</p>
+    </div>
+    <div class="sec">
       <h2>Tessellation</h2>
       <div class="btnrow">
-        <button class="chip" id="qDraft" aria-pressed="true">Draft</button>
-        <button class="chip" id="qStudio" aria-pressed="false">Studio</button>
+        <button class="chip" id="qDraft" type="button" aria-pressed="true">Draft</button>
+        <button class="chip" id="qStudio" type="button" aria-pressed="false">Studio</button>
       </div>
       <p class="note">Draft thins the petal mesh while you drag a slider. Studio rebuilds at the
         production density the Blender pipeline renders from.</p>
@@ -238,18 +560,29 @@
     </div>
   </aside>
 
-  <!-- ===================== VIEWPORT ===================== -->
-  <div class="stagearea">
-    <canvas id="view"></canvas>
-    <div class="chips tl" id="viewChips"></div>
-    <div class="chips bl" id="modeChips"></div>
-    <div class="gapwrap">
-      <span>Gap</span>
-      <input type="range" id="gap" min="0" max="80" step="0.5" value="0">
-      <b id="gapVal">0.0 mm</b>
+  <!-- ===================== STAGE ===================== -->
+  <section class="stage">
+    <div class="viewpane" data-view="design">
+      <div class="stagearea">
+        <canvas id="view"></canvas>
+        <div class="chips tl" id="viewChips"></div>
+        <div class="chips bl" id="modeChips"></div>
+        <div class="scalebar" id="scalebar" hidden>
+          <span class="slabel">10 mm</span>
+          <span class="bar"></span>
+        </div>
+        <div class="gapwrap">
+          <span>Gap</span>
+          <input type="range" id="gap" min="0" max="80" step="0.5" value="0" aria-label="Separation gap">
+          <b id="gapVal">0.0 mm</b>
+        </div>
+        <div class="busy" id="busy" hidden><span class="spin"></span><span class="txt" id="busyTxt">Building</span></div>
+      </div>
     </div>
-    <div class="busy" id="busy" hidden><span class="spin"></span><span class="txt" id="busyTxt">Building</span></div>
-  </div>
+    <div class="viewpane" data-view="compare" id="comparePane" hidden></div>
+    <div class="viewpane" data-view="library" id="libraryPane" hidden></div>
+    <div class="viewpane" data-view="spec" id="specPane" hidden></div>
+  </section>
 
   <!-- ===================== RIGHT RAIL ===================== -->
   <aside class="rail right">
@@ -270,927 +603,36 @@
     </div>
 
     <div class="sec" id="aiSec" hidden>
-      <h2>Claude designer</h2>
+      <h2>Claude at the bench</h2>
       <div class="chatlog" id="chatlog"></div>
-      <textarea id="ask" rows="3" placeholder="Make the flower fuller and strengthen the S-curve of the split."></textarea>
+      <textarea id="ask" rows="3" placeholder="Make it read fuller and bring the height under 35 mm."></textarea>
       <div class="btnrow" style="margin-top:7px">
-        <button class="btn" id="send">Ask Claude</button>
-        <button class="btn ghost" id="stop" hidden>Stop</button>
+        <button class="btn primary" id="send" type="button">Ask Claude</button>
+        <button class="btn ghost" id="stop" type="button" hidden>Stop</button>
       </div>
-      <p class="note">Claude may only move parameters that exist in the schema, within their
-        declared bounds. It cannot run code or reach the filesystem &mdash; every change is
-        re-validated here and anything out of range is rejected and reported.</p>
+      <p class="note" id="aiMode"></p>
+      <p class="note">Claude may only move parameters that exist in the schema, within their declared
+        bounds. It cannot run code or reach the filesystem, and every change it makes is one press
+        of Undo away.</p>
     </div>
 
-    <div class="sec" id="exportSec" hidden>
+    <div class="sec">
       <h2>Export</h2>
-      <div class="btnrow">
-        <button class="btn ghost" id="dlStl">Both pieces &middot; STL</button>
-        <button class="btn ghost" id="dlCfg">Configuration &middot; JSON</button>
-      </div>
-      <p class="note" id="dlNote">Binary STL in millimetres, one mesh per piece, zipped with a
-        build report.</p>
+      <div id="exportBody"></div>
     </div>
 
     <div class="caveat">
-      <b>What this is.</b> The real geometry engine, ported to JavaScript and running live on
-      this page &mdash; same layer schedule, same closed-solid petals, same exact-clipping split
-      kernel. Two things stay on the desktop build: photoreal rendering in Blender, and the
-      boolean union that fuses the petals, base and centre into a single manufacturable solid.
-      What you see here is the flower as built &mdash; overlapping closed shells, identical in
-      render, but a body count rather than one part.
+      <b>What this is.</b> The real geometry engine, ported to JavaScript and running live on this
+      page &mdash; same layer schedule, same closed-solid petals, same exact-clipping split kernel.
+      Two things stay on the desktop build: photoreal rendering in Blender, and the boolean union
+      that fuses the petals, base and centre into a single manufacturable solid. What you see here
+      is the flower as built &mdash; overlapping closed shells, identical in render, but a body
+      count rather than one part.
     </div>
   </aside>
 </div>
 
+<nav class="tabbar" id="tabBar" aria-label="Views"></nav>
+
 <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
-<script type="module">
-import * as ENGINE from './engine.js';
-
-/* ================== configuration schema (mirrors the Pydantic source) ===== */
-const FLOWER_GROUPS = [
-  ['Form', true, [
-    ['diameter_mm', 30, 200, 1, 'mm', 'Overall diameter of the finished flower.'],
-    ['relief_depth_mm', 4, 60, 0.5, 'mm', 'Height of the domed rosette above its base plane.'],
-    ['thickness_mm', 0.3, 5, 0.1, 'mm', 'Material thickness of each petal.'],
-  ]],
-  ['Petals', true, [
-    ['layer_count', 1, 12, 1, 'rows', 'Number of concentric petal rows.'],
-    ['petal_count_base', 5, 60, 1, 'petals', 'Petals in the outermost row; inner rows scale from this.'],
-    ['petal_density', 0.4, 2.5, 0.05, '\u00d7', 'Multiplier on petals per row. Higher reads fuller.'],
-    ['petal_length_ratio', 0.15, 0.75, 0.01, '\u00d7', 'Petal length as a fraction of flower radius.'],
-    ['petal_width_ratio', 0.2, 1.4, 0.01, '\u00d7', 'Width relative to natural spacing. Above 1 overlaps.'],
-    ['petal_overlap', 0, 0.8, 0.01, '\u00d7', 'Radial overlap between adjacent rows.'],
-  ]],
-  ['Petal shape', false, [
-    ['petal_curvature', 0, 1, 0.01, '\u00d7', 'Lengthwise curl. 0 is flat, 1 curls strongly inward.'],
-    ['dome_gain', 0.1, 1.2, 0.01, '\u00d7', 'How steeply the rows climb toward the centre. This is what turns a flat rosette into a pompon.'],
-    ['petal_cup', 0, 1, 0.01, '\u00d7', 'Crosswise cupping, the channel along the petal.'],
-    ['petal_ruffle_amp', 0, 1, 0.01, '\u00d7', 'Amplitude of the ruffled petal edge.'],
-    ['petal_ruffle_freq', 1, 10, 0.1, 'cycles', 'Number of ruffle waves across the petal edge.'],
-    ['petal_notch', 0, 0.7, 0.01, '\u00d7', 'Depth of the notch at the petal tip.'],
-    ['layer_tilt_gain', 0, 1.4, 0.01, '\u00d7', 'How much more upright each inner row stands.'],
-  ]],
-  ['Centre', false, [
-    ['center_diameter_ratio', 0.08, 0.6, 0.01, '\u00d7', 'Centre boss diameter as a fraction of flower diameter.'],
-    ['center_dome_height', 0, 1.2, 0.01, '\u00d7', 'Centre dome height relative to relief depth.'],
-    ['center_floret_rings', 0, 10, 1, 'rings', 'Rings of tiny disc florets in the centre.'],
-  ]],
-  ['Structure', false, [
-    ['base_disc_ratio', 0.15, 0.95, 0.01, '\u00d7', 'Structural base disc diameter. This is what physically carries each half.'],
-    ['base_thickness_mm', 0.5, 6, 0.1, 'mm', 'Thickness of the structural base disc.'],
-  ]],
-  ['Variation', false, [
-    ['organic_variation', 0, 1, 0.01, '\u00d7', 'Per-petal jitter in angle, length, width and tilt.'],
-    ['seed', 1, 999999, 1, '', 'Random seed. The same seed reproduces the flower exactly.'],
-  ]],
-];
-
-const HAT_GROUP = ['Hat', false, [
-  ['head_circumference_mm', 520, 640, 5, 'mm', 'Inside head circumference. 58 cm is the commonest adult size, and it is the one dimension a hat cannot get wrong.'],
-  ['crown_height_mm', 40, 200, 1, 'mm', 'Height of the crown above the brim plane.'],
-  ['crown_crease', 0, 1.5, 0.01, '\u00d7', 'Depth of the centre crease and finger dents. 0 leaves a smooth crown.'],
-  ['brim_width_mm', 10, 180, 1, 'mm', 'Brim reach beyond the head radius. This is what decides whether the accessory fits.'],
-  ['brim_droop_deg', -10, 45, 0.5, '\u00b0', 'How far the brim falls from horizontal.'],
-  ['brim_curl', 0, 0.6, 0.01, '\u00d7', 'Upward curl at the outer edge.'],
-  ['thickness_mm', 0.4, 6, 0.1, 'mm', 'Material thickness of the hat body.'],
-  ['band_height_mm', 0, 90, 1, 'mm', 'Height of the ribbon band. 0 omits it.'],
-]];
-
-const PLACEMENT_GROUP = ['Placement', false, [
-  ['radial_position', 0, 1, 0.01, '\u00d7', '0 seats the accessory against the band at the crown foot; 1 puts it at the brim edge.'],
-  ['azimuth_deg', -180, 180, 1, '\u00b0', 'Position around the crown. 0 is the front of the hat.'],
-  ['surface_offset_mm', -5, 30, 0.1, 'mm', 'Lift off the hat surface. The fixing takes up this gap.'],
-  ['tilt_deg', -60, 60, 1, '\u00b0', 'Tip the accessory outward (+) or inward (-) from the local surface.'],
-  ['roll_deg', -180, 180, 1, '\u00b0', 'Spin it in its own plane. This aims the dividing curve.'],
-]];
-
-const SPLIT_GROUP = ['Dividing curve', true, [
-  ['position', -0.6, 0.6, 0.01, '\u00d7', 'Lateral position of the split. 0 is centred.'],
-  ['orientation_deg', -180, 180, 1, '\u00b0', 'Rotation of the split axis around the flower.'],
-  ['amplitude', 0, 0.9, 0.01, '\u00d7', 'How far the curve swings sideways. This drives the S.'],
-  ['smoothness', 0.05, 1, 0.01, '\u00d7', 'Curve softness. Low is taut and angular, high is flowing.'],
-  ['organic_roughness', 0, 1, 0.01, '\u00d7', 'Irregularity of the organic split only.'],
-]];
-
-const CONCEPTS = [
-  { key: 'A', name: 'Balanced Split',
-    desc: 'A clear, near-symmetric division. The dividing line reads as a single confident stroke.',
-    split: { type: 'balanced', position: 0, amplitude: 0.18, smoothness: 0.7, orientation_deg: 0, separation_mm: 18 } },
-  { key: 'B', name: 'S River Split', priority: true,
-    desc: 'A flowing, river-inspired separation with an editable curve.',
-    split: { type: 's_river', position: 0, amplitude: 0.34, smoothness: 0.72, orientation_deg: 12, separation_mm: 18 } },
-  { key: 'C', name: 'Organic Asymmetric',
-    desc: 'An expressive, irregular division that wanders with the petal arrangement.',
-    split: { type: 'organic', position: 0.10, amplitude: 0.40, smoothness: 0.55, orientation_deg: -28,
-             separation_mm: 55, organic_octaves: 3, organic_roughness: 0.55, organic_seed: 11 } },
-];
-
-/* The refined marigold (Concept C v2 review). One master flower serves all
- * three concepts -- only the dividing curve differs -- so the refinement
- * applies to every concept, not just C. ENGINE.FLOWER_DEFAULTS is left alone:
- * it is the engine's own baseline and what the Python parity test compares
- * against. */
-const REFINED = {
-  layer_count: 9, petal_count_base: 26, petal_density: 1.65, petal_overlap: 0.56,
-  petal_length_ratio: 0.37, petal_width_ratio: 1.12,
-  petal_curvature: 0.64, petal_cup: 0.58, layer_tilt_gain: 0.80,
-  relief_depth_mm: 40.0, dome_gain: 0.56,
-  petal_ruffle_amp: 0.42, petal_ruffle_freq: 4.6, petal_notch: 0.10,
-  center_diameter_ratio: 0.14, center_dome_height: 0.16, center_floret_rings: 3,
-  organic_variation: 0.52,
-};
-
-/* ================== state ================== */
-const state = {
-  concept: 'B',
-  flower: { ...ENGINE.FLOWER_DEFAULTS, ...REFINED },
-  hat: { ...ENGINE.HAT_DEFAULTS, style: 'wide_brim', brim_width_mm: 110, crown_height_mm: 104 },
-  placement: { ...ENGINE.PLACEMENT_DEFAULTS },
-  split: { ...ENGINE.SPLIT_DEFAULTS, ...CONCEPTS[1].split },
-  quality: 'draft',
-  mode: 'assembled',
-  showWall: true,
-  showCurve: false,
-  wireframe: false,
-  gapMm: 0,
-  view: 'three_quarter',
-  metrics: null,
-  last: null,
-};
-
-const $ = (id) => document.getElementById(id);
-const fmt = (x, d) => Number(x).toFixed(d);
-
-/* ================== three.js scene ================== */
-const THREE = window.THREE;
-const canvas = $('view');
-let renderer, scene, camera, rootA, rootB, rootHat, curveLine;
-let matA, matB, matWallA, matWallB, matHat, matBand;
-let sepDir = [1, 0];
-let framed = false;
-let frameR = 4.7;
-let lastHatR = 0;
-const cam = { az: 0.66, el: 0.52, dist: 26, target: new THREE.Vector3(0, 0, 0.9) };
-const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-let autoSpin = !reduceMotion;
-
-function initScene() {
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-  renderer.setClearAlpha(0);
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.06;
-
-  scene = new THREE.Scene();
-  camera = new THREE.PerspectiveCamera(34, 1, 0.1, 400);
-
-  scene.add(new THREE.HemisphereLight(0xF6E2C0, 0x1A1610, 0.85));
-  const key = new THREE.DirectionalLight(0xFFF0D6, 2.35); key.position.set(7, -9, 12); scene.add(key);
-  const fill = new THREE.DirectionalLight(0xC8D8FF, 0.55); fill.position.set(-9, 4, 5); scene.add(fill);
-  const rim = new THREE.DirectionalLight(0xFFB347, 0.85); rim.position.set(-3, 10, -6); scene.add(rim);
-
-  // A soft painted pool under the flower instead of a shadow map: same read,
-  // no per-frame cost on 130k triangles.
-  const c = document.createElement('canvas'); c.width = c.height = 256;
-  const g = c.getContext('2d');
-  const rg = g.createRadialGradient(128, 128, 8, 128, 128, 126);
-  rg.addColorStop(0, 'rgba(0,0,0,0.44)'); rg.addColorStop(0.55, 'rgba(0,0,0,0.16)');
-  rg.addColorStop(1, 'rgba(0,0,0,0)');
-  g.fillStyle = rg; g.fillRect(0, 0, 256, 256);
-  const pool = new THREE.Mesh(
-    new THREE.PlaneGeometry(26, 26),
-    new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false })
-  );
-  pool.position.z = -0.12; scene.add(pool);
-
-  const mk = (hex) => new THREE.MeshStandardMaterial({ color: new THREE.Color(hex), roughness: 0.62, metalness: 0.02 });
-  matA = mk(0xF2A007); matB = mk(0xE0780D);
-  matWallA = mk(0xC8541B); matWallB = mk(0xA8431A);
-  matWallA.roughness = matWallB.roughness = 0.48;
-
-  matHat = mk(0x17150F); matHat.roughness = 0.92; matHat.metalness = 0.0;
-  matBand = mk(0x0B0A08); matBand.roughness = 0.55;
-
-  rootA = new THREE.Group(); rootB = new THREE.Group(); rootHat = new THREE.Group();
-  scene.add(rootA); scene.add(rootB); scene.add(rootHat);
-
-  const cg = new THREE.BufferGeometry();
-  cg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(3), 3));
-  curveLine = new THREE.Line(cg, new THREE.LineBasicMaterial({ color: 0x8FD6FF }));
-  curveLine.renderOrder = 999;
-  curveLine.material.depthTest = false;
-  curveLine.visible = false;
-  scene.add(curveLine);
-
-  attachControls();
-  window.addEventListener('resize', resize);
-  resize();
-  renderer.setAnimationLoop(tick);
-}
-
-function resize() {
-  const w = canvas.clientWidth || 1, h = canvas.clientHeight || 1;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-  renderer.setSize(w, h, false);
-  camera.aspect = w / h;
-  camera.updateProjectionMatrix();
-}
-
-function tick() {
-  if (autoSpin) cam.az += 0.0016;
-  const ce = Math.cos(cam.el), se = Math.sin(cam.el);
-  camera.position.set(
-    cam.target.x + cam.dist * ce * Math.cos(cam.az),
-    cam.target.y + cam.dist * ce * Math.sin(cam.az),
-    cam.target.z + cam.dist * se
-  );
-  camera.up.set(0, 0, 1);
-  camera.lookAt(cam.target);
-  renderer.render(scene, camera);
-}
-
-function attachControls() {
-  let drag = null;
-  canvas.addEventListener('pointerdown', (e) => {
-    drag = { x: e.clientX, y: e.clientY };
-    autoSpin = false;
-    canvas.classList.add('dragging');
-    canvas.setPointerCapture(e.pointerId);
-  });
-  canvas.addEventListener('pointermove', (e) => {
-    if (!drag) return;
-    cam.az -= (e.clientX - drag.x) * 0.0072;
-    cam.el = Math.max(-1.45, Math.min(1.45, cam.el + (e.clientY - drag.y) * 0.0062));
-    drag = { x: e.clientX, y: e.clientY };
-  });
-  const end = (e) => { drag = null; canvas.classList.remove('dragging');
-    try { canvas.releasePointerCapture(e.pointerId); } catch (_) {} };
-  canvas.addEventListener('pointerup', end);
-  canvas.addEventListener('pointercancel', end);
-  canvas.addEventListener('wheel', (e) => {
-    e.preventDefault(); autoSpin = false;
-    cam.dist = Math.max(6, Math.min(90, cam.dist * (1 + Math.sign(e.deltaY) * 0.09)));
-  }, { passive: false });
-
-  let pinch = 0;
-  canvas.addEventListener('touchmove', (e) => {
-    if (e.touches.length !== 2) return;
-    const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX,
-                         e.touches[0].clientY - e.touches[1].clientY);
-    if (pinch) { autoSpin = false; cam.dist = Math.max(6, Math.min(90, cam.dist * pinch / d)); }
-    pinch = d;
-  }, { passive: true });
-  canvas.addEventListener('touchend', () => { pinch = 0; });
-}
-
-/* ================== geometry upload ================== */
-function buildPieceGroup(group, piece, mat, wallMat) {
-  for (const ch of group.children.slice()) { ch.geometry.dispose(); group.remove(ch); }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(piece.pos, 3));
-  if (piece.flowerIdx.length) {
-    const g1 = geo.clone();
-    g1.setIndex(new THREE.BufferAttribute(piece.flowerIdx, 1));
-    g1.computeVertexNormals();
-    group.add(new THREE.Mesh(g1, mat));
-  }
-  if (piece.wallIdx.length) {
-    const g2 = geo.clone();
-    g2.setIndex(new THREE.BufferAttribute(piece.wallIdx, 1));
-    g2.computeVertexNormals();
-    const m = new THREE.Mesh(g2, wallMat);
-    m.userData.isWall = true;
-    group.add(m);
-  }
-  geo.dispose();
-}
-
-function applyResult(res) {
-  state.last = res;
-  state.metrics = res.metrics;
-  sepDir = res.sepDir;
-  buildPieceGroup(rootA, res.A, matA, matWallA);
-  buildPieceGroup(rootB, res.B, matB, matWallB);
-  if (res.hat) buildPieceGroup(rootHat, res.hat, matHat, matBand);
-  else for (const ch of rootHat.children.slice()) { ch.geometry.dispose(); rootHat.remove(ch); }
-  rootHat.visible = !!res.hat;
-  $('stageChip').innerHTML = res.hat
-    ? 'Stage Two &middot; on the hat' : 'Stage One &middot; flower only';
-  const cg = new THREE.BufferGeometry();
-  cg.setAttribute('position', new THREE.BufferAttribute(res.curve, 3));
-  curveLine.geometry.dispose();
-  curveLine.geometry = cg;
-  // The hat is roughly four times the flower across, so when it is on, it
-  // decides the framing and where the camera looks.
-  const hatR = res.metrics.hat
-    ? res.metrics.hat.overall_diameter_mm * 0.5 * ENGINE.MM : 0;
-  frameR = hatR || res.metrics.radius_scene;
-  cam.target.set(0, 0, hatR ? res.metrics.hat.overall_height_mm * ENGINE.MM * 0.34
-                            : res.metrics.height_scene * 0.45);
-  if (!framed || hatR !== lastHatR) {
-    framed = true; lastHatR = hatR;
-    cam.dist = VIEWS[state.view][2] * frameR;
-  }
-  applyDisplay();
-  renderReadout();
-  $('exportSec').hidden = !(downloads);
-}
-
-function applyDisplay() {
-  const m = state.mode;
-  rootA.visible = (m !== 'b');
-  rootB.visible = (m !== 'a');
-  const half = state.gapMm * ENGINE.MM * 0.5;
-  rootA.position.set(sepDir[0] * half, sepDir[1] * half, 0);
-  rootB.position.set(-sepDir[0] * half, -sepDir[1] * half, 0);
-  for (const g of [rootA, rootB]) {
-    for (const ch of g.children) if (ch.userData.isWall) ch.visible = state.showWall;
-  }
-  matA.wireframe = matB.wireframe = matWallA.wireframe = matWallB.wireframe = state.wireframe;
-  curveLine.visible = state.showCurve;
-}
-
-/* ================== readout ================== */
-function renderReadout() {
-  const m = state.metrics;
-  if (!m) return;
-  $('specs').innerHTML = [
-    ['Diameter', fmt(m.diameter_mm, 1), 'mm'],
-    ['Height', fmt(m.height_mm, 1), 'mm'],
-    ['Petals', String(m.petals), 'in ' + m.rows + ' rows'],
-    ['Triangles', (m.triangles / 1000).toFixed(1), 'k'],
-  ].map(([l, n, u]) =>
-    '<div class="spec"><div class="lab">' + l + '</div><div class="num">' + n +
-    '<small>' + u + '</small></div></div>').join('');
-
-  const chk = (name, ok, v) =>
-    '<div class="chk ' + (ok ? 'ok' : 'bad') + '"><span class="dot"></span>' +
-    '<span class="name">' + name + '</span><span class="v">' + v + '</span></div>';
-  const openOk = m.open_edges_a === 0 && m.open_edges_b === 0;
-  $('checks').innerHTML =
-    chk('Piece A is a closed solid', m.open_edges_a === 0, m.open_edges_a + ' open edges') +
-    chk('Piece B is a closed solid', m.open_edges_b === 0, m.open_edges_b + ' open edges') +
-    chk('Every cut face capped', m.cap_failures === 0, m.cap_failures + ' failures') +
-    chk('A + B reconstruct the master', m.volume_error_pct < 1e-3,
-        m.volume_error_pct < 1e-9 ? '0.000000%' : m.volume_error_pct.toExponential(2) + '%') +
-    chk('Material balance A : B', true,
-        (m.balance * 100).toFixed(1) + ' : ' + ((1 - m.balance) * 100).toFixed(1));
-  // The bound is 1e-3%, not zero. Making each piece's winding globally
-  // consistent flips any inside-out body, including the specks a cut through a
-  // petal tip leaves behind, and flipping one shifts the A + B sum by twice its
-  // volume. A real failure -- a petal landing on neither side -- is four orders
-  // of magnitude above this.
-  $('verifyNote').innerHTML = openOk
-    ? 'Two genuinely separate closed meshes, cut by exact per-triangle clipping &mdash; not a texture, a colour boundary or a drawn line. Hide either piece to confirm.'
-    : 'This parameter combination left open edges. That is a real defect, reported rather than hidden.';
-
-  const kv = (k, v) => '<div class="kv"><span>' + k + '</span><b>' + v + '</b></div>';
-  $('detail').innerHTML =
-    (m.hat ? kv('Hat', m.hat.style.replace('_', ' ') + ', ' +
-                 m.hat.overall_diameter_mm.toFixed(0) + ' mm across') +
-             kv('Brim width', m.hat.brim_width_mm.toFixed(1) + ' mm') +
-             kv('Seated at radius', m.hat.seated_radius_mm.toFixed(1) + ' mm') +
-             kv('Hat triangles', m.hat.triangles) : '') +
-    kv('Bodies in master', m.bodies_master) +
-    kv('Bodies in piece A / B', m.bodies_a + ' / ' + m.bodies_b) +
-    kv('Closed bodies cut', m.bodies_total) +
-    kv('Bodies the curve divides', m.bodies_divided) +
-    kv('Triangles added by split', (m.triangles_a + m.triangles_b - m.triangles)) +
-    kv('Triangles clipped', m.triangles_clipped) +
-    kv('Cut-wall triangles', m.cap_triangles) +
-    kv('Boundary caps built', m.caps_built) +
-    kv('Path perturbation', fmt(m.path_perturbation_mm, 5) + ' mm') +
-    kv('Flower build', Math.round(m.flower_ms) + ' ms') +
-    kv('Split kernel', Math.round(m.split_ms) + ' ms');
-}
-
-/* ================== generation ================== */
-let worker = null, jobId = 0, pending = false, queued = false;
-try {
-  worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
-} catch (_) { worker = null; }
-
-function draftFlower(f) {
-  if (state.quality === 'studio') return f;
-  return { ...f,
-    petal_segments_u: Math.min(f.petal_segments_u, 10),
-    petal_segments_v: Math.min(f.petal_segments_v, 7) };
-}
-
-function regenerate() {
-  if (pending) { queued = true; return; }
-  pending = true; queued = false;
-  const id = ++jobId;
-  $('busy').hidden = false;
-  $('busyTxt').textContent = 'Building';
-  const flower = draftFlower(state.flower);
-  const split = { ...state.split };
-  const hat = { ...state.hat,
-    // The hat is four times the flower across but far simpler; thinning it
-    // while a slider is moving keeps the rebuild under a second.
-    revolve_segments: state.quality === 'studio' ? 96 : 64,
-    profile_segments: state.quality === 'studio' ? 160 : 110 };
-  const placement = { ...state.placement };
-
-  const finish = (res) => {
-    pending = false;
-    $('busy').hidden = true;
-    applyResult(res);
-    if (queued) regenerate();
-  };
-  const fail = (msg) => {
-    pending = false;
-    $('busyTxt').textContent = 'Build failed: ' + msg;
-    setTimeout(() => { $('busy').hidden = true; }, 4000);
-  };
-
-  if (worker) {
-    worker.onmessage = (ev) => {
-      const d = ev.data;
-      if (d.id !== id) return;
-      if (d.type === 'progress') $('busyTxt').textContent = d.stage;
-      else if (d.type === 'done') finish(d);
-      else if (d.type === 'error') fail(d.message);
-    };
-    worker.postMessage({ id, flower, split, hat, placement });
-  } else {
-    // No worker in this host: build on the main thread. Slower to paint, same result.
-    setTimeout(() => {
-      try { finish(ENGINE.generateDesign(flower, split, null, hat, placement)); }
-      catch (e) { fail(String(e && e.message ? e.message : e)); }
-    }, 16);
-  }
-}
-
-let debounce = 0;
-function scheduleDraft() {
-  clearTimeout(debounce);
-  debounce = setTimeout(regenerate, 170);
-}
-
-/* ================== controls ================== */
-function slider(target, key, lo, hi, step, unit, hint) {
-  const wrap = document.createElement('div'); wrap.className = 'p';
-  const id = 'p_' + key;
-  const isInt = step >= 1;
-  wrap.innerHTML =
-    '<div class="row"><label for="' + id + '">' + key.replace(/_/g, ' ')
-      .replace(/\bmm\b/, '(mm)').replace(/\bdeg\b/, '(deg)') + '</label>' +
-    '<span class="val" id="v_' + key + '"></span></div>' +
-    '<input type="range" id="' + id + '" min="' + lo + '" max="' + hi + '" step="' + step + '">' +
-    '<div class="hint">' + hint + '</div>';
-  const input = wrap.querySelector('input');
-  const val = wrap.querySelector('.val');
-  const show = () => {
-    const v = target[key];
-    val.textContent = (isInt ? String(Math.round(v)) : fmt(v, step < 0.05 ? 2 : 2)) + (unit ? ' ' + unit : '');
-  };
-  input.value = target[key];
-  show();
-  input.addEventListener('input', () => {
-    target[key] = isInt ? Math.round(+input.value) : +input.value;
-    show(); scheduleDraft();
-  });
-  input.addEventListener('change', () => {
-    target[key] = isInt ? Math.round(+input.value) : +input.value;
-    show(); clearTimeout(debounce); regenerate();
-  });
-  wrap.dataset.key = key;
-  return wrap;
-}
-
-function buildParams() {
-  const host = $('params');
-  host.innerHTML = '';
-  const groups = [...FLOWER_GROUPS.map((g) => [g, state.flower]),
-                 [SPLIT_GROUP, state.split],
-                 [HAT_GROUP, state.hat], [PLACEMENT_GROUP, state.placement]];
-  for (const [[title, open, items], target] of groups) {
-    const d = document.createElement('details');
-    d.className = 'grp'; d.open = open;
-    const s = document.createElement('summary'); s.textContent = title; d.appendChild(s);
-    const body = document.createElement('div'); body.className = 'grpbody';
-    if (title === 'Hat') {
-      const sel = document.createElement('div'); sel.className = 'p';
-      sel.innerHTML = '<div class="row"><label for="p_hatstyle">silhouette</label></div>' +
-        '<select id="p_hatstyle">' +
-        '<option value="fedora">Fedora</option>' +
-        '<option value="wide_brim">Wide brim</option>' +
-        '<option value="boater">Boater</option>' +
-        '<option value="cloche">Cloche</option>' +
-        '<option value="bucket">Bucket</option></select>' +
-        '<div class="hint">Sets crown taper, dome, flare and edge softness. Only the fedora and wide brim are creased.</div>';
-      body.appendChild(sel);
-      const el = sel.querySelector('select');
-      el.value = state.hat.style;
-      el.addEventListener('change', () => { state.hat.style = el.value; regenerate(); });
-    }
-    if (title === 'Dividing curve') {
-      const sel = document.createElement('div'); sel.className = 'p';
-      sel.innerHTML = '<div class="row"><label for="p_type">curve family</label></div>' +
-        '<select id="p_type"><option value="balanced">Balanced &mdash; single stroke</option>' +
-        '<option value="s_river">S river &mdash; meander</option>' +
-        '<option value="organic">Organic &mdash; fractal wander</option></select>' +
-        '<div class="hint">Every family is x = f(y), which is what guarantees the curve divides the plane into exactly two regions.</div>';
-      body.appendChild(sel);
-      const el = sel.querySelector('select');
-      el.value = state.split.type;
-      el.addEventListener('change', () => { state.split.type = el.value; regenerate(); });
-    }
-    for (const [key, lo, hi, step, unit, hint] of items) body.appendChild(slider(target, key, lo, hi, step, unit, hint));
-    d.appendChild(body);
-    host.appendChild(d);
-  }
-}
-
-
-function buildConcepts() {
-  const host = $('concepts');
-  host.innerHTML = '';
-  for (const c of CONCEPTS) {
-    const b = document.createElement('button');
-    b.className = 'concept';
-    b.type = 'button';
-    b.setAttribute('aria-pressed', String(c.key === state.concept));
-    b.innerHTML = '<div class="k">CONCEPT ' + c.key + (c.priority ? ' <span class="flag">&middot; PRIORITY</span>' : '') +
-      '</div><div class="n">' + c.name + '</div><div class="d">' + c.desc + '</div>';
-    b.addEventListener('click', () => {
-      state.concept = c.key;
-      state.split = { ...ENGINE.SPLIT_DEFAULTS, ...c.split };
-      for (const el of host.children) el.setAttribute('aria-pressed', 'false');
-      b.setAttribute('aria-pressed', 'true');
-      buildParams();
-      regenerate();
-    });
-    host.appendChild(b);
-  }
-}
-
-// azimuth, elevation, and distance as a multiple of the measured radius, so
-// framing holds when the flower's diameter changes.
-const VIEWS = {
-  three_quarter: [0.66, 0.52, 4.7], top: [-Math.PI / 2, 1.44, 4.3],
-  front: [-Math.PI / 2, 0.10, 5.0], side: [0, 0.14, 5.0],
-};
-const frameRadius = () => frameR || 4.7;
-function buildChips() {
-  const vc = $('viewChips'); vc.innerHTML = '';
-  for (const [key, label] of [['three_quarter', 'Three quarter'], ['top', 'Top'], ['front', 'Front'], ['side', 'Side']]) {
-    const b = document.createElement('button');
-    b.className = 'chip'; b.type = 'button'; b.textContent = label;
-    b.setAttribute('aria-pressed', String(state.view === key));
-    b.addEventListener('click', () => {
-      state.view = key; autoSpin = false;
-      const [az, el, mult] = VIEWS[key];
-      cam.az = az; cam.el = el; cam.dist = mult * frameRadius();
-      for (const x of vc.children) x.setAttribute('aria-pressed', 'false');
-      b.setAttribute('aria-pressed', 'true');
-    });
-    vc.appendChild(b);
-  }
-
-  const mc = $('modeChips'); mc.innerHTML = '';
-  const modes = [['assembled', 'Assembled'], ['a', 'Piece A'], ['b', 'Piece B']];
-  const modeBtns = [];
-  for (const [key, label] of modes) {
-    const b = document.createElement('button');
-    b.className = 'chip'; b.type = 'button'; b.textContent = label;
-    b.setAttribute('aria-pressed', String(state.mode === key));
-    b.addEventListener('click', () => {
-      state.mode = key;
-      for (const x of modeBtns) x.setAttribute('aria-pressed', 'false');
-      b.setAttribute('aria-pressed', 'true');
-      applyDisplay();
-    });
-    modeBtns.push(b); mc.appendChild(b);
-  }
-  const toggle = (label, prop) => {
-    const b = document.createElement('button');
-    b.className = 'chip'; b.type = 'button'; b.textContent = label;
-    b.setAttribute('aria-pressed', String(state[prop]));
-    b.addEventListener('click', () => {
-      state[prop] = !state[prop];
-      b.setAttribute('aria-pressed', String(state[prop]));
-      applyDisplay();
-    });
-    mc.appendChild(b);
-  };
-  const hatBtn = document.createElement('button');
-  hatBtn.className = 'chip'; hatBtn.type = 'button'; hatBtn.textContent = 'On the hat';
-  hatBtn.setAttribute('aria-pressed', String(state.placement.show_hat));
-  hatBtn.addEventListener('click', () => {
-    state.placement.show_hat = !state.placement.show_hat;
-    hatBtn.setAttribute('aria-pressed', String(state.placement.show_hat));
-    regenerate();
-  });
-  mc.appendChild(hatBtn);
-  toggle('Cut wall', 'showWall');
-  toggle('Curve', 'showCurve');
-  toggle('Wireframe', 'wireframe');
-}
-
-$('gap').addEventListener('input', (e) => {
-  state.gapMm = +e.target.value;
-  $('gapVal').textContent = fmt(state.gapMm, 1) + ' mm';
-  // Widen the framing so both pieces stay in view, but never undo a
-  // deliberate zoom-out.
-  const need = VIEWS[state.view][2] * frameRadius() + state.gapMm * ENGINE.MM * 0.55;
-  if (cam.dist < need) cam.dist = need;
-  applyDisplay();
-});
-for (const [id, q] of [['qDraft', 'draft'], ['qStudio', 'studio']]) {
-  $(id).addEventListener('click', () => {
-    state.quality = q;
-    $('qDraft').setAttribute('aria-pressed', String(q === 'draft'));
-    $('qStudio').setAttribute('aria-pressed', String(q === 'studio'));
-    regenerate();
-  });
-}
-
-/* ================== export ================== */
-let downloads = null;
-
-function stlBinary(piece) {
-  const pos = piece.pos, idx = piece.flowerIdx, wall = piece.wallIdx;
-  const n = (idx.length + wall.length) / 3;
-  const buf = new ArrayBuffer(84 + n * 50);
-  const dv = new DataView(buf);
-  const head = 'AFRi Studio marigold piece - binary STL - millimetres';
-  for (let i = 0; i < head.length; i++) dv.setUint8(i, head.charCodeAt(i));
-  dv.setUint32(80, n, true);
-  let o = 84;
-  const S = 1 / ENGINE.MM;   // scene units -> millimetres
-  const emit = (arr) => {
-    for (let t = 0; t < arr.length; t += 3) {
-      const a = arr[t] * 3, b = arr[t + 1] * 3, c = arr[t + 2] * 3;
-      const ux = pos[b] - pos[a], uy = pos[b + 1] - pos[a + 1], uz = pos[b + 2] - pos[a + 2];
-      const vx = pos[c] - pos[a], vy = pos[c + 1] - pos[a + 1], vz = pos[c + 2] - pos[a + 2];
-      let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
-      const L = Math.hypot(nx, ny, nz) || 1; nx /= L; ny /= L; nz /= L;
-      dv.setFloat32(o, nx, true); dv.setFloat32(o + 4, ny, true); dv.setFloat32(o + 8, nz, true); o += 12;
-      for (const p of [a, b, c]) {
-        dv.setFloat32(o, pos[p] * S, true);
-        dv.setFloat32(o + 4, pos[p + 1] * S, true);
-        dv.setFloat32(o + 8, pos[p + 2] * S, true);
-        o += 12;
-      }
-      dv.setUint16(o, 0, true); o += 2;
-    }
-  };
-  emit(idx); emit(wall);
-  return new Uint8Array(buf);
-}
-
-/* Minimal ZIP writer, store method -- no dependency, deterministic output. */
-const CRC = (() => {
-  const t = new Uint32Array(256);
-  for (let i = 0; i < 256; i++) { let c = i; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[i] = c >>> 0; }
-  return (buf) => { let c = 0xFFFFFFFF; for (let i = 0; i < buf.length; i++) c = t[(c ^ buf[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
-})();
-
-function zip(entries) {
-  const enc = new TextEncoder();
-  const chunks = [], central = [];
-  let offset = 0;
-  for (const [name, data] of entries) {
-    const nb = enc.encode(name);
-    const crc = CRC(data);
-    const local = new Uint8Array(30 + nb.length);
-    const dv = new DataView(local.buffer);
-    dv.setUint32(0, 0x04034b50, true); dv.setUint16(4, 20, true); dv.setUint16(6, 0, true);
-    dv.setUint16(8, 0, true); dv.setUint16(10, 0, true); dv.setUint16(12, 0x21, true);
-    dv.setUint32(14, crc, true); dv.setUint32(18, data.length, true); dv.setUint32(22, data.length, true);
-    dv.setUint16(26, nb.length, true); dv.setUint16(28, 0, true);
-    local.set(nb, 30);
-    chunks.push(local, data);
-    const cd = new Uint8Array(46 + nb.length);
-    const cv = new DataView(cd.buffer);
-    cv.setUint32(0, 0x02014b50, true); cv.setUint16(4, 20, true); cv.setUint16(6, 20, true);
-    cv.setUint16(8, 0, true); cv.setUint16(10, 0, true); cv.setUint16(12, 0, true); cv.setUint16(14, 0x21, true);
-    cv.setUint32(16, crc, true); cv.setUint32(20, data.length, true); cv.setUint32(24, data.length, true);
-    cv.setUint16(28, nb.length, true); cv.setUint32(42, offset, true);
-    cd.set(nb, 46);
-    central.push(cd);
-    offset += local.length + data.length;
-  }
-  let cdSize = 0; for (const c of central) cdSize += c.length;
-  const end = new Uint8Array(22);
-  const ev = new DataView(end.buffer);
-  ev.setUint32(0, 0x06054b50, true);
-  ev.setUint16(8, entries.length, true); ev.setUint16(10, entries.length, true);
-  ev.setUint32(12, cdSize, true); ev.setUint32(16, offset, true);
-  return new Blob([...chunks, ...central, end], { type: 'application/zip' });
-}
-
-function buildReport() {
-  const m = state.metrics, c = CONCEPTS.find((x) => x.key === state.concept);
-  return [
-    'AFRi Studio - marigold two-piece accessory', '',
-    'Concept        ' + state.concept + ' ' + (c ? c.name : ''),
-    'Curve family   ' + m.path_kind,
-    'Generated      ' + new Date().toISOString(),
-    'Engine         browser JavaScript port of design_engine',
-    '',
-    'MEASURED',
-    '  diameter          ' + fmt(m.diameter_mm, 2) + ' mm',
-    '  height            ' + fmt(m.height_mm, 2) + ' mm',
-    '  petals            ' + m.petals + ' in ' + m.rows + ' rows',
-    '',
-    'TRIANGLE COUNT',
-    '  master            ' + m.triangles,
-    '  piece A           ' + m.triangles_a,
-    '  piece B           ' + m.triangles_b,
-    '  A + B             ' + (m.triangles_a + m.triangles_b),
-    '  added by split    ' + (m.triangles_a + m.triangles_b - m.triangles),
-    '  of which cut wall ' + m.cap_triangles + ' (both walls)',
-    '',
-    '  The pieces do not sum to the master, and should not. Every triangle the',
-    '  curve crosses is subdivided into several, and each piece is then given a',
-    '  cut wall of its own that did not exist before.',
-    '',
-    'COMPONENTS',
-    '  master bodies     ' + m.bodies_master,
-    '  piece A bodies    ' + m.bodies_a,
-    '  piece B bodies    ' + m.bodies_b,
-    '',
-    '  This browser build ships the flower as built: overlapping closed shells,',
-    '  one per petal plus the base and centre. It renders identically to the',
-    '  consolidated solid but is not a manufacturable part. The desktop pipeline',
-    '  boolean-unions them into one body per piece before export.',
-    '',
-    'SPLIT VERIFICATION',
-    '  open edges A      ' + m.open_edges_a,
-    '  open edges B      ' + m.open_edges_b,
-    '  cap failures      ' + m.cap_failures,
-    '  volume error      ' + m.volume_error_pct.toExponential(3) + ' %',
-    '  balance A:B       ' + (m.balance * 100).toFixed(2) + ' : ' + ((1 - m.balance) * 100).toFixed(2),
-    '  bodies divided    ' + m.bodies_divided + ' of ' + m.bodies_total,
-    '',
-    'UNITS  STL vertices are millimetres.',
-    '',
-    'NOTE   These are provisional studio concepts. No client reference, brand',
-    '       palette or size chart has been supplied. Nothing here is approved',
-    '       for production.', '',
-    'CONFIGURATION', JSON.stringify({ flower: state.flower, split: state.split }, null, 2),
-  ].join('\n');
-}
-
-async function offer(filename, data, note) {
-  if (!downloads) return;
-  const el = $('dlNote');
-  try {
-    await downloads.save({ filename, data });
-    el.textContent = note;
-  } catch (e) {
-    const code = e && e.code;
-    el.textContent = code === 'declined' ? 'Save cancelled.'
-      : code === 'rate_limited' ? 'Too many saves at once - try again in a moment.'
-      : 'Could not save that file (' + (code || 'unknown') + ').';
-  }
-}
-
-$('dlStl').addEventListener('click', () => {
-  if (!state.last) return;
-  const enc = new TextEncoder();
-  const tag = 'AFRi_Concept' + state.concept;
-  offer(tag + '_pieces.zip', zip([
-    [tag + '_piece_A.stl', stlBinary(state.last.A)],
-    [tag + '_piece_B.stl', stlBinary(state.last.B)],
-    ['BUILD_REPORT.txt', enc.encode(buildReport())],
-  ]), 'Saved: two binary STL meshes in millimetres plus the build report.');
-});
-$('dlCfg').addEventListener('click', () => {
-  offer('AFRi_Concept' + state.concept + '_config.json',
-    JSON.stringify({ flower: state.flower, split: state.split, metrics: state.metrics }, null, 2),
-    'Saved: the exact configuration, ready to feed the desktop Blender pipeline.');
-});
-
-/* ================== Claude designer ================== */
-let sample = null, ctl = null;
-
-function paramTable() {
-  const rows = [];
-  for (const [, , items] of FLOWER_GROUPS) {
-    for (const [k, lo, hi] of items) rows.push('flower.' + k + ' [' + lo + '..' + hi + '] now=' + state.flower[k]);
-  }
-  for (const [k, lo, hi] of SPLIT_GROUP[2]) rows.push('split.' + k + ' [' + lo + '..' + hi + '] now=' + state.split[k]);
-  rows.push('split.type {balanced|s_river|organic} now=' + state.split.type);
-  return rows.join('\n');
-}
-
-function bubble(cls, who, html) {
-  const d = document.createElement('div');
-  d.className = 'msg ' + cls;
-  d.innerHTML = '<div class="who">' + who + '</div><div class="body">' + html + '</div>';
-  $('chatlog').appendChild(d);
-  $('chatlog').scrollTop = $('chatlog').scrollHeight;
-  return d.querySelector('.body');
-}
-const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-async function askClaude() {
-  const q = $('ask').value.trim();
-  if (!q || !sample) return;
-  $('ask').value = '';
-  bubble('you', 'You', esc(q));
-  const out = bubble('cc', 'Claude', 'Thinking&hellip;');
-  $('send').disabled = true;
-  $('stop').hidden = false;
-  ctl = new AbortController();
-
-  const prompt =
-    'You are the design assistant inside AFRi Studio, a parametric tool for a two-piece ' +
-    'marigold flower hat accessory. The user asks for a design change; you answer ONLY by ' +
-    'adjusting named parameters.\n\n' +
-    'Adjustable parameters, with their hard bounds and current values:\n' + paramTable() + '\n\n' +
-    'Reply with only a JSON object of the form:\n' +
-    '{"changes":[{"param":"flower.petal_density","value":1.7,"reason":"fuller rosette"}],' +
-    '"note":"one short sentence"}\n' +
-    'Use the exact parameter names above, keep every value inside its bounds, change only what ' +
-    'the request needs, and leave "changes" empty if nothing should move.\n\n' +
-    'Request: ' + q;
-
-  try {
-    const res = await sample.json(prompt, { signal: ctl.signal, modelTier: 'default' });
-    const applied = [], rejected = [];
-    for (const ch of (Array.isArray(res && res.changes) ? res.changes : [])) {
-      const name = String(ch && ch.param || '');
-      const dot = name.indexOf('.');
-      const scope = name.slice(0, dot), key = name.slice(dot + 1);
-      const target = scope === 'flower' ? state.flower : scope === 'split' ? state.split : null;
-      if (!target || !(key in target)) { rejected.push(name + ' - not a parameter'); continue; }
-      if (key === 'type') {
-        if (['balanced', 's_river', 'organic'].includes(ch.value)) { target.type = ch.value; applied.push([name, ch.value, ch.reason]); }
-        else rejected.push(name + ' - not a curve family');
-        continue;
-      }
-      const spec = [...FLOWER_GROUPS.flatMap((g) => g[2].map((i) => ['flower.' + i[0], i])),
-                    ...SPLIT_GROUP[2].map((i) => ['split.' + i[0], i])].find((p) => p[0] === name);
-      if (!spec) { rejected.push(name + ' - not adjustable here'); continue; }
-      const [, lo, hi] = spec[1];
-      const v = Number(ch.value);
-      if (!Number.isFinite(v)) { rejected.push(name + ' - not a number'); continue; }
-      if (v < lo || v > hi) { rejected.push(name + ' = ' + v + ' - outside ' + lo + '..' + hi); continue; }
-      target[key] = v;
-      applied.push([name, v, ch.reason]);
-    }
-    let html = esc(res && res.note ? res.note : '');
-    if (applied.length) {
-      html += '<ul>' + applied.map(([n, v, r]) =>
-        '<li><code>' + esc(n.split('.')[1]) + '</code> &rarr; <code>' + esc(v) + '</code>' +
-        (r ? ' &mdash; ' + esc(r) : '') + '</li>').join('') + '</ul>';
-    }
-    if (rejected.length) {
-      html += '<ul>' + rejected.map((r) => '<li>Rejected: ' + esc(r) + '</li>').join('') + '</ul>';
-    }
-    if (!applied.length && !rejected.length) html += '<br><em>No parameter changes proposed.</em>';
-    out.innerHTML = html || '<em>No response.</em>';
-    if (applied.length) { buildParams(); regenerate(); }
-  } catch (e) {
-    const code = e && e.code;
-    out.innerHTML = code === 'cancelled' ? '<em>Stopped.</em>'
-      : code === 'not_granted' ? 'Claude is not enabled for this page on your account.'
-      : code === 'rate_limited' ? 'Rate limited &mdash; try again shortly.'
-      : code === 'invalid_json' ? 'The reply was not usable parameter JSON. Try rephrasing.'
-      : 'Could not reach Claude (' + esc(code || 'unknown') + ').';
-  } finally {
-    $('send').disabled = false;
-    $('stop').hidden = true;
-    ctl = null;
-  }
-}
-$('send').addEventListener('click', askClaude);
-$('stop').addEventListener('click', () => ctl && ctl.abort());
-$('ask').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) askClaude();
-});
-
-/* ================== boot ================== */
-if (!window.THREE) {
-  // The 3D library is the one thing this page cannot draw without. Say so
-  // plainly instead of leaving an empty black rectangle.
-  document.querySelector('.stagearea').innerHTML =
-    '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;' +
-    'padding:24px;text-align:center;color:var(--muted);font-size:13px;line-height:1.6">' +
-    'The 3D library could not be loaded, so the viewport is unavailable.<br>' +
-    'Check the network connection and reload the page.</div>';
-  throw new Error('three.js unavailable');
-}
-initScene();
-buildConcepts();
-buildParams();
-buildChips();
-regenerate();
-
-(async () => {
-  try {
-    sample = await window.claude?.use?.('sample');
-    if (sample) $('aiSec').hidden = false;
-  } catch (_) {}
-  try {
-    downloads = await window.claude?.use?.('downloads');
-    if (downloads && state.last) $('exportSec').hidden = false;
-  } catch (_) {}
-})();
-</script>
+<script type="module" src="./app.js"></script>

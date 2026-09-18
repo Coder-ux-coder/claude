@@ -1,108 +1,82 @@
-# Web Studio - the browser-native build
+# AFRi Marigold Studio — browser build
 
-A single page that generates the master marigold, splits it into two genuinely
-separate closed solids, and lets you steer the whole thing with sliders. No
-server, no Python, no Blender, no install.
+A working parametric design application for the AFRi two-piece marigold accessory.
+The real geometry engine, ported to JavaScript and running live on the page: same
+layer schedule, same closed-solid petals, same exact per-triangle clipping split
+kernel as `design_engine/`.
 
-    web_studio/
-      engine.js    hand port of design_engine/ to typed-array JavaScript
-      worker.js    runs a generation off the main thread
-      index.html   the studio: viewport, parameter editor, verification, export
+## Architecture
 
-Open `index.html` from any static server (`python3 -m http.server`) or use the
-published artifact.
+The page is a shell. Everything else is an ES module, loaded same-origin.
 
-## What is ported, and what is not
-
-Ported, and running live in the page:
-
-| Python | JavaScript |
+| File | Responsibility |
 | --- | --- |
-| `geometry/mesh.py` | `Mesh` as flat `Float64Array` / `Int32Array`, `weld`, `orient`, `concat` |
-| `geometry/curves.py` | `smoothstep`, `valueNoise1D`, Catmull-Rom |
-| `petals/profile.py` | `widthProfile`, `tipLengthProfile` |
-| `petals/petal.py` | `buildPetal` - closed solid shell, mid-surface offset, stitched rim |
-| `flower/base.py` | `buildBaseDisc`, `buildCenter` |
-| `flower/marigold.py` | `layerSchedule`, `buildMasterFlower` |
-| `splitting/paths.py` | `buildSplitPath` - balanced, s_river, organic |
-| `splitting/splitter.py` | `splitFlower` - exact per-triangle clipping, per-body, with capping |
+| `index.html` | Design tokens, layout, static shell. No application logic. |
+| `app.js` | Composition root: state wiring, build pipeline, views, keyboard, capabilities. |
+| `schema.js` | Every parameter with its bounds and its explanation. One table, read by the controls, the command palette, the designer's allow-list and the spec sheet. |
+| `store.js` | The design document, its undo/redo history, and the listener bus. Only the design is undoable; camera and display state are not. |
+| `viewport.js` | One instance per canvas: scene, lighting rig, materials, framing, scale, capture. |
+| `views.js` | Library, Compare and Spec — renderers over a context object. |
+| `library.js` | Persistence on the `db` capability, plus the private per-viewer workspace. |
+| `designer.js` | Claude at the bench: the tool loop and the parameter allow-list. |
+| `exporters.js` | Binary STL, ZIP, build report, spec model and spec sheet. |
+| `ui.js` | Toasts, dialogs, command palette, sliders, selects. |
+| `engine.js` | The geometry kernel. Hand-ported from `design_engine/`, parity-tested against it. |
+| `worker.js` | Runs `generateDesign` off the main thread. Two instances: the bench and the compare pane. |
 
-Not ported, and deliberately so:
+## The four views
 
-* **Blender.** Materials, lighting, Cycles rendering, `.blend` and glTF export
-  stay in `blender_worker/` on the desktop build. The page uses three.js for a
-  working viewport, not for photoreal output.
-* **The boolean union.** The desktop pipeline fuses the petals, base and centre
-  into a single manifold with manifold3d before splitting, so each half exports
-  as one solid. manifold3d is a WASM module that fetches its own `.wasm` at
-  runtime, and the Artifact CSP blocks a library's runtime fetches, so the page
-  cannot run it. The browser build therefore ships the flower *as built* -
-  overlapping closed shells, one per petal plus the base and centre. It renders
-  identically; it is not a manufacturable part. The page says so, and reports
-  the real body count rather than implying one solid.
+- **Bench** — the viewport, 43 parameters, live measurement and split verification.
+- **Compare** — the working design beside one off the shelf, cameras locked together,
+  with the measured deltas and every parameter that differs listed underneath.
+- **Library** — every design the team has saved, with a captured still, the measurements
+  and who saved it.
+- **Spec** — a manufacturing sheet generated from the built geometry, printable and
+  exportable as a standalone HTML document.
 
-## Parity
+## Runtime capabilities
 
-`tests/integration/test_js_parity.py` runs the JavaScript engine under node and
-compares it against Python. Measured on the default configuration:
+Each one is optional. The studio builds, measures, verifies and renders without any
+of them; they are checked at run time and the affordances they drive stay hidden when
+absent.
 
-| Quantity | Python | JavaScript |
-| --- | --- | --- |
-| Vertices | 65,976 | 65,976 |
-| Triangles | 131,316 | 131,316 |
-| Volume | 21.033674189 | 21.033673698 |
-| Surface area | 431.110259242 | 431.110260340 |
+| Capability | What it gives the product |
+| --- | --- |
+| `db` | The shared design library, and each viewer's private workspace (`data/users/<id>/workspace`) so the bench is where they left it. |
+| `user` | Attribution on saved designs, and the write-level check that decides whether to offer library controls. Only ids are stored; names are resolved per viewer on every render. |
+| `sample` | Claude at the bench. Where the host offers tools, Claude moves parameters, rebuilds, and reads the measurements back — so it can converge on a target instead of guessing once. |
+| `downloads` | STL pair plus build report, configuration JSON, high-resolution stills, and the spec sheet. |
+| `room` | Who else is in the studio right now, and presenting a saved design to them. |
 
-The residual, about 2 parts in 10^8, is exactly the float32 rounding in the
-Python `Mesh` vertex store against float64 in JavaScript.
+Declaring `db` makes the artifact organization-internal: it can no longer be shared by
+public link.
 
-Parity is asserted with `organic_variation = 0` **and** `petal_ruffle_amp = 0`.
-numpy's PCG64 cannot be reproduced in JavaScript, so any parameter that
-consumes a random draw diverges by construction. Note that the per-petal
-ruffle *phase* is drawn whether or not jitter is enabled, which is why the
-ruffle has to be switched off too; with both off, no random number reaches the
-geometry.
+## Keyboard
 
-At the shipped defaults the two engines therefore produce the same flower
-design with individual petals seated at slightly different angles. The layer
-schedule, the petal shape, the split path and the cut are identical.
+`⌘K` / `Ctrl K` command palette · `⌘Z` / `⌘⇧Z` undo and redo · `⌘S` save ·
+`1`–`4` views · `A` / `B` isolate a piece · `H` hat · `W` wireframe · `C` dividing
+curve · `Space` pause the turntable.
 
-## A known ambiguity in the cut wall
+## What stays on the desktop build
 
-Both engines produce two watertight pieces that reconstruct the master to
-machine precision. They do **not** always agree on how much volume lands on
-each side - typically within 1%.
+Two things, stated plainly rather than faked here:
 
-This is not a porting defect. A boundary loop through a petal is not planar,
-because the split path curves across the petal's width. Ear-clipping such a
-loop is under-determined: several triangulations are valid, they describe
-slightly different ruled surfaces, and which one you pick decides which side
-a sliver of material falls on. Python walks its boundary edges in `set`
-iteration order and JavaScript in insertion order, so the two pick different
-valid triangulations.
+1. **Photoreal rendering.** Blender Cycles renders the product shots; this page uses
+   three.js, which is a preview, not a render.
+2. **Boolean consolidation.** `manifold3d` fuses the petals, base and centre into one
+   manifold solid per piece. It fetches its own WebAssembly at run time, which the
+   artifact's content policy blocks, so the browser build ships the flower **as built**:
+   overlapping closed shells, one per petal. It renders identically and it verifies
+   identically, but it is a body count rather than a single manufacturable part.
 
-Consequences, stated plainly:
+## Running it locally
 
-* Each piece is closed, and A + B reconstruct the master exactly. Both engines
-  satisfy this. The physical claim is unaffected.
-* The reported A:B balance can differ by up to about one percentage point
-  between engines for the same configuration.
-* The cut wall's micro-shape differs by well under the material thickness.
+```sh
+cd AFRi-Studio/web_studio
+python3 -m http.server 8899
+# then open http://127.0.0.1:8899/index.html
+```
 
-The fix, if this ever needs to be tight, is to subdivide each boundary loop at
-the split path's own sample points before triangulating, so the cut wall
-follows the curve instead of chording across it. That changes the production
-kernel and has not been done.
-
-## Capabilities the published page uses
-
-* `sample` - the Claude designer. It may only move parameters that exist in the
-  schema, within their declared bounds; every proposed change is re-validated
-  in the page and anything out of range is rejected and shown. It cannot run
-  code, read files or reach the network.
-* `downloads` - export. Two binary STL meshes in millimetres plus a build
-  report, in a zip. STL is not on the platform's download allowlist, which is
-  why the zip is not optional.
-
-Both degrade to hidden when unavailable. The geometry, the split, the
-verification and the viewport work with neither.
+ES modules and workers need an HTTP origin; opening the file directly will not work.
+Without `window.claude` the capability-driven features stay hidden, which is the
+same path a viewer gets when a capability is not granted.
