@@ -54,6 +54,9 @@ CAMERAS = {
     # Used with an explicit target on the flower and a matching frame radius,
     # so it reads as a detail of the accessory rather than of the hat.
     "hat_detail":        (24.0,  30.0, 1.05, 100.0),
+    # From below, for the fixing: the pins point down into the brim, so no
+    # camera above the hat can show them.
+    "hat_underside":     (24.0, -38.0, 1.15, 100.0),
 }
 
 SENSOR_MM = 36.0

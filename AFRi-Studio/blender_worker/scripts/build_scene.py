@@ -422,6 +422,8 @@ def main():
                     created[key].location = (normal[0] * s, normal[1] * s, nz * s)
         if "hat" in created and "show_hat" in shot:
             created["hat"].hide_render = not bool(shot["show_hat"])
+        if "show_backdrop" in shot:
+            floor.hide_render = not bool(shot["show_backdrop"])
 
         if shot.get("resolution"):
             scene.render.resolution_x = scene.render.resolution_y = int(shot["resolution"])

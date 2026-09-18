@@ -44,6 +44,11 @@ SHOTS = [
      "detail": True},
     {"name": "06_pieces_lifted", "camera": "hat_detail", "separated": True,
      "detail": True},
+    # The fixing, seen from underneath with the hat and floor out of the way.
+    # Every camera above the hat sees the top of the accessory and none of the
+    # pins, which point down through the brim.
+    {"name": "07_fixing_underside", "camera": "hat_underside", "separated": True,
+     "detail": True, "show_hat": False, "show_backdrop": False},
 ]
 
 BUILDS = {
