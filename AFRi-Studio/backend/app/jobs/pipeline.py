@@ -21,9 +21,11 @@ from backend.app.core.config import (BLENDER_SCRIPT, JOB_TIMEOUT_SECONDS,
                                      TMP_DIR, find_blender)
 from design_engine.configurations.schema import DesignConfig
 from design_engine.flower.marigold import MM, build_master_flower
-from design_engine.geometry.mesh import PART_BASE
+from design_engine.geometry.mesh import PART_BASE, Mesh
 from design_engine.geometry.consolidate import (clean_piece, consolidate,
                                                 fragment_report, restore_provenance)
+from design_engine.assembly.attachment import (build_pins,
+                                               check_pins_clear_the_hat)
 from design_engine.assembly.contact import contact_report, summarise
 from design_engine.assembly.placement import place_on_hat
 from design_engine.hat.hat import build_hat
@@ -159,6 +161,44 @@ def run_pipeline(config: DesignConfig, outdir: Path, *, shots=None,
     sep_world = np.array([sep_normal[0] * cw - sep_normal[1] * sw,
                           sep_normal[0] * sw + sep_normal[1] * cw, 0.0])
 
+    # ---- attachment ------------------------------------------------------
+    attachment = None
+    if (config.placement.show_hat
+            and config.placement.attachment.value == "pin"):
+        check_cancel()
+        emit("ASSEMBLY", "siting the pins")
+        attachment = {}
+        fused = {}
+        for key, piece in (("piece_a", sr.piece_a), ("piece_b", sr.piece_b)):
+            pins, rep = build_pins(piece, config.placement)
+            rep = check_pins_clear_the_hat(rep, config.hat, config.placement)
+            attachment[key] = rep
+            if pins is None:
+                fused[key] = piece
+                continue
+            # Fuse the pins into the piece, so the half stays ONE solid rather
+            # than a body with two loose studs balanced on its back.
+            merged, _ = consolidate(Mesh.concat([piece, pins]),
+                                    dust_volume_mm3=config.flower.dust_volume_mm3,
+                                    part_id=PART_BASE, name=key)
+            fused[key] = restore_provenance(merged, Mesh.concat([piece, pins]))
+        sr.piece_a, sr.piece_b = fused["piece_a"], fused["piece_b"]
+        a_rep = attachment["piece_a"]
+        emit("ASSEMBLY",
+             f"{a_rep['placed']} pins per piece, "
+             f"{a_rep['min_clearance_mm']:.1f} mm from the nearest edge, "
+             f"{a_rep['protrusion_mm']:.1f} mm through the hat",
+             **{k: a_rep[k] for k in ("placed", "min_clearance_mm",
+                                      "protrusion_mm", "takes_a_clutch")})
+        for key, rep in attachment.items():
+            if not rep["all_sites_have_material"]:
+                emit("ASSEMBLY", f"WARNING {key}: a pin sits too close to an edge "
+                                 f"({rep['min_clearance_mm']:.2f} mm of material)")
+            if not rep["takes_a_clutch"]:
+                emit("ASSEMBLY", f"WARNING {key}: pins protrude only "
+                                 f"{rep['protrusion_mm']:.1f} mm through the hat; "
+                                 f"a clutch needs about 2.5 mm")
+
     if config.placement.show_hat:
         check_cancel()
         emit("HAT", f"building the {config.hat.style.value}")
@@ -175,7 +215,8 @@ def run_pipeline(config: DesignConfig, outdir: Path, *, shots=None,
         placed, frame, R, t = place_on_hat(local, hat, config.hat, config.placement)
         reports = {k: contact_report(m, R, t, hat, config.hat, config.placement)
                    for k, m in local.items()}
-        assembly = {"frame": {"radius_mm": frame.radius_mm,
+        assembly = {"attachment": attachment,
+                    "frame": {"radius_mm": frame.radius_mm,
                               "surface_z_mm": frame.surface_z_mm,
                               "profile_index": frame.profile_index},
                     "pieces": reports,

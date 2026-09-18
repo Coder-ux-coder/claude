@@ -163,6 +163,26 @@ def validate_split(master: Mesh, piece_a: Mesh, piece_b: Mesh,
         detail += f"; {specks} sub-threshold slivers ignored"
     checks.append(_check("outward_normals", not inverted, detail, value=len(inverted)))
 
+    # A mesh can enclose positive volume and still have faces that disagree
+    # with their neighbours across a shared edge. Exact boolean kernels reject
+    # such a mesh, and its measured volume is wrong by whatever the disagreeing
+    # faces contribute, so consistency is checked separately from facing.
+    inconsistent = 0
+    for piece in (piece_a, piece_b):
+        seen: dict[tuple[int, int], int] = {}
+        for a, b, c in piece.faces:
+            for x, y in ((a, b), (b, c), (c, a)):
+                seen[(int(x), int(y))] = seen.get((int(x), int(y)), 0) + 1
+        for (x, y), n in seen.items():
+            if seen.get((y, x), 0) != n:
+                inconsistent += 1
+    checks.append(_check(
+        "consistent_winding", inconsistent == 0,
+        "every shared edge is traversed in opposite directions by its two faces"
+        if not inconsistent else
+        f"{inconsistent} directed edges are traversed the same way by both faces",
+        value=inconsistent))
+
     # ---- exact reconstruction -------------------------------------------
     vm, va, vb = master.volume(), piece_a.volume(), piece_b.volume()
     rel = abs(va + vb - vm) / max(abs(vm), 1e-12)

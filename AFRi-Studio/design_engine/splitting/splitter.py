@@ -418,6 +418,19 @@ def split_flower(master: Mesh, cfg: SplitConfig, radius: float,
     piece_a = Mesh.concat(meshes_a, name="piece_a")
     piece_b = Mesh.concat(meshes_b, name="piece_b")
 
+    # Make the winding globally consistent before handing the pieces back.
+    #
+    # Orienting each cap loop by its area-weighted normal gets the *net* facing
+    # right, which is what the volume checks see, but it does not guarantee
+    # that every cap triangle agrees with the surface it seals along their
+    # shared edge. Measured on the shipped flower: 52 directed edges out of
+    # roughly 690,000 were traversed the same way by both their faces. That is
+    # a small defect with two real consequences -- the reported volume was out
+    # by 0.04%, and an exact boolean kernel refuses the mesh outright, which is
+    # what blocked fusing the attachment pins into the piece.
+    piece_a = piece_a.oriented()
+    piece_b = piece_b.oriented()
+
     if abs(theta) > 1e-9:
         piece_a = piece_a.rotated_z(theta)
         piece_b = piece_b.rotated_z(theta)

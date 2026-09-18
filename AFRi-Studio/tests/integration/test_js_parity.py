@@ -117,4 +117,12 @@ def test_js_split_is_watertight_and_conservative(kind):
     assert s["open_b"] == 0, "piece B left open edges"
     assert s["cap_failures"] == 0, "a cut face failed to cap"
     err = abs(s["volume_a"] + s["volume_b"] - js["volume"]) / abs(js["volume"])
-    assert err < 1e-9, "pieces do not reconstruct the master: %.3e" % err
+    # Not 1e-9. The kernel now makes each piece's winding globally consistent,
+    # which flips any inside-out body -- including the specks a cut through a
+    # petal tip leaves behind, whose volumes are around 1e-6 of a cubic unit.
+    # Flipping one changes the A + B sum by twice its volume, so the sum no
+    # longer matches a master that still holds those specks the wrong way
+    # round. The correction is worth more than the exactness: a real failure,
+    # such as a petal landing on neither side, is four orders of magnitude
+    # larger than this bound.
+    assert err < 1e-5, "pieces do not reconstruct the master: %.3e" % err

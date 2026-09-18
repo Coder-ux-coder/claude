@@ -70,6 +70,30 @@ is exactly what guarantees it divides the flower into two regions and nothing
 else. That is the main technical risk in stage two and should not be spent
 until someone has held a 3 mm gap in their hand and objected to it.
 
+## The fixing
+
+Two pins per half, fused into the piece so each half stays a single solid
+rather than a body with studs balanced on its back.
+
+Where a pin goes is not a styling decision. Each is sited at a local maximum of
+the distance to the edge of that piece's flat footprint — put one near a rim
+and it tears out — and the pair is forced at least a third of the footprint
+apart, because two pins close together are one pin and the piece pivots on
+them. Every clearance is measured and reported, so a pin too close to an edge
+shows up as a number rather than being discovered by a maker.
+
+| | Wide brim | Fedora |
+|---|---|---|
+| Pins per half | 2 | 2 |
+| Spacing, piece A / B | 24.5 / 27.4 mm | 16.7 / 19.0 mm |
+| Least material around a pin | 7.80 mm | 6.46 mm |
+| Shank through the hat | 5.4 mm | 5.4 mm |
+| Enough to take a clutch | yes | yes |
+
+Ø1.6 mm × 9 mm pins, through a 1.6 mm hat at a 2 mm standoff. Shorten the pin
+below about 6 mm and the shank no longer clears the felt with enough left to
+grip; the pipeline warns when that happens rather than shipping it quietly.
+
 ## What was built
 
 * `design_engine/hat/` — five styles (fedora, boater, wide brim, cloche,
@@ -84,13 +108,13 @@ until someone has held a 3 mm gap in their hand and objected to it.
 
 ## Not done, and stated
 
-* **Attachment is not modelled.** `PlacementConfig` carries the pin parameters
-  and they are validated, but no pin geometry is generated. The list of options
-  from the plan — pin and clutch, brooch bar, magnets either side of the brim,
-  sewn mount, edge clip — has not been narrowed, and it interacts with the
-  two-piece concept: the halves can take separate fixings and be positioned
-  independently, or share a carrier plate and be easier to align but no longer
-  two independent objects on the hat. That is a client decision.
+* **Only one fixing of the five is modelled.** Pin-and-clutch is built,
+  because it is the only candidate that is geometry rather than a bought
+  component. Brooch bar, magnets either side of the brim, a sewn mount and an
+  edge clip are not, and the choice between them is still the client's. It
+  also interacts with the two-piece concept: the halves can take separate
+  fixings and be positioned independently, or share a carrier plate and be
+  easier to align but no longer two independent objects on the hat.
 * **Surface conforming is not implemented.** See above.
 * **Nothing has been reviewed by a maker.** Wall thickness against process,
   petal fragility, draft angles, tolerance at the split boundary, and whether

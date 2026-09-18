@@ -1294,8 +1294,15 @@ export function splitFlower(master, bodies, cfg, radius, onProgress, eps = 1e-9)
 
   if (onProgress) onProgress('capping ' + nClippedBodies + ' divided bodies', 3, 5);
 
-  let pieceA = concat(meshesA, 'piece_a').mesh;
-  let pieceB = concat(meshesB, 'piece_b').mesh;
+  // Make the winding globally consistent before handing the pieces back.
+  // Orienting each cap by its area-weighted normal gets the net facing right,
+  // which is what a volume check sees, but it does not guarantee every cap
+  // triangle agrees with the surface it seals along their shared edge:
+  // measured on the shipped flower, 52 directed edges out of ~690,000 were
+  // traversed the same way by both faces, putting the reported volume out by
+  // 0.04% and making an exact boolean kernel reject the mesh outright.
+  let pieceA = orient(concat(meshesA, 'piece_a').mesh);
+  let pieceB = orient(concat(meshesB, 'piece_b').mesh);
 
   if (Math.abs(theta) > 1e-9) {
     pieceA = rotatedZ(pieceA, theta);

@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from design_engine.geometry.mesh import Mesh
+from design_engine.geometry.mesh import PART_MOUNT, Mesh
 from design_engine.hat.hat import HatResult
 from design_engine.hat.profile import MM, head_radius
 
@@ -98,7 +98,12 @@ def underside_vertices(local_mesh: Mesh, band_mm: float = 0.25) -> np.ndarray:
     flower is placed, because that is where 'the bottom' is well defined.
     """
     z = local_mesh.verts[:, 2].astype(np.float64)
-    return np.nonzero(z <= band_mm * MM)[0]
+    inside = z <= band_mm * MM
+    # A pin runs several millimetres below the base plane; including its shank
+    # would swamp the gap statistics with points that are meant to be down
+    # there.
+    inside &= z >= -band_mm * MM
+    return np.nonzero(inside)[0]
 
 
 def contact_report(local_mesh: Mesh, rotation: np.ndarray, translation: np.ndarray,
@@ -136,10 +141,21 @@ def contact_report(local_mesh: Mesh, rotation: np.ndarray, translation: np.ndarr
         })
 
     # Interference: any part of the flower inside the hat, not just its base.
-    d_all = signed_distance_to_hat(placed_all, hat) / MM
+    #
+    # Attachment pins are excluded, because passing through the hat is the
+    # entire point of a pin. Counting them made a correctly fitted accessory
+    # report 7.2 mm of collision. Their protrusion is measured separately, by
+    # attachment.check_pins_clear_the_hat.
+    body = np.ones(local_mesh.n_verts, dtype=bool)
+    mount_faces = local_mesh.parts >= PART_MOUNT
+    if mount_faces.any():
+        body[:] = False
+        body[np.unique(local_mesh.faces[~mount_faces])] = True
+    d_all = signed_distance_to_hat(placed_all[body], hat) / MM
     worst = float(d_all.min())
     report["interference_mm"] = round(-worst, 4) if worst < 0 else 0.0
     report["vertices_inside_hat"] = int((d_all < -1e-6).sum())
+    report["mount_vertices_excluded"] = int((~body).sum())
 
     # Load on the brim.
     centroid, volume = mesh_centroid(local_mesh)

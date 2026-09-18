@@ -147,3 +147,102 @@ def test_a_flower_pushed_into_the_hat_reports_interference(hat):
         R, t = placement_matrix(surface_frame(hat, cfg, pc), pc)
         d = signed_distance_to_hat(place(probe, R, t).verts.astype(np.float64), hat)
         assert (d.min() < 0) == expect_hit, f"offset {offset}mm: min distance {d.min() / MM:.2f}mm"
+
+
+# ---------------------------------------------------------------------------
+# Attachment
+# ---------------------------------------------------------------------------
+def _disc(radius=3.0, thickness=0.2, segments=48):
+    """A flat disc standing in for a piece's base: bottom face on z = 0."""
+    th = np.linspace(0, 2 * np.pi, segments, endpoint=False)
+    top = np.stack([radius * np.cos(th), radius * np.sin(th),
+                    np.full(segments, thickness)], axis=1)
+    bot = np.stack([radius * np.cos(th), radius * np.sin(th),
+                    np.zeros(segments)], axis=1)
+    ct = np.array([[0.0, 0.0, thickness]])
+    cb = np.array([[0.0, 0.0, 0.0]])
+    v = np.concatenate([top, bot, ct, cb])
+    it, ib, c_t, c_b = 0, segments, 2 * segments, 2 * segments + 1
+    f = []
+    for j in range(segments):
+        jn = (j + 1) % segments
+        f += [[c_t, it + j, it + jn], [c_b, ib + jn, ib + j],
+              [it + j, ib + j, ib + jn], [it + j, ib + jn, it + jn]]
+    return Mesh(v.astype(np.float32), np.array(f, dtype=np.int32)).welded(1e-6).oriented()
+
+
+def test_pins_sit_inside_the_material():
+    from design_engine.assembly.attachment import build_pins
+    piece = _disc(radius=3.0)
+    pins, rep = build_pins(piece, PlacementConfig(pin_count=2, pin_diameter_mm=1.6))
+    assert rep["placed"] == 2
+    assert rep["all_sites_have_material"], rep
+    for s in rep["sites"]:
+        r = np.hypot(s["x_mm"], s["y_mm"])
+        assert r + 0.8 < 3.0 / MM, f"pin at r={r:.1f}mm is outside a 30mm disc"
+
+
+def test_pins_are_spread_apart_not_clustered():
+    """Two pins in the same place are one pin, and the piece pivots on them."""
+    from design_engine.assembly.attachment import build_pins
+    piece = _disc(radius=3.0)
+    _, rep = build_pins(piece, PlacementConfig(pin_count=2, pin_diameter_mm=1.6))
+    (a, b) = rep["sites"]
+    sep = np.hypot(a["x_mm"] - b["x_mm"], a["y_mm"] - b["y_mm"])
+    assert sep > 0.25 * (2 * 3.0 / MM), f"pins only {sep:.1f}mm apart on a 60mm piece"
+
+
+def test_pins_are_closed_solids():
+    from design_engine.assembly.attachment import build_pins
+    from design_engine.splitting.splitter import boundary_edges
+    pins, _ = build_pins(_disc(), PlacementConfig(pin_count=2))
+    assert pins is not None
+    assert len(boundary_edges(pins.faces)) == 0
+    labels = pins.component_labels()
+    assert len(np.unique(labels)) == 2
+    for u in np.unique(labels):
+        assert Mesh(pins.verts, pins.faces[labels == u]).volume() > 0
+
+
+def test_pins_carry_the_mount_part_id():
+    from design_engine.assembly.attachment import build_pins
+    from design_engine.geometry.mesh import PART_MOUNT, part_kind
+    pins, _ = build_pins(_disc(), PlacementConfig(pin_count=2))
+    assert set(np.unique(pins.parts).tolist()) == {PART_MOUNT}
+    assert part_kind(PART_MOUNT) == "mount"
+
+
+@pytest.mark.parametrize("length,thickness,offset,expected", [
+    (9.0, 1.6, 2.0, True),      # plenty of shank for a clutch
+    (4.0, 1.6, 2.0, False),     # barely through
+    (9.0, 6.0, 2.0, False),   # 9 - 6 - 2 = 1 mm of shank: not enough to grip
+    (5.0, 3.0, 2.0, False),
+])
+def test_pin_reach_through_the_hat_is_judged(length, thickness, offset, expected):
+    from design_engine.assembly.attachment import check_pins_clear_the_hat
+    rep = check_pins_clear_the_hat(
+        {"placed": 2}, HatConfig(thickness_mm=thickness),
+        PlacementConfig(pin_length_mm=length, surface_offset_mm=offset))
+    assert rep["takes_a_clutch"] is expected
+    assert rep["protrusion_mm"] == pytest.approx(length - thickness - offset, abs=1e-6)
+
+
+def test_pins_do_not_count_as_interference(hat):
+    """A pin passing through the hat is the point of a pin, not a collision."""
+    from design_engine.assembly.attachment import build_pins
+    from design_engine.assembly.contact import contact_report
+    from design_engine.geometry.mesh import Mesh as M
+
+    cfg = HatConfig(**FAST)
+    pc = PlacementConfig(radial_position=0.5, surface_offset_mm=3.0, pin_count=2)
+    piece = _disc(radius=2.0)
+    pins, _ = build_pins(piece, pc)
+    with_pins = M.concat([piece, pins])
+    R, t = placement_matrix(surface_frame(hat, cfg, pc), pc)
+
+    bare = contact_report(piece, R, t, hat, cfg, pc)
+    fitted = contact_report(with_pins, R, t, hat, cfg, pc)
+    assert bare["interference_mm"] == pytest.approx(0.0, abs=1e-6)
+    assert fitted["interference_mm"] == pytest.approx(0.0, abs=1e-6), \
+        "the pins were counted as a collision"
+    assert fitted["mount_vertices_excluded"] > 0
