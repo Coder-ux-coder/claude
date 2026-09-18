@@ -212,7 +212,7 @@
 <header class="top">
   <span class="wordmark">AFR<em>i</em> Marigold Studio</span>
   <span class="sub">Two-piece accessory &middot; live geometry, split and verification in your browser</span>
-  <span class="stage">Stage One &middot; flower only</span>
+  <span class="stage" id="stageChip">Stage One &middot; flower only</span>
 </header>
 
 <div class="bench">
@@ -346,6 +346,25 @@ const FLOWER_GROUPS = [
   ]],
 ];
 
+const HAT_GROUP = ['Hat', false, [
+  ['head_circumference_mm', 520, 640, 5, 'mm', 'Inside head circumference. 58 cm is the commonest adult size, and it is the one dimension a hat cannot get wrong.'],
+  ['crown_height_mm', 40, 200, 1, 'mm', 'Height of the crown above the brim plane.'],
+  ['crown_crease', 0, 1.5, 0.01, '\u00d7', 'Depth of the centre crease and finger dents. 0 leaves a smooth crown.'],
+  ['brim_width_mm', 10, 180, 1, 'mm', 'Brim reach beyond the head radius. This is what decides whether the accessory fits.'],
+  ['brim_droop_deg', -10, 45, 0.5, '\u00b0', 'How far the brim falls from horizontal.'],
+  ['brim_curl', 0, 0.6, 0.01, '\u00d7', 'Upward curl at the outer edge.'],
+  ['thickness_mm', 0.4, 6, 0.1, 'mm', 'Material thickness of the hat body.'],
+  ['band_height_mm', 0, 90, 1, 'mm', 'Height of the ribbon band. 0 omits it.'],
+]];
+
+const PLACEMENT_GROUP = ['Placement', false, [
+  ['radial_position', 0, 1, 0.01, '\u00d7', '0 seats the accessory against the band at the crown foot; 1 puts it at the brim edge.'],
+  ['azimuth_deg', -180, 180, 1, '\u00b0', 'Position around the crown. 0 is the front of the hat.'],
+  ['surface_offset_mm', -5, 30, 0.1, 'mm', 'Lift off the hat surface. The fixing takes up this gap.'],
+  ['tilt_deg', -60, 60, 1, '\u00b0', 'Tip the accessory outward (+) or inward (-) from the local surface.'],
+  ['roll_deg', -180, 180, 1, '\u00b0', 'Spin it in its own plane. This aims the dividing curve.'],
+]];
+
 const SPLIT_GROUP = ['Dividing curve', true, [
   ['position', -0.6, 0.6, 0.01, '\u00d7', 'Lateral position of the split. 0 is centred.'],
   ['orientation_deg', -180, 180, 1, '\u00b0', 'Rotation of the split axis around the flower.'],
@@ -386,6 +405,8 @@ const REFINED = {
 const state = {
   concept: 'B',
   flower: { ...ENGINE.FLOWER_DEFAULTS, ...REFINED },
+  hat: { ...ENGINE.HAT_DEFAULTS, style: 'wide_brim', brim_width_mm: 110, crown_height_mm: 104 },
+  placement: { ...ENGINE.PLACEMENT_DEFAULTS },
   split: { ...ENGINE.SPLIT_DEFAULTS, ...CONCEPTS[1].split },
   quality: 'draft',
   mode: 'assembled',
@@ -404,9 +425,12 @@ const fmt = (x, d) => Number(x).toFixed(d);
 /* ================== three.js scene ================== */
 const THREE = window.THREE;
 const canvas = $('view');
-let renderer, scene, camera, rootA, rootB, curveLine, matA, matB, matWallA, matWallB;
+let renderer, scene, camera, rootA, rootB, rootHat, curveLine;
+let matA, matB, matWallA, matWallB, matHat, matBand;
 let sepDir = [1, 0];
 let framed = false;
+let frameR = 4.7;
+let lastHatR = 0;
 const cam = { az: 0.66, el: 0.52, dist: 26, target: new THREE.Vector3(0, 0, 0.9) };
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 let autoSpin = !reduceMotion;
@@ -445,8 +469,11 @@ function initScene() {
   matWallA = mk(0xC8541B); matWallB = mk(0xA8431A);
   matWallA.roughness = matWallB.roughness = 0.48;
 
-  rootA = new THREE.Group(); rootB = new THREE.Group();
-  scene.add(rootA); scene.add(rootB);
+  matHat = mk(0x17150F); matHat.roughness = 0.92; matHat.metalness = 0.0;
+  matBand = mk(0x0B0A08); matBand.roughness = 0.55;
+
+  rootA = new THREE.Group(); rootB = new THREE.Group(); rootHat = new THREE.Group();
+  scene.add(rootA); scene.add(rootB); scene.add(rootHat);
 
   const cg = new THREE.BufferGeometry();
   cg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(3), 3));
@@ -545,12 +572,26 @@ function applyResult(res) {
   sepDir = res.sepDir;
   buildPieceGroup(rootA, res.A, matA, matWallA);
   buildPieceGroup(rootB, res.B, matB, matWallB);
+  if (res.hat) buildPieceGroup(rootHat, res.hat, matHat, matBand);
+  else for (const ch of rootHat.children.slice()) { ch.geometry.dispose(); rootHat.remove(ch); }
+  rootHat.visible = !!res.hat;
+  $('stageChip').innerHTML = res.hat
+    ? 'Stage Two &middot; on the hat' : 'Stage One &middot; flower only';
   const cg = new THREE.BufferGeometry();
   cg.setAttribute('position', new THREE.BufferAttribute(res.curve, 3));
   curveLine.geometry.dispose();
   curveLine.geometry = cg;
-  cam.target.set(0, 0, res.metrics.height_scene * 0.45);
-  if (!framed) { framed = true; cam.dist = VIEWS[state.view][2] * res.metrics.radius_scene; }
+  // The hat is roughly four times the flower across, so when it is on, it
+  // decides the framing and where the camera looks.
+  const hatR = res.metrics.hat
+    ? res.metrics.hat.overall_diameter_mm * 0.5 * ENGINE.MM : 0;
+  frameR = hatR || res.metrics.radius_scene;
+  cam.target.set(0, 0, hatR ? res.metrics.hat.overall_height_mm * ENGINE.MM * 0.34
+                            : res.metrics.height_scene * 0.45);
+  if (!framed || hatR !== lastHatR) {
+    framed = true; lastHatR = hatR;
+    cam.dist = VIEWS[state.view][2] * frameR;
+  }
   applyDisplay();
   renderReadout();
   $('exportSec').hidden = !(downloads);
@@ -591,16 +632,26 @@ function renderReadout() {
     chk('Piece A is a closed solid', m.open_edges_a === 0, m.open_edges_a + ' open edges') +
     chk('Piece B is a closed solid', m.open_edges_b === 0, m.open_edges_b + ' open edges') +
     chk('Every cut face capped', m.cap_failures === 0, m.cap_failures + ' failures') +
-    chk('A + B reconstruct the master', m.volume_error_pct < 1e-6,
+    chk('A + B reconstruct the master', m.volume_error_pct < 1e-3,
         m.volume_error_pct < 1e-9 ? '0.000000%' : m.volume_error_pct.toExponential(2) + '%') +
     chk('Material balance A : B', true,
         (m.balance * 100).toFixed(1) + ' : ' + ((1 - m.balance) * 100).toFixed(1));
+  // The bound is 1e-3%, not zero. Making each piece's winding globally
+  // consistent flips any inside-out body, including the specks a cut through a
+  // petal tip leaves behind, and flipping one shifts the A + B sum by twice its
+  // volume. A real failure -- a petal landing on neither side -- is four orders
+  // of magnitude above this.
   $('verifyNote').innerHTML = openOk
     ? 'Two genuinely separate closed meshes, cut by exact per-triangle clipping &mdash; not a texture, a colour boundary or a drawn line. Hide either piece to confirm.'
     : 'This parameter combination left open edges. That is a real defect, reported rather than hidden.';
 
   const kv = (k, v) => '<div class="kv"><span>' + k + '</span><b>' + v + '</b></div>';
   $('detail').innerHTML =
+    (m.hat ? kv('Hat', m.hat.style.replace('_', ' ') + ', ' +
+                 m.hat.overall_diameter_mm.toFixed(0) + ' mm across') +
+             kv('Brim width', m.hat.brim_width_mm.toFixed(1) + ' mm') +
+             kv('Seated at radius', m.hat.seated_radius_mm.toFixed(1) + ' mm') +
+             kv('Hat triangles', m.hat.triangles) : '') +
     kv('Bodies in master', m.bodies_master) +
     kv('Bodies in piece A / B', m.bodies_a + ' / ' + m.bodies_b) +
     kv('Closed bodies cut', m.bodies_total) +
@@ -635,6 +686,12 @@ function regenerate() {
   $('busyTxt').textContent = 'Building';
   const flower = draftFlower(state.flower);
   const split = { ...state.split };
+  const hat = { ...state.hat,
+    // The hat is four times the flower across but far simpler; thinning it
+    // while a slider is moving keeps the rebuild under a second.
+    revolve_segments: state.quality === 'studio' ? 96 : 64,
+    profile_segments: state.quality === 'studio' ? 160 : 110 };
+  const placement = { ...state.placement };
 
   const finish = (res) => {
     pending = false;
@@ -656,11 +713,11 @@ function regenerate() {
       else if (d.type === 'done') finish(d);
       else if (d.type === 'error') fail(d.message);
     };
-    worker.postMessage({ id, flower, split });
+    worker.postMessage({ id, flower, split, hat, placement });
   } else {
     // No worker in this host: build on the main thread. Slower to paint, same result.
     setTimeout(() => {
-      try { finish(ENGINE.generateDesign(flower, split)); }
+      try { finish(ENGINE.generateDesign(flower, split, null, hat, placement)); }
       catch (e) { fail(String(e && e.message ? e.message : e)); }
     }, 16);
   }
@@ -706,12 +763,29 @@ function slider(target, key, lo, hi, step, unit, hint) {
 function buildParams() {
   const host = $('params');
   host.innerHTML = '';
-  const groups = [...FLOWER_GROUPS.map((g) => [g, state.flower]), [SPLIT_GROUP, state.split]];
+  const groups = [...FLOWER_GROUPS.map((g) => [g, state.flower]),
+                 [SPLIT_GROUP, state.split],
+                 [HAT_GROUP, state.hat], [PLACEMENT_GROUP, state.placement]];
   for (const [[title, open, items], target] of groups) {
     const d = document.createElement('details');
     d.className = 'grp'; d.open = open;
     const s = document.createElement('summary'); s.textContent = title; d.appendChild(s);
     const body = document.createElement('div'); body.className = 'grpbody';
+    if (title === 'Hat') {
+      const sel = document.createElement('div'); sel.className = 'p';
+      sel.innerHTML = '<div class="row"><label for="p_hatstyle">silhouette</label></div>' +
+        '<select id="p_hatstyle">' +
+        '<option value="fedora">Fedora</option>' +
+        '<option value="wide_brim">Wide brim</option>' +
+        '<option value="boater">Boater</option>' +
+        '<option value="cloche">Cloche</option>' +
+        '<option value="bucket">Bucket</option></select>' +
+        '<div class="hint">Sets crown taper, dome, flare and edge softness. Only the fedora and wide brim are creased.</div>';
+      body.appendChild(sel);
+      const el = sel.querySelector('select');
+      el.value = state.hat.style;
+      el.addEventListener('change', () => { state.hat.style = el.value; regenerate(); });
+    }
     if (title === 'Dividing curve') {
       const sel = document.createElement('div'); sel.className = 'p';
       sel.innerHTML = '<div class="row"><label for="p_type">curve family</label></div>' +
@@ -759,7 +833,7 @@ const VIEWS = {
   three_quarter: [0.66, 0.52, 4.7], top: [-Math.PI / 2, 1.44, 4.3],
   front: [-Math.PI / 2, 0.10, 5.0], side: [0, 0.14, 5.0],
 };
-const frameRadius = () => (state.metrics && state.metrics.radius_scene) || 4.7;
+const frameRadius = () => frameR || 4.7;
 function buildChips() {
   const vc = $('viewChips'); vc.innerHTML = '';
   for (const [key, label] of [['three_quarter', 'Three quarter'], ['top', 'Top'], ['front', 'Front'], ['side', 'Side']]) {
@@ -802,6 +876,15 @@ function buildChips() {
     });
     mc.appendChild(b);
   };
+  const hatBtn = document.createElement('button');
+  hatBtn.className = 'chip'; hatBtn.type = 'button'; hatBtn.textContent = 'On the hat';
+  hatBtn.setAttribute('aria-pressed', String(state.placement.show_hat));
+  hatBtn.addEventListener('click', () => {
+    state.placement.show_hat = !state.placement.show_hat;
+    hatBtn.setAttribute('aria-pressed', String(state.placement.show_hat));
+    regenerate();
+  });
+  mc.appendChild(hatBtn);
   toggle('Cut wall', 'showWall');
   toggle('Curve', 'showCurve');
   toggle('Wireframe', 'wireframe');

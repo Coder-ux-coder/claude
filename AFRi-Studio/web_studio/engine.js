@@ -120,10 +120,18 @@ export const PART_BASE = 1000000;
 export const PART_CENTER = 2000000;
 export const PART_PETAL = 3000000;
 export const PART_BOUNDARY = 4000000;
+// Stage two. The hat never goes through the split kernel, but it shares the
+// mesh type and the part-provenance channel, so it needs ids of its own.
+export const PART_HAT = 5000000;      // crown + brim shell
+export const PART_HATBAND = 6000000;  // ribbon band
+export const PART_MOUNT = 7000000;    // attachment hardware
 
 export function petalPartId(layer, index) { return PART_PETAL + layer * 10000 + index; }
 
 export function partKind(pid) {
+  if (pid >= PART_MOUNT) return 'mount';
+  if (pid >= PART_HATBAND) return 'hatband';
+  if (pid >= PART_HAT) return 'hat';
   if (pid >= PART_BOUNDARY) return 'boundary';
   if (pid >= PART_PETAL) return 'petal';
   if (pid >= PART_CENTER) return 'center';
@@ -1354,7 +1362,8 @@ function packPiece(m) {
   for (let i = 0; i < m.verts.length; i++) pos[i] = m.verts[i];
   const flowerIdx = [], wallIdx = [];
   for (let f = 0; f < m.nFaces; f++) {
-    const dst = m.parts[f] >= PART_BOUNDARY ? wallIdx : flowerIdx;
+    const pid = m.parts[f];
+    const dst = (pid >= PART_BOUNDARY && pid < PART_HAT) ? wallIdx : flowerIdx;
     dst.push(m.faces[f * 3], m.faces[f * 3 + 1], m.faces[f * 3 + 2]);
   }
   return {
@@ -1363,7 +1372,7 @@ function packPiece(m) {
   };
 }
 
-export function generateDesign(flower, split, onProgress) {
+export function generateDesign(flower, split, onProgress, hatCfg = null, placeCfg = null) {
   const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
   const t0 = now();
   const r = buildMasterFlower(flower, onProgress);
@@ -1374,8 +1383,24 @@ export function generateDesign(flower, split, onProgress) {
   const s = splitFlower(r.mesh, r.bodies, split, radius, onProgress);
   const splitMs = now() - t1;
 
-  const A = packPiece(s.pieceA);
-  const B = packPiece(s.pieceB);
+  // ---- stage two: build the hat and seat the accessory on it -----------
+  let hatPacked = null, hatStats = null, place = null, frame = null;
+  let pieceA = s.pieceA, pieceB = s.pieceB;
+  if (placeCfg && placeCfg.show_hat && hatCfg) {
+    const t2 = now();
+    const hat = buildHat(hatCfg, onProgress);
+    frame = surfaceFrame(hat, hatCfg, placeCfg);
+    place = placementMatrix(frame, placeCfg);
+    pieceA = placeMesh(s.pieceA, place.R, place.t);
+    pieceB = placeMesh(s.pieceB, place.R, place.t);
+    hatPacked = packPiece(hat.mesh);
+    hatStats = { ...hat.stats, seconds: (now() - t2) / 1000,
+                 seated_radius_mm: frame.radius_mm,
+                 seated_z_mm: frame.surface_z_mm };
+  }
+
+  const A = packPiece(pieceA);
+  const B = packPiece(pieceB);
   const masterVol = meshVolume(r.mesh);
 
   // The dividing curve in world space, drawn at the rosette's crown.
@@ -1391,7 +1416,21 @@ export function generateDesign(flower, split, onProgress) {
     curve[i * 3 + 2] = zTop;
   }
   const mn = s.path.meanNormal();
-  const sepDir = [mn[0] * c - mn[1] * sn, mn[0] * sn + mn[1] * c];
+  let sepDir = [mn[0] * c - mn[1] * sn, mn[0] * sn + mn[1] * c, 0];
+  if (place) {
+    const R = place.R;
+    // The curve and the separation direction are drawn in the flower's own
+    // frame; once the accessory is seated they have to travel with it.
+    for (let i = 0; i < n; i++) {
+      const x = curve[i * 3], y = curve[i * 3 + 1], z = curve[i * 3 + 2];
+      curve[i * 3] = R[0] * x + R[1] * y + R[2] * z + place.t[0];
+      curve[i * 3 + 1] = R[3] * x + R[4] * y + R[5] * z + place.t[1];
+      curve[i * 3 + 2] = R[6] * x + R[7] * y + R[8] * z + place.t[2];
+    }
+    const d = sepDir;
+    sepDir = [R[0] * d[0] + R[1] * d[1], R[3] * d[0] + R[4] * d[1],
+              R[6] * d[0] + R[7] * d[1]];
+  }
   const bounds = meshBounds(r.mesh);
 
   const metrics = {
@@ -1415,5 +1454,373 @@ export function generateDesign(flower, split, onProgress) {
     radius_scene: Math.max(bounds[1][0], bounds[1][1], -bounds[0][0], -bounds[0][1]),
     height_scene: bounds[1][2] - bounds[0][2],
   };
-  return { A, B, curve, sepDir, metrics };
+  if (hatStats) metrics.hat = hatStats;
+  return { A, B, hat: hatPacked, curve, sepDir, metrics };
+}
+
+/* ------------------------------------------------------------------ *
+ * Stage two: the hat.
+ *
+ * A port of design_engine/hat/ and design_engine/assembly/placement.py.
+ * Construction mirrors the petal exactly: sweep a meridian to get a
+ * mid-surface, offset it both ways by half the material thickness, stitch the
+ * brim edge. A fedora is not a surface of revolution -- it has a lengthwise
+ * centre crease and two finger dents -- so those are applied to the
+ * mid-surface before it is thickened, which keeps the shell closed and the
+ * normals correct.
+ *
+ * Not ported: the contact and interference measurement. That is a
+ * manufacturing question answered on the desktop build, and a number the page
+ * reported without the boolean behind it would be worth less than no number.
+ * ------------------------------------------------------------------ */
+
+export const HAT_STYLES = {
+  fedora:    { crown_taper: 0.86, crown_dome: 0.085, side_flare: 0.72, brim_rise: 1.25, edge_softness: 0.013, crease: 1.0 },
+  boater:    { crown_taper: 1.00, crown_dome: 0.000, side_flare: 1.00, brim_rise: 1.00, edge_softness: 0.005, crease: 0.0 },
+  wide_brim: { crown_taper: 0.90, crown_dome: 0.075, side_flare: 0.80, brim_rise: 1.35, edge_softness: 0.016, crease: 0.45 },
+  cloche:    { crown_taper: 0.72, crown_dome: 0.380, side_flare: 0.55, brim_rise: 1.55, edge_softness: 0.030, crease: 0.0 },
+  bucket:    { crown_taper: 0.94, crown_dome: 0.160, side_flare: 0.88, brim_rise: 1.15, edge_softness: 0.028, crease: 0.0 },
+};
+
+export const HAT_DEFAULTS = {
+  style: 'fedora', head_circumference_mm: 580.0, crown_height_mm: 112.0,
+  crown_taper: 0.0, crown_crease: 1.0,
+  brim_width_mm: 68.0, brim_droop_deg: 9.0, brim_curl: 0.10, thickness_mm: 1.6,
+  band_depth_mm: 2.2, band_height_mm: 34.0, band_z_mm: 3.0,
+  profile_segments: 160, revolve_segments: 96,
+};
+
+export const PLACEMENT_DEFAULTS = {
+  show_hat: false, azimuth_deg: -52.0, radial_position: 0.45,
+  surface_offset_mm: 2.0, tilt_deg: 0.0, roll_deg: 18.0,
+};
+
+export function headRadius(circumferenceMm) {
+  return (circumferenceMm / (2 * Math.PI)) * MM;
+}
+
+/* Resample a polyline to n points at uniform arclength. */
+function resampleByArclength(pts, n) {
+  const m = pts.length;
+  const s = new Float64Array(m);
+  for (let i = 1; i < m; i++) {
+    s[i] = s[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+  }
+  const total = s[m - 1];
+  const out = [];
+  if (!(total > 0)) { for (let i = 0; i < n; i++) out.push([pts[0][0], pts[0][1]]); return out; }
+  for (let k = 0; k < n; k++) {
+    const target = total * k / (n - 1);
+    let lo = 0, hi = m - 1;
+    while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (s[mid] <= target) lo = mid; else hi = mid; }
+    const span = s[hi] - s[lo];
+    const t = span === 0 ? 0 : (target - s[lo]) / span;
+    out.push([pts[lo][0] + (pts[hi][0] - pts[lo][0]) * t,
+              pts[lo][1] + (pts[hi][1] - pts[lo][1]) * t]);
+  }
+  return out;
+}
+
+/* Round the meridian's corners with a small Gaussian pass. Felt and straw do
+ * not fold to a mathematical corner, and the radius is what separates a fedora
+ * from a bowler -- the kernel has to stay small. */
+function smoothProfile(prof, softness) {
+  const n = prof.length;
+  const sigma = Math.max(0.5, softness * n);
+  const half = Math.ceil(sigma * 3);
+  if (half < 1) return prof;
+  const k = [];
+  let ksum = 0;
+  for (let x = -half; x <= half; x++) { const w = Math.exp(-0.5 * (x / sigma) ** 2); k.push(w); ksum += w; }
+  for (let i = 0; i < k.length; i++) k[i] /= ksum;
+  const at = (i) => prof[Math.min(Math.max(i, 0), n - 1)];
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    let r = 0, z = 0;
+    for (let j = -half; j <= half; j++) {
+      const w = k[j + half], p = at(i + j);
+      r += p[0] * w; z += p[1] * w;
+    }
+    out.push([r, z]);
+  }
+  if (prof[0][0] < 1e-9) out[0][0] = 0;
+  return out;
+}
+
+export function buildHatProfile(cfg) {
+  const preset = HAT_STYLES[cfg.style] || HAT_STYLES.fedora;
+  const taper = cfg.crown_taper > 0 ? cfg.crown_taper : preset.crown_taper;
+  const rh = headRadius(cfg.head_circumference_mm);
+  const rt = rh * taper;
+  const H = cfg.crown_height_mm * MM;
+  const bw = cfg.brim_width_mm * MM;
+  const dome = preset.crown_dome * H;
+  const droop = cfg.brim_droop_deg * Math.PI / 180;
+  const pts = [];
+
+  for (let i = 0; i < 64; i++) {                       // crown top
+    const r = rt * i / 63;
+    const u = rt > 1e-9 ? r / rt : 0;
+    pts.push([r, H + dome * Math.pow(clamp(1 - u * u, 0, 1), 1.35)]);
+  }
+  for (let i = 1; i <= 96; i++) {                      // crown side
+    const t = i / 96;
+    pts.push([rt + (rh - rt) * Math.pow(t, preset.side_flare), H * Math.pow(1 - t, 1.12)]);
+  }
+  for (let i = 1; i <= 110; i++) {                     // brim
+    const v = i / 110;
+    pts.push([rh + bw * v,
+              -Math.tan(droop) * bw * Math.pow(v, preset.brim_rise)
+              + cfg.brim_curl * bw * Math.pow(v, 3.4)]);
+  }
+  const prof = resampleByArclength(smoothProfile(pts, preset.edge_softness),
+                                   Math.max(60, cfg.profile_segments | 0));
+  prof[0][0] = 0;
+  return prof;
+}
+
+/* Index range of the brim: crown foot to outer edge. The crown foot is the
+ * construction corner (rh, 0), found by proximity -- a radius test picks the
+ * TOP of a boater's crown, whose side sits at exactly rh for its whole height. */
+export function brimSpan(prof, rh) {
+  let best = 0, bd = Infinity;
+  for (let i = 0; i < prof.length; i++) {
+    const dr = prof[i][0] - rh, dz = prof[i][1];
+    const d = dr * dr + dz * dz;
+    if (d < bd) { bd = d; best = i; }
+  }
+  return [best, prof.length - 1];
+}
+
+export function buildHat(cfg, onProgress) {
+  const preset = HAT_STYLES[cfg.style] || HAT_STYLES.fedora;
+  const prof = buildHatProfile(cfg);
+  const rh = headRadius(cfg.head_circumference_mm);
+  const rt = rh * (cfg.crown_taper > 0 ? cfg.crown_taper : preset.crown_taper);
+  const H = cfg.crown_height_mm * MM;
+  const creaseDepth = cfg.crown_crease * preset.crease * H * 0.34;
+  const pinchDepth = cfg.crown_crease * preset.crease * rt * 0.14;
+  if (onProgress) onProgress('hat meridian', 1, 3);
+
+  const n = prof.length, m = Math.max(24, cfg.revolve_segments | 0);
+  const mid = new Float64Array(n * m * 3);
+  let topZ = -Infinity;
+  for (let i = 0; i < n; i++) if (prof[i][1] > topZ) topZ = prof[i][1];
+  const wDen = Math.max(topZ - H * 0.72, 1e-6);
+
+  for (let i = 0; i < n; i++) {
+    const r = prof[i][0], z0 = prof[i][1];
+    for (let j = 0; j < m; j++) {
+      const th = 2 * Math.PI * j / m;
+      let x = r * Math.cos(th), y = r * Math.sin(th), z = z0;
+      if (creaseDepth > 0 || pinchDepth > 0) {
+        const w = Math.pow(clamp((z - H * 0.72) / wDen, 0, 1), 1.1);
+        if (creaseDepth > 0) {
+          const crease = Math.exp(-((x / Math.max(0.30 * rt, 1e-6)) ** 2));
+          const along = clamp(1 - 0.45 * (y / Math.max(rt, 1e-6)) ** 2, 0, 1);
+          z -= creaseDepth * crease * along * w;
+        }
+        if (pinchDepth > 0) {
+          const rr = Math.max(0.42 * rt, 1e-6);
+          for (const sx of [-1, 1]) {
+            const cx = sx * 0.62 * rt, cy = 0.58 * rt;
+            const g = Math.exp(-(((x - cx) ** 2 + (y - cy) ** 2) / (rr * rr))) * w;
+            const rad = Math.hypot(x, y) || 1;
+            x -= pinchDepth * g * x / rad;
+            y -= pinchDepth * g * y / rad;
+          }
+        }
+      }
+      const o = (i * m + j) * 3;
+      mid[o] = x; mid[o + 1] = y; mid[o + 2] = z;
+    }
+  }
+  if (onProgress) onProgress('sweeping crown and brim', 2, 3);
+
+  // Normals from the parametric tangents. theta wraps; the meridian does not.
+  const N = new Float64Array(n * m * 3);
+  const g3 = (i, j, k) => mid[(i * m + j) * 3 + k];
+  let zAcc = 0;
+  for (let i = 0; i < n; i++) {
+    const im = i === 0 ? 0 : i - 1, ip = i === n - 1 ? n - 1 : i + 1;
+    const sc = (i === 0 || i === n - 1) ? 1.0 : 0.5;
+    for (let j = 0; j < m; j++) {
+      const jm = (j - 1 + m) % m, jp = (j + 1) % m;
+      const du = [ (g3(ip,j,0)-g3(im,j,0))*sc, (g3(ip,j,1)-g3(im,j,1))*sc, (g3(ip,j,2)-g3(im,j,2))*sc ];
+      const dv = [ (g3(i,jp,0)-g3(i,jm,0))*0.5, (g3(i,jp,1)-g3(i,jm,1))*0.5, (g3(i,jp,2)-g3(i,jm,2))*0.5 ];
+      let nx = du[1]*dv[2]-du[2]*dv[1], ny = du[2]*dv[0]-du[0]*dv[2], nz = du[0]*dv[1]-du[1]*dv[0];
+      const L = Math.hypot(nx, ny, nz);
+      const d = L < 1e-12 ? 1 : L;
+      const o = (i * m + j) * 3;
+      N[o] = nx / d; N[o + 1] = ny / d; N[o + 2] = nz / d;
+      if (i === 0) zAcc += nz / d;
+    }
+  }
+  // At a pole the crosswise tangent vanishes; the meridian is horizontal there,
+  // so the normal is the axis.
+  if (prof[0][0] < 1e-9) for (let j = 0; j < m; j++) {
+    const o = j * 3; N[o] = 0; N[o + 1] = 0; N[o + 2] = 1;
+  }
+  if (zAcc < 0 && prof[0][0] >= 1e-9) for (let i = 0; i < N.length; i++) N[i] = -N[i];
+
+  const h = cfg.thickness_mm * MM * 0.5;
+  const nv = n * m;
+  const verts = new Float64Array(nv * 2 * 3);
+  for (let i = 0; i < nv; i++) {
+    for (let k = 0; k < 3; k++) {
+      verts[i * 3 + k] = mid[i * 3 + k] + N[i * 3 + k] * h;
+      verts[(nv + i) * 3 + k] = mid[i * 3 + k] - N[i * 3 + k] * h;
+    }
+  }
+  const faces = [];
+  const ring = (off, flip) => {
+    for (let i = 0; i < n - 1; i++) {
+      for (let j = 0; j < m; j++) {
+        const jn = (j + 1) % m;
+        const a = off + i * m + j, b = off + i * m + jn;
+        const c = off + (i + 1) * m + jn, d = off + (i + 1) * m + j;
+        if (flip) faces.push(a, c, b, a, d, c); else faces.push(a, b, c, a, c, d);
+      }
+    }
+  };
+  ring(0, false); ring(nv, true);
+  for (let j = 0; j < m; j++) {                        // stitch the brim edge
+    const jn = (j + 1) % m;
+    const t0 = (n - 1) * m + j, t1 = (n - 1) * m + jn;
+    faces.push(t0, nv + t0, nv + t1, t0, nv + t1, t1);
+  }
+  const F = Int32Array.from(faces);
+  let shell = mesh(verts, F, new Int32Array(F.length / 3).fill(PART_HAT), 'hat_shell');
+  shell = orient(weld(shell, 1e-5));
+
+  const parts = [shell];
+  if (cfg.band_depth_mm > 0 && cfg.band_height_mm > 0) {
+    parts.push(buildHatBand(prof, cfg, m));
+  }
+  const { mesh: full, bodies } = concat(parts, 'hat');
+  const b = meshBounds(full);
+  if (onProgress) onProgress('hat complete', 3, 3);
+  return {
+    mesh: full, profile: prof, bodies,
+    stats: {
+      style: cfg.style,
+      head_radius_mm: rh / MM,
+      brim_width_mm: (prof[prof.length - 1][0] - rh) / MM,
+      overall_diameter_mm: Math.max(b[1][0] - b[0][0], b[1][1] - b[0][1]) / MM,
+      overall_height_mm: (b[1][2] - b[0][2]) / MM,
+      triangles: full.nFaces,
+    },
+  };
+}
+
+/* The ribbon band: a closed loop in the meridian plane swept around the axis.
+ * A torus -- watertight, and separate from the shell. */
+function buildHatBand(prof, cfg, segments) {
+  const depth = cfg.band_depth_mm * MM;
+  const z0 = cfg.band_z_mm * MM;
+  const z1 = z0 + cfg.band_height_mm * MM;
+  const crown = prof.filter((p) => p[1] >= -1e-6);
+  const cz = Float64Array.from(crown.map((p) => p[1])).reverse();
+  const cr = Float64Array.from(crown.map((p) => p[0])).reverse();
+
+  const steps = 24, loopR = [], loopZ = [];
+  const zs = [];
+  for (let i = 0; i < steps; i++) zs.push(z0 + (z1 - z0) * i / (steps - 1));
+  const rIn = zs.map((z) => interpSorted(z, cz, cr) + cfg.thickness_mm * MM * 0.5);
+  for (let i = 0; i < steps; i++) { loopR.push(rIn[i] + depth); loopZ.push(zs[i]); }
+  for (let i = steps - 1; i >= 0; i--) { loopR.push(rIn[i]); loopZ.push(zs[i]); }
+
+  const n = loopR.length, m = segments;
+  const verts = new Float64Array(n * m * 3);
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < m; j++) {
+      const th = 2 * Math.PI * j / m, o = (i * m + j) * 3;
+      verts[o] = loopR[i] * Math.cos(th);
+      verts[o + 1] = loopR[i] * Math.sin(th);
+      verts[o + 2] = loopZ[i];
+    }
+  }
+  const faces = [];
+  for (let i = 0; i < n; i++) {
+    const inx = (i + 1) % n;                            // the meridian loop closes too
+    for (let j = 0; j < m; j++) {
+      const jn = (j + 1) % m;
+      const a = i * m + j, b = i * m + jn, c = inx * m + jn, d = inx * m + j;
+      faces.push(a, b, c, a, c, d);
+    }
+  }
+  const F = Int32Array.from(faces);
+  return orient(weld(mesh(verts, F, new Int32Array(F.length / 3).fill(PART_HATBAND),
+                          'hat_band'), 1e-5));
+}
+
+/* ---- placement ---------------------------------------------------- */
+export function surfaceFrame(hat, hatCfg, pc) {
+  const prof = hat.profile;
+  const rh = headRadius(hatCfg.head_circumference_mm);
+  const [start, end] = brimSpan(prof, rh);
+  const t = clamp(pc.radial_position, 0, 1);
+  const index = start + t * (end - start);
+
+  const i0 = Math.min(Math.max(Math.floor(index), 0), prof.length - 2);
+  const f = clamp(index - i0, 0, 1);
+  const p = [prof[i0][0] * (1 - f) + prof[i0 + 1][0] * f,
+             prof[i0][1] * (1 - f) + prof[i0 + 1][1] * f];
+  const a = prof[Math.max(i0 - 1, 0)], b = prof[Math.min(i0 + 1, prof.length - 1)];
+  const d = [b[0] - a[0], b[1] - a[1]];
+  const dl = Math.hypot(d[0], d[1]) || 1;
+  const tanRz = [d[0] / dl, d[1] / dl];
+  const nrmRz = [-d[1] / dl, d[0] / dl];
+
+  const lift = hatCfg.thickness_mm * MM * 0.5 + pc.surface_offset_mm * MM;
+  const pr = p[0] + nrmRz[0] * lift, pz = p[1] + nrmRz[1] * lift;
+  const phi = pc.azimuth_deg * Math.PI / 180;
+  const c = Math.cos(phi), s = Math.sin(phi);
+
+  let normal = [nrmRz[0] * c, nrmRz[0] * s, nrmRz[1]];
+  const nl = Math.hypot(...normal) || 1;
+  normal = normal.map((v) => v / nl);
+  let tangent = [tanRz[0] * c, tanRz[0] * s, tanRz[1]];
+  const dot = tangent[0] * normal[0] + tangent[1] * normal[1] + tangent[2] * normal[2];
+  tangent = tangent.map((v, i) => v - normal[i] * dot);
+  const tl = Math.hypot(...tangent) || 1;
+  tangent = tangent.map((v) => v / tl);
+  const bitangent = [
+    normal[1] * tangent[2] - normal[2] * tangent[1],
+    normal[2] * tangent[0] - normal[0] * tangent[2],
+    normal[0] * tangent[1] - normal[1] * tangent[0],
+  ];
+  return { origin: [pr * c, pr * s, pz], tangent, bitangent, normal,
+           radius_mm: pr / MM, surface_z_mm: pz / MM };
+}
+
+export function placementMatrix(frame, pc) {
+  let T = frame.tangent.slice(), B = frame.bitangent.slice(), N = frame.normal.slice();
+  const roll = pc.roll_deg * Math.PI / 180;
+  if (Math.abs(roll) > 1e-12) {
+    const cr = Math.cos(roll), sr = Math.sin(roll);
+    const nT = T.map((v, i) => v * cr + B[i] * sr);
+    const nB = T.map((v, i) => -v * sr + B[i] * cr);
+    T = nT; B = nB;
+  }
+  const tilt = pc.tilt_deg * Math.PI / 180;
+  if (Math.abs(tilt) > 1e-12) {
+    const ct = Math.cos(tilt), st = Math.sin(tilt);
+    const nT = T.map((v, i) => v * ct - N[i] * st);
+    const nN = T.map((v, i) => v * st + N[i] * ct);
+    T = nT; N = nN;
+  }
+  // columns [T, B, N]
+  return { R: [T[0], B[0], N[0], T[1], B[1], N[1], T[2], B[2], N[2]], t: frame.origin };
+}
+
+export function placeMesh(m, R, t) {
+  const V = m.verts, out = new Float64Array(V.length);
+  for (let i = 0; i < V.length; i += 3) {
+    const x = V[i], y = V[i + 1], z = V[i + 2];
+    out[i] = R[0] * x + R[1] * y + R[2] * z + t[0];
+    out[i + 1] = R[3] * x + R[4] * y + R[5] * z + t[1];
+    out[i + 2] = R[6] * x + R[7] * y + R[8] * z + t[2];
+  }
+  return mesh(out, m.faces, m.parts, m.name);
 }

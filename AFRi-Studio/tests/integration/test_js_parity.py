@@ -126,3 +126,47 @@ def test_js_split_is_watertight_and_conservative(kind):
     # such as a petal landing on neither side, is four orders of magnitude
     # larger than this bound.
     assert err < 1e-5, "pieces do not reconstruct the master: %.3e" % err
+
+
+# ---------------------------------------------------------------------------
+# Stage two: the hat
+# ---------------------------------------------------------------------------
+def _js_hat(style: str) -> dict:
+    return _run_js("""
+import * as E from '%s';
+const cfg = {...E.HAT_DEFAULTS, style: '%s'};
+const h = E.buildHat(cfg);
+const b = E.meshBounds(h.mesh);
+const prof = h.profile;
+console.log(JSON.stringify({
+  triangles: h.mesh.nFaces, verts: h.mesh.nVerts,
+  volume: E.meshVolume(h.mesh),
+  open_edges: E.boundaryEdges(h.mesh.faces, 3).length,
+  head_radius_mm: h.stats.head_radius_mm,
+  diameter_mm: h.stats.overall_diameter_mm,
+  height_mm: h.stats.overall_height_mm,
+  profile_points: prof.length,
+  profile_end_r: prof[prof.length - 1][0],
+}));
+""" % (ENGINE.as_posix(), style))
+
+
+@pytest.mark.parametrize("style", ["fedora", "boater", "wide_brim", "cloche", "bucket"])
+def test_hat_matches_python(style):
+    """The browser hat has to be the same hat the renders show."""
+    from design_engine.configurations.schema import HatConfig, HatStyle
+    from design_engine.hat.hat import build_hat
+
+    js = _js_hat(style)
+    cfg = HatConfig(style=HatStyle(style), profile_segments=160, revolve_segments=96)
+    py = build_hat(cfg)
+
+    assert js["open_edges"] == 0, "the browser hat is not closed"
+    assert js["triangles"] == py.mesh.n_faces
+    assert js["verts"] == py.mesh.n_verts
+    assert js["profile_points"] == len(py.profile)
+    # Head size is the dimension a hat cannot get wrong.
+    assert js["head_radius_mm"] == pytest.approx(py.stats["head_radius_mm"], abs=0.01)
+    assert js["diameter_mm"] == pytest.approx(py.stats["overall_diameter_mm"], abs=0.05)
+    assert js["height_mm"] == pytest.approx(py.stats["overall_height_mm"], abs=0.05)
+    assert js["volume"] == pytest.approx(py.mesh.volume(), rel=REL_TOL)

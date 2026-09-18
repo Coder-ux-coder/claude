@@ -5,15 +5,19 @@
 import { generateDesign } from './engine.js';
 
 self.onmessage = (ev) => {
-  const { id, flower, split } = ev.data;
+  const { id, flower, split, hat, placement } = ev.data;
   try {
     const out = generateDesign(flower, split,
-      (stage, i, n) => self.postMessage({ id, type: 'progress', stage, i, n }));
-    self.postMessage({ id, type: 'done', ...out }, [
+      (stage, i, n) => self.postMessage({ id, type: 'progress', stage, i, n }),
+      hat, placement);
+    const transfer = [
       out.A.pos.buffer, out.A.flowerIdx.buffer, out.A.wallIdx.buffer,
       out.B.pos.buffer, out.B.flowerIdx.buffer, out.B.wallIdx.buffer,
       out.curve.buffer,
-    ]);
+    ];
+    if (out.hat) transfer.push(out.hat.pos.buffer, out.hat.flowerIdx.buffer,
+                               out.hat.wallIdx.buffer);
+    self.postMessage({ id, type: 'done', ...out }, transfer);
   } catch (err) {
     self.postMessage({ id, type: 'error', message: String(err && err.message ? err.message : err) });
   }
