@@ -1,0 +1,140 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", "Consolas", monospace;
+
+  /* Workspace surfaces - a restrained, low-glare dark palette */
+  --color-ink-950: #080b14;
+  --color-ink-900: #0d1220;
+  --color-ink-850: #111829;
+  --color-ink-800: #172033;
+  --color-ink-700: #222e47;
+  --color-ink-600: #33415e;
+  --color-mute-400: #8194b4;
+  --color-mute-300: #a8b8d2;
+  --color-accent-500: #3b82f6;
+  --color-accent-400: #60a5fa;
+  --color-accent-300: #93c5fd;
+  --color-accent-200: #bfdbfe;
+}
+
+/* -------------------------------------------------------------------------
+   Reusable workspace classes.  `@utility` (Tailwind v4) is used instead of
+   `@layer components` so that one class can `@apply` another.
+   ---------------------------------------------------------------------- */
+
+@utility panel {
+  @apply bg-ink-900 border border-ink-800 rounded-xl;
+}
+
+@utility field {
+  @apply w-full bg-ink-950 border border-ink-700 rounded-lg px-3 py-2.5 text-[15px]
+         text-slate-100 placeholder:text-slate-600 transition
+         focus:border-accent-500 focus:ring-2 focus:ring-accent-500/25 focus:outline-none;
+}
+
+@utility field-error {
+  @apply border-rose-500/70 focus:border-rose-500 focus:ring-rose-500/25;
+}
+
+@utility field-ok {
+  @apply border-emerald-600/60;
+}
+
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2
+         text-sm font-medium transition select-none
+         disabled:opacity-40 disabled:cursor-not-allowed;
+}
+
+@utility btn-primary {
+  @apply btn bg-accent-500 text-white shadow-sm shadow-accent-500/25;
+  &:hover:not(:disabled) {
+    @apply bg-accent-400;
+  }
+}
+
+@utility btn-secondary {
+  @apply btn bg-ink-800 text-slate-200 border border-ink-700;
+  &:hover:not(:disabled) {
+    @apply bg-ink-700 border-ink-600;
+  }
+}
+
+@utility btn-ghost {
+  @apply btn text-mute-300;
+  &:hover:not(:disabled) {
+    @apply text-slate-100 bg-ink-800;
+  }
+}
+
+@utility btn-danger {
+  @apply btn bg-rose-600/90 text-white;
+  &:hover:not(:disabled) {
+    @apply bg-rose-500;
+  }
+}
+
+@utility btn-xs {
+  @apply px-2 py-1 text-xs gap-1.5 rounded-md;
+}
+
+@utility chip {
+  @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium;
+}
+
+@utility label {
+  @apply flex items-center gap-2 text-[13px] font-semibold text-mute-300 mb-1.5;
+}
+
+@utility hint {
+  @apply text-xs text-mute-400 leading-relaxed;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-ink-950 text-slate-200 font-sans antialiased;
+    margin: 0;
+  }
+
+  /* Native controls should match the workspace, not the OS light theme. */
+  input,
+  textarea,
+  select,
+  button {
+    font: inherit;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--color-accent-500) 40%, transparent);
+  }
+
+  *:focus-visible {
+    @apply outline-2 outline-offset-2 outline-accent-500;
+  }
+}
+
+/* Slim scrollbars that do not fight the dark theme. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-ink-700) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-ink-700);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--color-ink-600);
+  background-clip: content-box;
+}

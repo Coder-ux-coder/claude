@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+
+# The repository root ignores lock files globally; this project keeps its own
+# so installs are reproducible on the machine that runs it.
+!frontend/package-lock.json
+
+# Your lead database and exports stay on your machine
+backend/data/
+*.csv
