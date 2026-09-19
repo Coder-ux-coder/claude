@@ -142,6 +142,24 @@ export function specModel(design, metrics, name) {
       ['Tilt / roll', fmt(design.placement.tilt_deg, 0) + '° / ' + fmt(design.placement.roll_deg, 0) + '°'],
     ] });
   }
+  if (m.fit) {
+    const f = m.fit;
+    sections.push({ title: 'Fit, measured', rows: [
+      ['Interference with the hat', fmt(f.interference_mm, 3) + ' mm'],
+      ['Closest approach', fmt(f.gap_min_mm, 2) + ' mm'],
+      ['Furthest gap', fmt(f.gap_max_mm, 2) + ' mm'],
+      ['Conformance error', fmt(f.conformance_error_mm, 2) + ' mm'],
+      ['Footprint touching', (f.contact_fraction * 100).toFixed(1) + ' %'],
+      ['Contact tolerance', fmt(f.contact_tolerance_mm, 2) + ' mm'],
+      ['Brim edge radius', fmt(f.brim_edge_radius_mm, 1) + ' mm'],
+      ['Footprint radius', fmt(f.footprint_radius_mm, 1) + ' mm'],
+      ['Past the brim edge', fmt(f.overhang_mm, 2) + ' mm'],
+      ['Mass, upper bound', fmt(f.mass_upper_g, 1) + ' g at ' + f.assumed_density_g_cm3 + ' g/cm\u00b3'],
+      ['Brim moment, upper bound', Math.round(f.brim_moment_upper_g_mm) + ' g\u00b7mm at ' +
+        fmt(f.moment_arm_mm, 1) + ' mm arm'],
+      ['Basis of the bounds', 'Volume is overcounted where petals intersect until the pieces are fused.'],
+    ] });
+  }
   sections.push({ title: 'Finish', rows: [
     ['Specified finish', material.name],
     ['Process note', material.note],
@@ -252,6 +270,19 @@ export function buildReport(design, metrics, name) {
     '  consolidated solid but is not yet a manufacturable part. The desktop',
     '  pipeline boolean-unions them into one body per piece before export.',
     '',
+    ...(m.fit ? [
+      'FIT ON THE HAT',
+      '  interference      ' + fmt(m.fit.interference_mm, 3) + ' mm',
+      '  closest approach  ' + fmt(m.fit.gap_min_mm, 2) + ' mm',
+      '  conformance error ' + fmt(m.fit.conformance_error_mm, 2) + ' mm',
+      '  footprint touching' + (m.fit.contact_fraction * 100).toFixed(1).padStart(7) + ' %',
+      '  past brim edge    ' + fmt(m.fit.overhang_mm, 2) + ' mm',
+      '  mass upper bound  ' + fmt(m.fit.mass_upper_g, 1) + ' g',
+      '',
+      '  Mass is an upper bound. This build ships the flower as overlapping closed',
+      '  shells, so its volume is overcounted wherever petals intersect.',
+      '',
+    ] : []),
     'SPLIT VERIFICATION',
     '  open edges A      ' + m.open_edges_a,
     '  open edges B      ' + m.open_edges_b,

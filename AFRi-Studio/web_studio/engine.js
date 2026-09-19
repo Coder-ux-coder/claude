@@ -1384,7 +1384,7 @@ export function generateDesign(flower, split, onProgress, hatCfg = null, placeCf
   const splitMs = now() - t1;
 
   // ---- stage two: build the hat and seat the accessory on it -----------
-  let hatPacked = null, hatStats = null, place = null, frame = null;
+  let hatPacked = null, hatStats = null, place = null, frame = null, fit = null;
   let pieceA = s.pieceA, pieceB = s.pieceB;
   if (placeCfg && placeCfg.show_hat && hatCfg) {
     const t2 = now();
@@ -1397,6 +1397,8 @@ export function generateDesign(flower, split, onProgress, hatCfg = null, placeCf
     hatStats = { ...hat.stats, seconds: (now() - t2) / 1000,
                  seated_radius_mm: frame.radius_mm,
                  seated_z_mm: frame.surface_z_mm };
+    fit = fitReport([s.pieceA, s.pieceB], [pieceA, pieceB],
+                    hat, hatCfg, placeCfg, frame.radius_mm);
   }
 
   const A = packPiece(pieceA);
@@ -1455,6 +1457,7 @@ export function generateDesign(flower, split, onProgress, hatCfg = null, placeCf
     height_scene: bounds[1][2] - bounds[0][2],
   };
   if (hatStats) metrics.hat = hatStats;
+  if (fit) metrics.fit = fit;
   return { A, B, hat: hatPacked, curve, sepDir, metrics };
 }
 
@@ -1469,9 +1472,6 @@ export function generateDesign(flower, split, onProgress, hatCfg = null, placeCf
  * mid-surface before it is thickened, which keeps the shell closed and the
  * normals correct.
  *
- * Not ported: the contact and interference measurement. That is a
- * manufacturing question answered on the desktop build, and a number the page
- * reported without the boolean behind it would be worth less than no number.
  * ------------------------------------------------------------------ */
 
 export const HAT_STYLES = {
@@ -1493,6 +1493,7 @@ export const HAT_DEFAULTS = {
 export const PLACEMENT_DEFAULTS = {
   show_hat: false, azimuth_deg: -52.0, radial_position: 0.45,
   surface_offset_mm: 2.0, tilt_deg: 0.0, roll_deg: 18.0,
+  contact_tolerance_mm: 0.6,
 };
 
 export function headRadius(circumferenceMm) {
@@ -1812,6 +1813,168 @@ export function placementMatrix(frame, pc) {
   }
   // columns [T, B, N]
   return { R: [T[0], B[0], N[0], T[1], B[1], N[1], T[2], B[2], N[2]], t: frame.origin };
+}
+
+/* ------------------------------------------------------------------ *
+ * Stage two, part three: does it actually fit?
+ *
+ * A port of design_engine/assembly/contact.py. The distance is computed
+ * analytically against the meridian rather than by a nearest-neighbour search
+ * over the sampled skin: the skin is sampled at about 5.9 mm circumferentially,
+ * so a nearest-point search would carry several millimetres of error, which is
+ * useless for judging a sub-millimetre gap. Away from the crown dent the hat is
+ * a surface of revolution, so the exact distance is a two-dimensional
+ * point-to-polyline problem in (radius, height), solved to the resolution of
+ * the profile.
+ *
+ * One figure is deliberately a bound rather than a measurement. Mass, and the
+ * moment it puts on a brim, depend on the flower's volume -- and this build
+ * ships the flower as overlapping closed shells rather than one fused solid,
+ * so that volume is overcounted wherever petals intersect. Both are returned
+ * as upper bounds, named as such, and the interface says so.
+ * ------------------------------------------------------------------ */
+
+/* The outer skin's meridian: the mid-surface profile pushed out by half the
+ * material thickness, as (r, z) pairs in one flat array. */
+export function outerMeridian(prof, thickness) {
+  const n = prof.length;
+  const out = new Float64Array(n * 2);
+  const h = thickness * 0.5;
+  for (let i = 0; i < n; i++) {
+    const a = prof[Math.max(i - 1, 0)], b = prof[Math.min(i + 1, n - 1)];
+    const dx = b[0] - a[0], dy = b[1] - a[1];
+    const L = Math.hypot(dx, dy) || 1;
+    out[i * 2] = prof[i][0] - dy / L * h;
+    out[i * 2 + 1] = prof[i][1] + dx / L * h;
+  }
+  return out;
+}
+
+/* Signed distance from one world point, reduced to (radius, height), to the
+ * outer skin. Positive is clear of the hat, negative is inside it. Allocates
+ * nothing: it is called once per vertex. */
+export function signedDistanceToMeridian(mer, r, z) {
+  const S = mer.length / 2 - 1;
+  let bestD2 = Infinity, bestS = 0, bestT = 0, bdx = 0, bdy = 0;
+  for (let s = 0; s < S; s++) {
+    const ax = mer[s * 2], ay = mer[s * 2 + 1];
+    const abx = mer[s * 2 + 2] - ax, aby = mer[s * 2 + 3] - ay;
+    const den = abx * abx + aby * aby;
+    let t = den < 1e-18 ? 0 : ((r - ax) * abx + (z - ay) * aby) / den;
+    t = t < 0 ? 0 : (t > 1 ? 1 : t);
+    const dx = r - (ax + t * abx), dy = z - (ay + t * aby);
+    const d2 = dx * dx + dy * dy;
+    if (d2 < bestD2) { bestD2 = d2; bestS = s; bestT = t; bdx = dx; bdy = dy; }
+  }
+  const ax = mer[bestS * 2], ay = mer[bestS * 2 + 1];
+  const abx = mer[bestS * 2 + 2] - ax, aby = mer[bestS * 2 + 3] - ay;
+  const L = Math.hypot(abx, aby) || 1;
+  let sign = bdx * (-aby / L) + bdy * (abx / L);
+  sign = sign === 0 ? 1 : (sign > 0 ? 1 : -1);
+  // The meridian is an OPEN curve: it stops at the brim edge. A point out past
+  // that edge clamps onto the final vertex and, sitting below the brim's plane,
+  // comes back negative -- reading as "inside the hat" when it is in open air
+  // beyond the hat entirely. Anything whose nearest point is the clamped end of
+  // the last segment is outside by definition.
+  if (bestS === S - 1 && bestT >= 1 - 1e-9) sign = 1;
+  return Math.sqrt(bestD2) * sign;
+}
+
+/* Which vertices belong to an attachment pin. Passing through the hat is the
+ * entire point of a pin, so they are excluded from the collision test; without
+ * this a correctly fitted accessory reports millimetres of interference. */
+function mountVertexMask(m) {
+  let any = false;
+  for (let f = 0; f < m.nFaces; f++) if (m.parts[f] >= PART_MOUNT) { any = true; break; }
+  if (!any) return null;
+  const mask = new Uint8Array(m.nVerts);
+  for (let f = 0; f < m.nFaces; f++) {
+    if (m.parts[f] < PART_MOUNT) continue;
+    mask[m.faces[f * 3]] = 1; mask[m.faces[f * 3 + 1]] = 1; mask[m.faces[f * 3 + 2]] = 1;
+  }
+  return mask;
+}
+
+const DENSITY_G_CM3 = 1.24;      // cast polyurethane resin: a stated assumption
+
+export function fitReport(locals, placed, hat, hatCfg, pc, seatedRadiusMm) {
+  const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  const mer = outerMeridian(hat.profile, hatCfg.thickness_mm * MM);
+  const tol = Number.isFinite(pc.contact_tolerance_mm) ? pc.contact_tolerance_mm : 0.6;
+  const band = 0.25 * MM;        // the flat underside, taken in local space
+
+  let brimEdgeR = 0;
+  for (let i = 0; i < mer.length; i += 2) if (mer[i] > brimEdgeR) brimEdgeR = mer[i];
+
+  let worst = Infinity, inside = 0, bodyCount = 0, excluded = 0;
+  let footR = 0, volume = 0;
+  let gn = 0, gmin = Infinity, gmax = -Infinity, gsum = 0;
+  const gaps = [];
+
+  for (let k = 0; k < locals.length; k++) {
+    const L = locals[k], P = placed[k];
+    const mask = mountVertexMask(L);
+    const V = P.verts, Lv = L.verts;
+    for (let i = 0, v = 0; i < V.length; i += 3, v++) {
+      if (mask && mask[v]) { excluded++; continue; }
+      const r = Math.hypot(V[i], V[i + 1]);
+      const d = signedDistanceToMeridian(mer, r, V[i + 2]);
+      bodyCount++;
+      if (d < worst) worst = d;
+      if (d < -1e-6) inside++;
+      const lz = Lv[i + 2];
+      if (lz <= band && lz >= -band) {
+        const mmGap = d / MM;
+        gaps.push(mmGap);
+        gn++; gsum += mmGap;
+        if (mmGap < gmin) gmin = mmGap;
+        if (mmGap > gmax) gmax = mmGap;
+        if (r > footR) footR = r;
+      }
+    }
+    volume += Math.abs(meshVolume(L));
+  }
+
+  let seated = 0, contact = 0;
+  for (const g of gaps) {
+    if (g - gmin <= tol) seated++;
+    if (Math.abs(g) <= tol) contact++;
+  }
+
+  const volCm3 = volume / (MM * MM * MM) / 1000;
+  const massUpper = volCm3 * DENSITY_G_CM3;
+  // The arm is measured from where the accessory is seated to the crown foot,
+  // which is where the head carries the brim. Using the seated radius rather
+  // than a volume centroid keeps the arm exact even though the mass is a bound.
+  const arm = Math.max(0, seatedRadiusMm - headRadius(hatCfg.head_circumference_mm) / MM);
+
+  return {
+    underside_samples: gn,
+    body_vertices_tested: bodyCount,
+    mount_vertices_excluded: excluded,
+    contact_tolerance_mm: tol,
+    gap_min_mm: gn ? gmin : null,
+    gap_max_mm: gn ? gmax : null,
+    gap_mean_mm: gn ? gsum / gn : null,
+    // What decides rigid versus conforming is how far the flat back departs
+    // from the brim ACROSS the footprint, not how far it sits off it: a
+    // deliberate standoff shifts every gap equally and says nothing about
+    // whether the two shapes match.
+    conformance_error_mm: gn ? gmax - gmin : null,
+    seated_fraction: gn ? seated / gn : null,
+    contact_fraction: gn ? contact / gn : null,
+    interference_mm: Number.isFinite(worst) && worst < 0 ? -worst / MM : 0,
+    vertices_inside_hat: inside,
+    brim_edge_radius_mm: brimEdgeR / MM,
+    footprint_radius_mm: footR / MM,
+    overhang_mm: Math.max(0, (footR - brimEdgeR) / MM),
+    volume_upper_cm3: volCm3,
+    assumed_density_g_cm3: DENSITY_G_CM3,
+    mass_upper_g: massUpper,
+    moment_arm_mm: arm,
+    brim_moment_upper_g_mm: massUpper * arm,
+    fit_ms: (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0,
+  };
 }
 
 export function placeMesh(m, R, t) {

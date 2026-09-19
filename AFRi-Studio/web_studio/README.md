@@ -21,18 +21,44 @@ The page is a shell. Everything else is an ES module, loaded same-origin.
 | `designer.js` | Claude at the bench: the tool loop and the parameter allow-list. |
 | `exporters.js` | Binary STL, ZIP, build report, spec model and spec sheet. |
 | `ui.js` | Toasts, dialogs, command palette, sliders, selects. |
-| `engine.js` | The geometry kernel. Hand-ported from `design_engine/`, parity-tested against it. |
+| `engine.js` | The geometry kernel, plus the hat and the fit analysis. Hand-ported from `design_engine/`, parity-tested against it. |
 | `worker.js` | Runs `generateDesign` off the main thread. Two instances: the bench and the compare pane. |
 
 ## The four views
 
-- **Bench** — the viewport, 43 parameters, live measurement and split verification.
+- **Bench** — the viewport, 44 parameters, live measurement, split verification and,
+  once the hat is on, the fit report.
 - **Compare** — the working design beside one off the shelf, cameras locked together,
   with the measured deltas and every parameter that differs listed underneath.
 - **Library** — every design the team has saved, with a captured still, the measurements
   and who saved it.
 - **Spec** — a manufacturing sheet generated from the built geometry, printable and
   exportable as a standalone HTML document.
+
+## The fit report
+
+A render cannot answer whether an accessory fits a hat — overlapping geometry looks
+exactly like seated geometry. So the browser build now measures it, as a port of
+`design_engine/assembly/contact.py`:
+
+- **Interference** — how deep any part of the accessory sits inside the hat's outer skin.
+- **Clearance** — closest approach and furthest gap across the flat underside.
+- **Conformance error** — how far the flat back departs from the doubly curved brim
+  *across* the footprint. Measured from the closest approach, so a deliberate standoff
+  does not flatter it; this is the number that decides rigid versus conforming.
+- **Footprint touching** — the fraction of the underside within the contact tolerance.
+- **Past the brim edge** — how far the footprint overhangs, which is what rules a
+  narrow brim out.
+
+Distance is computed analytically against the hat's meridian, not by nearest-neighbour
+search over the sampled skin: the skin is sampled at about 5.9 mm circumferentially, so
+a nearest-point search would carry several millimetres of error — useless for judging a
+sub-millimetre gap.
+
+Two figures are bounds rather than measurements, and are labelled as such in the
+interface: **mass** and the **brim moment**. Both depend on volume, and this build ships
+the flower as overlapping closed shells, so its volume is overcounted wherever petals
+intersect.
 
 ## Runtime capabilities
 

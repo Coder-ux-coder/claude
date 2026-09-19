@@ -44,7 +44,14 @@ export function createLibraryView(root, ctx) {
         h('div', { class: 'cardmeta' },
           h('span', { text: s.diameter_mm ? fmt(s.diameter_mm, 1) + ' × ' + fmt(s.height_mm, 1) + ' mm' : '—' }),
           h('span', { text: s.petals ? s.petals + ' petals' : '' }),
-          s.checksPass === false ? h('span', { class: 'bad', text: 'failed checks' }) : null),
+          s.checksPass === false ? h('span', { class: 'bad', text: 'failed checks' }) : null,
+          s.fit ? h('span', {
+            class: s.fit === 'clears' ? 'good' : s.fit === 'collides' ? 'bad' : 'warn',
+            text: s.fit === 'clears' ? 'fits the hat'
+              : s.fit === 'collides' ? 'collides'
+              : s.fit === 'overhangs' ? 'overhangs the brim'
+              : 'grazes the hat',
+          }) : null),
         h('div', { class: 'cardfoot' },
           byline, h('span', { class: 'dot', text: '·' }), h('span', { text: ago(doc.updatedAt) })),
         h('div', { class: 'cardacts' },

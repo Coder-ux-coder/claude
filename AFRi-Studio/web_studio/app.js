@@ -131,6 +131,7 @@ function regenerate() {
       pending = false;
       busy(false);
       renderReadout();
+      renderFit();
       renderStageChip();
       if (store.ui.view === 'compare') compareView.refresh();
       if (store.ui.view === 'spec') specView.render();
@@ -390,6 +391,67 @@ function renderReadout() {
   kv('Split kernel', Math.round(m.split_ms) + ' ms');
 }
 
+/* The fit report: the one question a render cannot answer by being looked at.
+ * Every figure here is measured against the hat's outer skin analytically, so
+ * a sub-millimetre gap is a real number rather than the resolution of a mesh
+ * sampled every six millimetres. */
+function renderFit() {
+  const f = store.metrics && store.metrics.fit;
+  $('fitSec').hidden = !f;
+  if (!f) return;
+
+  const tol = f.contact_tolerance_mm;
+  const collides = f.interference_mm > tol;
+  const grazes = f.interference_mm > 1e-3;
+  const overhangs = f.overhang_mm > 1e-3;
+
+  const state = collides ? 'bad' : (overhangs || grazes) ? 'warn' : 'ok';
+  const word = collides ? 'Does not fit'
+    : overhangs ? 'Overhangs the brim'
+    : grazes ? 'Grazes the hat'
+    : 'Clears the hat';
+  const detail = collides
+    ? fmt(f.interference_mm, 2) + ' mm of the accessory is inside the hat'
+    : overhangs
+      ? fmt(f.overhang_mm, 1) + ' mm of the footprint is past the brim edge'
+      : grazes
+        ? 'touching by ' + fmt(f.interference_mm, 2) + ' mm, within the ' + fmt(tol, 2) + ' mm tolerance'
+        : fmt(f.gap_min_mm, 2) + ' mm at the closest approach';
+
+  const v = clear($('fitVerdict'));
+  v.className = 'verdict ' + state;
+  v.append(h('span', { class: 'mark' }),
+           h('div', null, h('div', { class: 'word', text: word }),
+                          h('div', { class: 'vsubtle', text: detail })));
+
+  const host = clear($('fit'));
+  const kv = (k, val, flag) => host.appendChild(h('div', { class: 'kv' + (flag || '') },
+    h('span', { text: k }), h('b', { text: val })));
+  kv('Interference', fmt(f.interference_mm, 3) + ' mm', collides ? ' flag' : grazes ? ' warnflag' : '');
+  kv('Closest approach', fmt(f.gap_min_mm, 2) + ' mm');
+  kv('Furthest gap', fmt(f.gap_max_mm, 2) + ' mm');
+  kv('Conformance error', fmt(f.conformance_error_mm, 2) + ' mm');
+  kv('Footprint touching', (f.contact_fraction * 100).toFixed(1) + ' %');
+  kv('Brim edge radius', fmt(f.brim_edge_radius_mm, 1) + ' mm');
+  kv('Footprint radius', fmt(f.footprint_radius_mm, 1) + ' mm');
+  kv('Past the brim edge', fmt(f.overhang_mm, 2) + ' mm', overhangs ? ' warnflag' : '');
+  kv('Mass at most', fmt(f.mass_upper_g, 1) + ' g');
+  kv('Moment arm', fmt(f.moment_arm_mm, 1) + ' mm');
+  kv('Brim moment at most', Math.round(f.brim_moment_upper_g_mm) + ' g\u00b7mm');
+  kv('Underside samples', String(f.underside_samples));
+
+  $('fitNote').textContent = collides
+    ? 'Raise the standoff, move the accessory inboard, or give the hat a wider brim. The kernel ' +
+      'measures the whole accessory against the hat\u2019s outer skin, not just its base.'
+    : overhangs
+      ? 'Part of the footprint reaches past the brim. That can be a deliberate look, but nothing ' +
+        'out there is supported \u2014 the fixing carries it.'
+      : 'Conformance error is how far the flat back departs from the doubly curved brim across the ' +
+        'footprint. It is measured from the closest approach, so a deliberate standoff does not ' +
+        'flatter it. Mass and moment are upper bounds: this build ships the flower as overlapping ' +
+        'shells, so its volume is overcounted where petals intersect.';
+}
+
 function renderStageChip() {
   const on = !!(store.metrics && store.metrics.hat);
   $('stageChip').textContent = on ? 'Stage two · on the hat' : 'Stage one · flower only';
@@ -449,10 +511,18 @@ function buildViewNav() {
 /* ===================== saving ===================== */
 function summary() {
   const m = store.metrics || {};
+  const f = m.fit;
   return {
     diameter_mm: m.diameter_mm, height_mm: m.height_mm,
     petals: m.petals, rows: m.rows, triangles: m.triangles,
     checksPass: m.open_edges_a === 0 && m.open_edges_b === 0 && m.cap_failures === 0,
+    // Whether this design was on a hat when it was saved, and whether it fitted.
+    // The shelf is more useful when it says so without opening every card.
+    fit: !f ? null
+      : f.interference_mm > f.contact_tolerance_mm ? 'collides'
+      : f.overhang_mm > 1e-3 ? 'overhangs'
+      : f.interference_mm > 1e-3 ? 'grazes'
+      : 'clears',
   };
 }
 
@@ -651,6 +721,15 @@ function describeGeometry(m) {
     cap_failures: mm.cap_failures,
     volume_error_pct: +Number(mm.volume_error_pct).toExponential(2),
     on_hat: !!mm.hat,
+    fit: mm.fit ? {
+      interference_mm: +mm.fit.interference_mm.toFixed(3),
+      overhang_past_brim_mm: +mm.fit.overhang_mm.toFixed(2),
+      closest_approach_mm: +mm.fit.gap_min_mm.toFixed(2),
+      conformance_error_mm: +mm.fit.conformance_error_mm.toFixed(2),
+      footprint_touching_pct: +(mm.fit.contact_fraction * 100).toFixed(1),
+      brim_edge_radius_mm: +mm.fit.brim_edge_radius_mm.toFixed(1),
+      footprint_radius_mm: +mm.fit.footprint_radius_mm.toFixed(1),
+    } : null,
   };
 }
 
