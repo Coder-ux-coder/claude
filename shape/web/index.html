@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Shape</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  color-scheme:light dark;
+  --ground:#F1F2EF; --card:#FFFFFF; --sunk:#E6E8E3;
+  --line:#DCDFD7; --ink:#151814; --muted:#646A5F; --faint:#949A8E;
+  --accent:#116153; --accent-ink:#FFFFFF; --bad:#9C3B2C;
+  --shadow:0 1px 2px rgba(20,24,18,.06), 0 12px 32px -18px rgba(20,24,18,.3);
+  --ui:"Schibsted Grotesk",system-ui,-apple-system,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#0F1210; --card:#171B18; --sunk:#0A0C0A;
+    --line:#252A26; --ink:#E8EBE6; --muted:#8E958A; --faint:#5F665C;
+    --accent:#4FD3B2; --accent-ink:#0A1512; --bad:#E08A78;
+    --shadow:0 1px 2px rgba(0,0,0,.5), 0 16px 40px -20px rgba(0,0,0,.8);
+  }
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{
+  margin:0;background:var(--ground);color:var(--ink);
+  font-family:var(--ui);font-size:16px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;align-items:center;
+  padding:0 16px;
+}
+.wrap{width:100%;max-width:640px;padding-block:clamp(40px,9vh,88px) 56px}
+header{margin-bottom:28px}
+h1{
+  margin:0;font-size:30px;font-weight:600;letter-spacing:-.02em;
+}
+h1 span{color:var(--accent)}
+.blurb{margin:6px 0 0;color:var(--muted);font-size:16px;text-wrap:balance}
+
+form{display:flex;flex-direction:column;gap:10px}
+label{font-size:14px;color:var(--muted)}
+textarea,input[type=password]{
+  width:100%;font:inherit;color:inherit;background:var(--card);
+  border:1px solid var(--line);border-radius:10px;padding:13px 14px;
+  resize:none;box-shadow:var(--shadow);
+}
+textarea{min-height:88px;font-size:17px}
+textarea::placeholder{color:var(--faint)}
+textarea:focus,input:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+button{
+  font:inherit;font-weight:600;cursor:pointer;border-radius:9px;
+  border:1px solid var(--line);background:var(--card);color:var(--ink);
+  padding:11px 18px;
+}
+button:hover:not(:disabled){border-color:var(--accent)}
+button.go{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+button.go:hover:not(:disabled){filter:brightness(1.08)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.plain{background:transparent;border-color:transparent;color:var(--muted);padding:11px 6px}
+button.plain:hover{color:var(--ink)}
+a.download{
+  font-weight:600;text-decoration:none;border-radius:9px;border:1px solid var(--line);
+  background:var(--card);color:var(--ink);padding:11px 18px;display:inline-block;
+}
+a.download:hover{border-color:var(--accent)}
+
+.tries{display:flex;gap:7px;flex-wrap:wrap;margin-top:2px}
+.try{
+  background:transparent;border:1px solid var(--line);color:var(--muted);
+  border-radius:999px;padding:6px 13px;font-size:14px;font-weight:400;
+}
+.try:hover{color:var(--ink);border-color:var(--accent)}
+
+.stage{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:15px;
+  padding:18px 0}
+.pulse{width:8px;height:8px;border-radius:50%;background:var(--accent);
+  animation:beat 1.1s ease-in-out infinite}
+@keyframes beat{0%,100%{opacity:.25;transform:scale(.8)}50%{opacity:1;transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){.pulse{animation:none;opacity:.8}}
+
+figure{margin:0 0 28px}
+.shot{
+  width:100%;max-width:440px;aspect-ratio:1;display:block;border-radius:12px;
+  background:var(--sunk);border:1px solid var(--line);object-fit:cover;box-shadow:var(--shadow);
+}
+figcaption{
+  display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;
+  font-family:var(--mono);font-size:13px;color:var(--muted);
+}
+.said{font-size:17px;margin:0 0 14px;text-wrap:balance}
+.said b{font-weight:600}
+
+.problem{
+  border:1px solid var(--line);border-left:3px solid var(--bad);background:var(--card);
+  border-radius:10px;padding:14px 16px;color:var(--ink);font-size:15px;
+}
+.keybox{border:1px solid var(--line);background:var(--card);border-radius:10px;
+  padding:14px 16px;margin-bottom:20px;box-shadow:var(--shadow)}
+.keybox p{margin:0 0 9px;font-size:14px;color:var(--muted)}
+footer{margin-top:38px;color:var(--faint);font-size:13px;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Shape<span>.</span></h1>
+    <p class="blurb">Say what you want. Claude builds it in Blender and shows you.</p>
+  </header>
+
+  <div class="keybox" id="keybox" hidden>
+    <p>Paste your Claude key to start. It is used for your request and never saved.</p>
+    <input type="password" id="key" placeholder="sk-ant-..." autocomplete="off" spellcheck="false">
+  </div>
+
+  <div class="stage" id="stage" hidden><span class="pulse"></span><span id="stageText">Starting</span></div>
+
+  <div id="problem" class="problem" hidden></div>
+
+  <figure id="result" hidden>
+    <p class="said" id="said"></p>
+    <img class="shot" id="shot" alt="">
+    <figcaption id="facts"></figcaption>
+    <div class="row" style="margin-top:16px">
+      <a class="download" id="dlModel" download>Download</a>
+      <button id="change" type="button">Change it</button>
+      <button class="plain" id="reset" type="button">Start again</button>
+    </div>
+  </figure>
+
+  <form id="form">
+    <label for="prompt" id="promptLabel">What should it be?</label>
+    <textarea id="prompt" placeholder="a chunky ceramic mug with a thick handle"></textarea>
+    <div class="row">
+      <button class="go" id="go" type="submit">Make</button>
+    </div>
+    <div class="tries" id="tries"></div>
+  </form>
+
+  <footer>
+    Built by Claude, run by Blender on this machine. The script is checked before it runs.
+  </footer>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const EXAMPLES = [
+  'a chunky ceramic mug with a thick handle',
+  'a simple wooden stool, three legs',
+  'a desk lamp with a cone shade',
+  'a stack of five river stones',
+];
+
+let current = null;          // the job showing right now
+let changing = false;        // the next Make is a change to `current`
+let hasServerKey = false;
+
+fetch('/state').then(r => r.json()).then(s => {
+  hasServerKey = s.hasKey;
+  $('keybox').hidden = s.hasKey;
+}).catch(() => { $('keybox').hidden = false; });
+
+for (const text of EXAMPLES) {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'try'; b.textContent = text;
+  b.addEventListener('click', () => { $('prompt').value = text; $('prompt').focus(); });
+  $('tries').appendChild(b);
+}
+
+function show(state) {
+  $('stage').hidden = state !== 'working';
+  $('result').hidden = state !== 'done';
+  $('problem').hidden = state !== 'failed';
+  $('go').disabled = state === 'working';
+  $('tries').hidden = state !== 'empty';
+}
+
+$('form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const prompt = $('prompt').value.trim();
+  if (!prompt) return;
+  const key = $('key') ? $('key').value.trim() : '';
+  if (!hasServerKey && !key) {
+    $('problem').textContent = 'Add your Claude key first.';
+    show('failed');
+    return;
+  }
+
+  show('working');
+  $('stageText').textContent = 'Starting';
+  const body = { prompt };
+  if (key) body.key = key;
+  if (changing && current) body.changeOf = current;
+
+  let id;
+  try {
+    const res = await fetch('/make', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'That did not work.');
+    id = data.id;
+  } catch (err) {
+    $('problem').textContent = err.message;
+    show('failed');
+    return;
+  }
+
+  changing = false;
+  poll(id, prompt);
+});
+
+async function poll(id, prompt) {
+  for (;;) {
+    await new Promise(r => setTimeout(r, 900));
+    let job;
+    try {
+      job = await (await fetch('/job/' + id)).json();
+    } catch (_) { continue; }
+
+    if (job.state === 'working') {
+      $('stageText').textContent = job.stage || 'Working';
+      continue;
+    }
+    if (job.state === 'failed') {
+      $('problem').textContent = job.error || 'That did not work.';
+      show('failed');
+      return;
+    }
+
+    current = id;
+    const r = job.result || {};
+    $('said').innerHTML = '<b></b>';
+    $('said').firstChild.textContent = prompt;
+    $('shot').src = '/out/' + id + '/view.png?t=' + Date.now();
+    $('shot').alt = prompt;
+    $('dlModel').href = '/out/' + id + '/model.glb';
+    $('dlModel').setAttribute('download', 'shape.glb');
+    const facts = [];
+    if (r.size_cm) facts.push('about ' + r.size_cm.join(' × ') + ' cm');
+    if (r.parts) facts.push(r.parts + (r.parts === 1 ? ' part' : ' parts'));
+    if (r.triangles) facts.push(r.triangles.toLocaleString() + ' triangles');
+    $('facts').textContent = facts.join('   ·   ');
+    $('prompt').value = '';
+    $('promptLabel').textContent = 'What should it be?';
+    show('done');
+    return;
+  }
+}
+
+$('change').addEventListener('click', () => {
+  changing = true;
+  $('promptLabel').textContent = 'What should change?';
+  $('prompt').placeholder = 'make the handle bigger';
+  $('prompt').focus();
+  $('prompt').scrollIntoView({ behavior: 'smooth', block: 'center' });
+});
+
+$('reset').addEventListener('click', () => {
+  current = null; changing = false;
+  $('prompt').value = '';
+  $('prompt').placeholder = EXAMPLES[0];
+  $('promptLabel').textContent = 'What should it be?';
+  show('empty');
+});
+
+show('empty');
+</script>
+</body>
+</html>
