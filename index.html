@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Art of Indian Dining</title>
+<meta name="description" content="An editorial portfolio of fine-dining restaurant writing: original profiles, a rewritten listing, and a maintained restaurant record.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+/* ─────────────────────────────  TOKENS  ───────────────────────────── */
+:root{
+  --ivory:#FAF6EE;
+  --ivory-2:#F4EDE1;
+  --ivory-3:#EBE1CF;
+  --forest:#12301E;
+  --forest-2:#1B4630;
+  --forest-3:#0C2317;
+  --gold:#A98544;
+  --gold-2:#C9A961;
+  --gold-3:#E4D2A6;
+  --ink:#20221D;
+  --muted:#6E6C60;
+  --rule:rgba(169,133,68,.38);
+
+  --serif:'Cormorant Garamond','EB Garamond',Didot,'Bodoni MT',Garamond,'Times New Roman',serif;
+  --sans:'Jost','Futura','Avenir Next','Helvetica Neue',Arial,sans-serif;
+
+  --gut:clamp(22px,5vw,64px);
+  --maxw:1220px;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{
+  margin:0;background:var(--ivory);color:var(--ink);
+  font-family:var(--serif);font-weight:400;
+  font-size:clamp(17px,1.08vw,19px);line-height:1.68;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+img{max-width:100%;display:block}
+
+/* paper grain */
+.grain{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:900;opacity:.05;mix-blend-mode:multiply}
+
+/* ─────────────────────────────  PRIMITIVES  ───────────────────────────── */
+.wrap{max-width:var(--maxw);margin:0 auto;padding-inline:var(--gut)}
+.narrow{max-width:760px;margin-inline:auto}
+
+.eyebrow{
+  font-family:var(--sans);font-weight:400;
+  font-size:.66rem;letter-spacing:.34em;text-transform:uppercase;
+  color:var(--gold);margin:0 0 1.15rem;
+}
+.eyebrow.pale{color:var(--gold-3)}
+
+h1,h2,h3,h4{font-weight:300;margin:0;letter-spacing:.005em}
+h1{font-size:clamp(3.1rem,8.6vw,7.1rem);line-height:.96}
+h2{font-size:clamp(2.2rem,4.6vw,3.6rem);line-height:1.08}
+h3{font-size:clamp(1.85rem,3.3vw,2.9rem);line-height:1.1}
+h4{font-size:1.28rem;line-height:1.25}
+
+p{margin:0 0 1.15em}
+em{font-style:italic}
+
+.lede{font-size:clamp(1.2rem,1.75vw,1.42rem);line-height:1.62;color:#3A3C34;font-weight:300}
+
+.label{
+  font-family:var(--sans);font-size:.6rem;font-weight:400;
+  letter-spacing:.26em;text-transform:uppercase;color:var(--muted);font-style:normal;
+}
+
+/* gold rule with centred diamond */
+.orn{display:flex;align-items:center;gap:1.1rem;justify-content:center;margin:0}
+.orn::before,.orn::after{content:"";height:1px;flex:1;background:linear-gradient(90deg,transparent,var(--rule),transparent)}
+.orn span{width:7px;height:7px;transform:rotate(45deg);background:var(--gold);flex:none;opacity:.85}
+.orn.left::before{display:none}
+.orn.left{justify-content:flex-start}
+.orn.short{max-width:150px;margin-inline:0}
+
+/* ─────────────────────────────  NAV  ───────────────────────────── */
+.topbar{
+  position:sticky;top:0;z-index:800;
+  background:rgba(250,246,238,.9);backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--rule);
+  transition:background .4s,border-color .4s;
+}
+.topbar .wrap{display:flex;align-items:center;justify-content:space-between;gap:1.5rem;padding-block:.82rem}
+.mark{font-family:var(--sans);font-size:.63rem;letter-spacing:.3em;text-transform:uppercase;color:var(--forest);white-space:nowrap}
+.mark b{font-weight:500}
+nav ul{display:flex;gap:clamp(1rem,2.4vw,2.1rem);list-style:none;margin:0;padding:0}
+nav a{
+  font-family:var(--sans);font-size:.62rem;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--muted);text-decoration:none;padding-bottom:3px;
+  border-bottom:1px solid transparent;transition:color .3s,border-color .3s;
+}
+nav a:hover{color:var(--forest);border-color:var(--gold)}
+@media(max-width:720px){nav{display:none}}
+@media(max-width:560px){.mark-sfx{display:none}.mark{font-size:.58rem;letter-spacing:.22em}}
+
+/* ─────────────────────────────  PLATES (art-directed imagery)  ───────────────────────────── */
+figure{margin:0}
+.plate{
+  position:relative;overflow:hidden;isolation:isolate;
+  background:linear-gradient(150deg,var(--p1),var(--p2) 58%,var(--p3));
+  aspect-ratio:var(--ar,4/5);
+}
+.plate::after{ /* inner gold hairline */
+  content:"";position:absolute;inset:14px;border:1px solid rgba(228,210,166,.34);pointer-events:none;z-index:3;
+}
+.plate::before{ /* light bloom */
+  content:"";position:absolute;inset:0;z-index:2;pointer-events:none;
+  background:radial-gradient(120% 80% at 28% 18%,rgba(255,244,214,.28),transparent 58%),
+             radial-gradient(90% 70% at 88% 102%,rgba(0,0,0,.42),transparent 60%);
+}
+.plate svg{position:absolute;inset:0;width:100%;height:100%;z-index:1}
+.plate .stamp{
+  position:absolute;left:28px;bottom:26px;z-index:4;
+  font-family:var(--sans);font-size:.56rem;letter-spacing:.28em;text-transform:uppercase;
+  color:rgba(240,230,208,.78);
+}
+figcaption{
+  font-size:.92rem;font-style:italic;color:var(--muted);
+  padding-top:.72rem;border-top:1px solid var(--rule);margin-top:.9rem;
+}
+
+.p-haveli{--p1:#2A1C10;--p2:#4A2C14;--p3:#120E08}
+.p-counter{--p1:#DCD3C2;--p2:#C3BCA9;--p3:#8E8A78}
+.p-coast{--p1:#0E3330;--p2:#1E5248;--p3:#08201E}
+.p-cover{--p1:#12301E;--p2:#2E4A2C;--p3:#0A1C12}
+
+/* ─────────────────────────────  HERO  ───────────────────────────── */
+.hero{
+  position:relative;background:var(--forest-3);color:var(--ivory);
+  padding:clamp(5rem,13vh,9rem) 0 clamp(3.4rem,8vh,5.5rem);
+  overflow:hidden;
+}
+.hero-art{position:absolute;inset:0;width:100%;height:100%;opacity:.5}
+.hero::after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(75% 58% at 50% 8%,rgba(201,169,97,.20),transparent 62%),
+             radial-gradient(100% 80% at 50% 118%,rgba(0,0,0,.62),transparent 66%);
+}
+.hero .wrap{position:relative;z-index:2;text-align:center}
+.hero h1{color:var(--ivory);letter-spacing:-.012em}
+.hero h1 em{display:block;font-style:italic;color:var(--gold-3);font-weight:300}
+.hero-sub{
+  font-size:clamp(1.15rem,2.1vw,1.55rem);color:rgba(240,232,215,.86);
+  font-style:italic;font-weight:300;margin:1.7rem 0 0;
+}
+.hero-meta{
+  display:flex;flex-wrap:wrap;justify-content:center;gap:.7rem clamp(1rem,3vw,2.4rem);
+  margin-top:2.9rem;font-family:var(--sans);font-size:.6rem;
+  letter-spacing:.26em;text-transform:uppercase;color:rgba(228,210,166,.7);
+}
+.hero-meta span{position:relative}
+.hero-frame{
+  display:inline-block;padding:clamp(2.2rem,5vw,3.4rem) clamp(1.4rem,5vw,3.6rem);
+  border-top:1px solid rgba(201,169,97,.42);border-bottom:1px solid rgba(201,169,97,.42);
+}
+.scroll-cue{
+  margin-top:clamp(2.6rem,6vh,4rem);display:inline-flex;flex-direction:column;align-items:center;gap:.7rem;
+  font-family:var(--sans);font-size:.55rem;letter-spacing:.3em;text-transform:uppercase;
+  color:rgba(228,210,166,.6);text-decoration:none;
+}
+.scroll-cue i{display:block;width:1px;height:46px;background:linear-gradient(var(--gold-2),transparent);animation:drop 2.8s ease-in-out infinite}
+@keyframes drop{0%,100%{opacity:.25;transform:scaleY(.55);transform-origin:top}50%{opacity:1;transform:scaleY(1);transform-origin:top}}
+
+/* ─────────────────────────────  SECTIONS  ───────────────────────────── */
+section{scroll-margin-top:66px}
+.band{padding:clamp(4.4rem,11vh,8rem) 0}
+.band.tint{background:var(--ivory-2)}
+.band.dark{background:var(--forest);color:var(--ivory)}
+
+.sec-head{text-align:center;max-width:720px;margin:0 auto clamp(3rem,6vw,4.6rem)}
+.sec-head h2{margin-bottom:1.3rem}
+.sec-head .orn{margin-top:1.9rem}
+
+/* ── Section 1 intro ── */
+.standfirst{margin-top:clamp(3rem,7vw,4.8rem);display:grid;grid-template-columns:1fr 1.35fr;gap:clamp(2rem,5vw,4.4rem);align-items:start}
+.standfirst .kicker{font-size:clamp(1.5rem,2.5vw,2rem);line-height:1.28;font-weight:300;color:var(--forest);font-style:italic}
+@media(max-width:820px){.standfirst{grid-template-columns:1fr;gap:1.9rem}}
+
+.cover{margin-top:clamp(3rem,7vw,4.6rem)}
+.cover .plate{--ar:21/8}
+@media(max-width:700px){.cover .plate{--ar:4/3}}
+
+/* ── Restaurant profiles ── */
+.profile{display:grid;grid-template-columns:1.02fr 1fr;gap:clamp(2.2rem,5.2vw,5.2rem);align-items:center}
+.profile + .profile{margin-top:clamp(4.6rem,10vw,8rem);padding-top:clamp(4.6rem,10vw,8rem);border-top:1px solid var(--rule)}
+.profile.flip .p-media{order:2}
+@media(max-width:900px){
+  .profile{grid-template-columns:1fr;gap:2.2rem}
+  .profile.flip .p-media{order:0}
+}
+.p-num{
+  font-family:var(--sans);font-size:.6rem;letter-spacing:.3em;text-transform:uppercase;
+  color:var(--gold);margin-bottom:1.1rem;
+}
+.p-body h3{margin-bottom:.55rem;color:var(--forest)}
+.p-place{
+  font-size:1.02rem;font-style:italic;color:var(--muted);margin:0 0 1.5rem;
+}
+.p-place b{font-style:normal;font-weight:400;color:var(--forest-2)}
+.p-desc{margin-top:1.6rem}
+.p-desc p:first-of-type::first-letter{
+  float:left;font-size:3.9em;line-height:.76;padding:.06em .1em 0 0;
+  color:var(--gold);font-weight:300;
+}
+.p-desc p:last-child{margin-bottom:0}
+
+.dishes{margin:2.1rem 0 0;padding:0;list-style:none;counter-reset:d}
+.dishes li{
+  counter-increment:d;display:grid;grid-template-columns:auto 1fr;gap:.95rem;
+  padding:.72rem 0;border-top:1px solid rgba(169,133,68,.22);
+}
+.dishes li::before{
+  content:counter(d,decimal-leading-zero);
+  font-family:var(--sans);font-size:.58rem;letter-spacing:.14em;color:var(--gold);padding-top:.44em;
+}
+.dishes b{font-weight:500;color:var(--forest)}
+.dishes span{display:block;font-size:.95rem;color:var(--muted);font-style:italic}
+
+.atmos{
+  margin-top:2.1rem;padding:1.35rem 0 0;border-top:1px solid var(--rule);
+}
+.atmos p:not(.label){margin:.55rem 0 0;font-style:italic;color:#3B3D35;font-size:1.06rem}
+
+/* ── Section 3: before / after ── */
+.seg{
+  display:inline-flex;border:1px solid var(--rule);background:var(--ivory);
+  padding:4px;gap:4px;margin:0 auto;
+}
+.seg button{
+  font-family:var(--sans);font-size:.6rem;letter-spacing:.22em;text-transform:uppercase;
+  padding:.72rem 1.35rem;background:none;border:0;color:var(--muted);cursor:pointer;
+  transition:background .35s,color .35s;
+}
+.seg button:hover{color:var(--forest)}
+.seg button.on{background:var(--forest);color:var(--gold-3)}
+
+.compare{
+  display:grid;grid-template-columns:1fr 1fr;gap:clamp(1.4rem,3.4vw,2.6rem);
+  margin-top:clamp(2.4rem,5vw,3.6rem);align-items:stretch;
+}
+@media(max-width:860px){.compare{grid-template-columns:1fr}}
+.col{
+  background:var(--ivory);border:1px solid var(--rule);padding:clamp(1.6rem,3.2vw,2.6rem);
+  transition:opacity .55s ease,filter .55s ease,transform .55s ease,box-shadow .55s ease;
+  display:flex;flex-direction:column;
+}
+.col header{display:flex;align-items:baseline;justify-content:space-between;gap:1rem;padding-bottom:1rem;border-bottom:1px solid var(--rule);margin-bottom:1.5rem}
+.col h4{color:var(--forest)}
+.col .wc{font-family:var(--sans);font-size:.57rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.col .text{font-size:1.06rem;line-height:1.72}
+.col.after{background:linear-gradient(175deg,#FFFDF8,var(--ivory))}
+.col.after .text{color:#24261F}
+
+.compare[data-view="before"] .col.after,
+.compare[data-view="after"]  .col.before{opacity:.2;filter:saturate(.25) blur(.6px)}
+.compare[data-view="after"]  .col.after{box-shadow:0 18px 44px -30px rgba(18,48,30,.6);transform:translateY(-4px)}
+.compare[data-view="before"] .col.before{box-shadow:0 18px 44px -30px rgba(18,48,30,.35)}
+@media(max-width:860px){
+  .compare[data-view="before"] .col.after,
+  .compare[data-view="after"] .col.before{display:none}
+}
+
+.changes{margin-top:clamp(2.4rem,5vw,3.4rem);border-top:1px solid var(--rule);padding-top:2.1rem}
+.changes ul{list-style:none;margin:1.3rem 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(255px,1fr));gap:1.1rem 2.4rem}
+.changes li{display:grid;grid-template-columns:auto 1fr;gap:.85rem;font-size:.99rem;color:#3B3D35}
+.changes li::before{content:"";width:5px;height:5px;transform:rotate(45deg);background:var(--gold);margin-top:.62em}
+.note{
+  margin-top:2.2rem;padding:1.15rem 1.4rem;background:rgba(169,133,68,.07);
+  border-left:2px solid var(--gold);font-size:.97rem;font-style:italic;color:#44463D;
+}
+
+/* ── Section 4: listing panel ── */
+.panel{border:1px solid var(--rule);background:var(--ivory);max-width:980px;margin-inline:auto}
+.panel-top{
+  background:var(--forest);color:var(--ivory);padding:clamp(1.7rem,3.4vw,2.5rem) clamp(1.6rem,3.6vw,3rem);
+  display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:1.2rem;
+}
+.panel-top h3{color:var(--ivory)}
+.panel-top .sub{font-style:italic;color:rgba(232,224,206,.72);margin:.35rem 0 0;font-size:1.02rem}
+.panel-top .verified{
+  font-family:var(--sans);font-size:.56rem;letter-spacing:.24em;text-transform:uppercase;
+  color:var(--gold-3);border:1px solid rgba(201,169,97,.45);padding:.5rem .85rem;white-space:nowrap;
+}
+.rows{padding:clamp(.6rem,2vw,1.2rem) clamp(1.6rem,3.6vw,3rem) clamp(1.8rem,3.6vw,2.6rem)}
+.row{display:grid;grid-template-columns:200px 1fr;gap:1.2rem 2.4rem;padding:1.2rem 0;border-bottom:1px solid rgba(169,133,68,.2)}
+.row:last-child{border-bottom:0}
+@media(max-width:680px){.row{grid-template-columns:1fr;gap:.35rem}}
+.row dt{margin:0}
+.row dd{margin:0;font-size:1.04rem}
+.row dd small{display:block;font-size:.9rem;color:var(--muted);font-style:italic;margin-top:.2rem}
+.row a{color:var(--forest-2);text-decoration:none;border-bottom:1px solid var(--gold);transition:color .3s}
+.row a:hover{color:var(--gold)}
+.chips{display:flex;flex-wrap:wrap;gap:.5rem;margin:0;padding:0;list-style:none}
+.chips li{
+  font-family:var(--sans);font-size:.58rem;letter-spacing:.16em;text-transform:uppercase;
+  border:1px solid var(--rule);padding:.42rem .72rem;color:var(--forest-2);
+}
+.dish-lines{margin:0;padding:0;list-style:none}
+.dish-lines li{padding:.28rem 0}
+.dish-lines i{color:var(--muted);font-size:.93rem}
+.panel-foot{
+  border-top:1px solid var(--rule);padding:1.1rem clamp(1.6rem,3.6vw,3rem);
+  display:flex;flex-wrap:wrap;gap:.6rem 1.8rem;justify-content:space-between;
+  background:var(--ivory-2);
+}
+
+/* ── Section 5: closing ── */
+.closing{position:relative;text-align:center;overflow:hidden}
+.closing .closing-art{position:absolute;inset:0;width:100%;height:100%;opacity:.42}
+.closing::after{content:"";position:absolute;inset:0;background:radial-gradient(70% 60% at 50% 50%,transparent,rgba(8,24,15,.66));pointer-events:none}
+.closing .wrap{position:relative;z-index:2}
+.closing h2{color:var(--ivory);max-width:17ch;margin-inline:auto;font-style:italic}
+.closing p{color:rgba(236,228,211,.82);margin-top:1.9rem;font-size:clamp(1.08rem,1.7vw,1.3rem)}
+.colophon{
+  margin-top:clamp(3rem,7vw,4.6rem);padding-top:1.7rem;border-top:1px solid rgba(201,169,97,.3);
+  font-family:var(--sans);font-size:.58rem;letter-spacing:.26em;text-transform:uppercase;
+  color:rgba(228,210,166,.6);display:flex;flex-wrap:wrap;gap:.6rem 2rem;justify-content:center;
+}
+
+/* ─────────────────────────────  MOTION  ───────────────────────────── */
+.rise{opacity:0;transform:translateY(22px);transition:opacity 1s cubic-bezier(.22,.61,.36,1),transform 1s cubic-bezier(.22,.61,.36,1);transition-delay:var(--d,0ms)}
+.rise.in{opacity:1;transform:none}
+@media(prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .rise{opacity:1;transform:none;transition:none}
+  .scroll-cue i{animation:none}
+}
+</style>
+</head>
+<body>
+
+<svg class="grain" aria-hidden="true" focusable="false">
+  <filter id="grainf"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter>
+  <rect width="100%" height="100%" filter="url(#grainf)"/>
+</svg>
+
+<!-- ══════════════ NAV ══════════════ -->
+<header class="topbar">
+  <div class="wrap">
+    <div class="mark"><b>The Art of Indian Dining</b><span class="mark-sfx"> &nbsp;·&nbsp; Editorial Portfolio</span></div>
+    <nav aria-label="Sections">
+      <ul>
+        <li><a href="#portfolio">Profiles</a></li>
+        <li><a href="#revision">Revision</a></li>
+        <li><a href="#listing">Listing</a></li>
+        <li><a href="#closing">Closing</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<!-- ══════════════ SECTION 1 — HERO ══════════════ -->
+<section class="hero" id="masthead">
+  <svg class="hero-art" viewBox="0 0 1200 620" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <defs>
+      <linearGradient id="hg" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#1E4530"/><stop offset="55%" stop-color="#12301E"/><stop offset="100%" stop-color="#081A10"/>
+      </linearGradient>
+      <pattern id="jali" width="56" height="96" patternUnits="userSpaceOnUse">
+        <path d="M28 2 C46 20 46 40 28 50 C10 40 10 20 28 2 Z" fill="none" stroke="#C9A961" stroke-width=".7" opacity=".5"/>
+        <path d="M28 50 C46 66 46 84 28 94 C10 84 10 66 28 50 Z" fill="none" stroke="#C9A961" stroke-width=".7" opacity=".28"/>
+        <circle cx="28" cy="50" r="1.6" fill="#C9A961" opacity=".55"/>
+      </pattern>
+    </defs>
+    <rect width="1200" height="620" fill="url(#hg)"/>
+    <rect width="1200" height="620" fill="url(#jali)" opacity=".5"/>
+    <g fill="none" stroke="#C9A961" opacity=".30">
+      <path d="M600 596 V300 a150 150 0 0 1 300 0 V596" stroke-width="1"/>
+      <path d="M600 596 V300 a150 150 0 0 0 -300 0 V596" stroke-width="1"/>
+      <path d="M600 596 V360 a92 92 0 0 1 184 0 V596" stroke-width=".6"/>
+      <path d="M600 596 V360 a92 92 0 0 0 -184 0 V596" stroke-width=".6"/>
+    </g>
+    <g stroke="#E4D2A6" opacity=".2">
+      <line x1="0" y1="596" x2="1200" y2="596" stroke-width="1"/>
+      <line x1="0" y1="586" x2="1200" y2="586" stroke-width=".4"/>
+    </g>
+  </svg>
+
+  <div class="wrap">
+    <div class="hero-frame rise">
+      <p class="eyebrow pale">Restaurant Writing &nbsp;·&nbsp; Research, Profiles &amp; Listings</p>
+      <h1>The Art of<br><em>Indian Dining</em></h1>
+      <p class="hero-sub">Exceptional restaurants. Remarkable stories.</p>
+    </div>
+    <div class="hero-meta rise" style="--d:180ms">
+      <span>Two Original Profiles</span>
+      <span>One Rewritten Listing</span>
+      <span>One Maintained Record</span>
+      <span>Autumn 2026</span>
+    </div>
+    <a class="scroll-cue rise" href="#portfolio" style="--d:320ms">Begin<i></i></a>
+  </div>
+</section>
+
+<!-- ══════════════ INTRO / STANDFIRST ══════════════ -->
+<section class="band">
+  <div class="wrap">
+    <div class="standfirst">
+      <div class="rise">
+        <p class="eyebrow">The Brief</p>
+        <p class="kicker">A restaurant guide is only as good as the sentence a reader remembers on the way to the table.</p>
+      </div>
+      <div class="rise" style="--d:140ms">
+        <p class="lede">This is a working portfolio of restaurant writing for a fine-dining guide: profiles researched and written from nothing, a weak listing rebuilt without inventing a single new claim, and an entry maintained to the standard a guide has to defend months after publication.</p>
+        <p>Three pieces of work follow. Read them the way an editor would — for specificity, for restraint, and for whether the writing gives a reader an actual reason to book. The establishments here are invented for the purpose; the craft is not.</p>
+        <div class="orn short"><span></span></div>
+      </div>
+    </div>
+
+    <figure class="cover rise" style="--d:200ms">
+      <div class="plate p-cover">
+        <svg viewBox="0 0 1400 534" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+          <defs>
+            <linearGradient id="cg" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#20482F"/><stop offset="60%" stop-color="#12301E"/><stop offset="100%" stop-color="#07170E"/>
+            </linearGradient>
+            <radialGradient id="flame" cx="50%" cy="86%" r="52%">
+              <stop offset="0%" stop-color="#E9B96A" stop-opacity=".55"/><stop offset="100%" stop-color="#E9B96A" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <rect width="1400" height="534" fill="url(#cg)"/>
+          <g fill="none" stroke="#C9A961" opacity=".26">
+            <path d="M170 534 V250 a90 90 0 0 1 180 0 V534"/><path d="M430 534 V210 a120 120 0 0 1 240 0 V534"/>
+            <path d="M740 534 V210 a120 120 0 0 1 240 0 V534"/><path d="M1050 534 V250 a90 90 0 0 1 180 0 V534"/>
+          </g>
+          <g stroke="#E4D2A6" opacity=".16">
+            <line x1="0" y1="430" x2="1400" y2="430"/><line x1="0" y1="438" x2="1400" y2="438" stroke-width=".4"/>
+          </g>
+          <g fill="#E4D2A6" opacity=".5">
+            <circle cx="260" cy="470" r="3"/><circle cx="550" cy="470" r="3"/><circle cx="860" cy="470" r="3"/><circle cx="1140" cy="470" r="3"/>
+          </g>
+          <rect width="1400" height="534" fill="url(#flame)"/>
+        </svg>
+        <span class="stamp">Plate I — Talao House, Udaipur</span>
+      </div>
+      <figcaption>The courtyard at Talao House, lit for the winter service. Braziers are set out from November; the upper terrace opens only when the wind allows.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ══════════════ SECTION 2 — PROFILES ══════════════ -->
+<section class="band tint" id="portfolio">
+  <div class="wrap">
+    <div class="sec-head rise">
+      <p class="eyebrow">Section Two</p>
+      <h2>Restaurant Profiles</h2>
+      <p class="lede">Two houses working at the top of their form, and nothing alike. Written to be read once and acted upon.</p>
+      <div class="orn"><span></span></div>
+    </div>
+
+    <!-- ── Profile 01 ── -->
+    <article class="profile">
+      <figure class="p-media rise">
+        <div class="plate p-haveli">
+          <svg viewBox="0 0 800 1000" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+            <defs>
+              <linearGradient id="hv" x1="0" y1="0" x2="0.4" y2="1">
+                <stop offset="0%" stop-color="#5A3617"/><stop offset="48%" stop-color="#2E1B0D"/><stop offset="100%" stop-color="#110B05"/>
+              </linearGradient>
+              <radialGradient id="ember" cx="30%" cy="74%" r="46%">
+                <stop offset="0%" stop-color="#F2B95E" stop-opacity=".62"/><stop offset="100%" stop-color="#F2B95E" stop-opacity="0"/>
+              </radialGradient>
+              <pattern id="lattice" width="48" height="48" patternUnits="userSpaceOnUse">
+                <path d="M24 0 L48 24 L24 48 L0 24 Z" fill="none" stroke="#E7C98A" stroke-width=".6" opacity=".45"/>
+                <circle cx="24" cy="24" r="4" fill="none" stroke="#E7C98A" stroke-width=".5" opacity=".3"/>
+              </pattern>
+            </defs>
+            <rect width="800" height="1000" fill="url(#hv)"/>
+            <rect x="70" y="120" width="660" height="470" fill="url(#lattice)" opacity=".5"/>
+            <g fill="none" stroke="#E7C98A" opacity=".42">
+              <path d="M150 1000 V430 a105 105 0 0 1 210 0 V1000" stroke-width="1.1"/>
+              <path d="M440 1000 V430 a105 105 0 0 1 210 0 V1000" stroke-width="1.1"/>
+              <path d="M150 430 h500" stroke-width=".5" opacity=".5"/>
+            </g>
+            <g stroke="#E7C98A" opacity=".26">
+              <line x1="0" y1="808" x2="800" y2="808"/><line x1="0" y1="818" x2="800" y2="818" stroke-width=".4"/>
+            </g>
+            <g fill="#F2B95E" opacity=".62">
+              <circle cx="255" cy="880" r="5"/><circle cx="545" cy="880" r="5"/><circle cx="400" cy="920" r="3.2"/>
+            </g>
+            <rect width="800" height="1000" fill="url(#ember)"/>
+          </svg>
+          <span class="stamp">Talao House — the lower courtyard</span>
+        </div>
+        <figcaption>Brass service and coal heat: the kitchen works from a single fire pit set into the courtyard floor.</figcaption>
+      </figure>
+
+      <div class="p-body rise" style="--d:140ms">
+        <p class="p-num">No. 01 &nbsp;/&nbsp; Restaurant Profile</p>
+        <h3>Talao House</h3>
+        <p class="p-place"><b>Udaipur, Rajasthan</b> &nbsp;·&nbsp; Rajput hunting-kitchen cooking &nbsp;·&nbsp; Dinner only, Tuesday to Sunday</p>
+        <div class="orn short left"><span></span></div>
+
+        <div class="p-desc">
+          <p>Talao House occupies the lake-facing wing of an 1890s merchant's haveli, and it has kept the building's habits: thick walls, small windows, a courtyard that holds the day's heat until well past ten. The kitchen cooks the way Rajput hunting camps did — few ingredients, a great deal of fire, and chilli used for depth rather than dare. Mutton is buried in coals, then finished in its own fat with Mathania chilli and a fistful of garlic. There is no tasting menu and no sequence to defend; dishes arrive on brass as they are ready, and nobody rushes you through them. Winter is the season to come, when the braziers are lit and the water below turns the colour of weak tea. Ask for the corner table on the upper terrace.</p>
+        </div>
+
+        <p class="label" style="margin-top:2.2rem">Signature Dishes</p>
+        <ul class="dishes">
+          <li><div><b>Jungli Maas</b><span>Mutton buried in coals, finished in its own fat</span></div></li>
+          <li><div><b>Safed Maas</b><span>Almond, yoghurt and white pepper — no chilli at all</span></div></li>
+          <li><div><b>Ker Sangri</b><span>Desert berry and bean, smoked with ghee and red chilli</span></div></li>
+          <li><div><b>Bajra Sogra</b><span>Millet bread pressed by hand, white butter, jaggery</span></div></li>
+        </ul>
+
+        <div class="atmos">
+          <p class="label">Dining Atmosphere</p>
+          <p>Firelit and unhurried. Forty covers across a stone courtyard and an upper terrace, brass service, and a noise level that suits a table of four far better than a table of twenty.</p>
+        </div>
+      </div>
+    </article>
+
+    <!-- ── Profile 02 ── -->
+    <article class="profile flip">
+      <figure class="p-media rise">
+        <div class="plate p-counter">
+          <svg viewBox="0 0 800 1000" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+            <defs>
+              <linearGradient id="cn" x1="0" y1="0" x2="0.3" y2="1">
+                <stop offset="0%" stop-color="#EDE6D8"/><stop offset="52%" stop-color="#C9C1AE"/><stop offset="100%" stop-color="#7E7A69"/>
+              </linearGradient>
+              <pattern id="grainjar" width="80" height="80" patternUnits="userSpaceOnUse">
+                <rect x="14" y="10" width="52" height="60" rx="5" fill="none" stroke="#4A4636" stroke-width=".8" opacity=".33"/>
+                <line x1="14" y1="26" x2="66" y2="26" stroke="#4A4636" stroke-width=".6" opacity=".22"/>
+                <circle cx="40" cy="48" r="10" fill="#4A4636" opacity=".08"/>
+              </pattern>
+            </defs>
+            <rect width="800" height="1000" fill="url(#cn)"/>
+            <rect x="0" y="60" width="800" height="480" fill="url(#grainjar)"/>
+            <g stroke="#3E3A2C" opacity=".38">
+              <line x1="0" y1="640" x2="800" y2="640" stroke-width="2.4"/>
+              <line x1="0" y1="652" x2="800" y2="652" stroke-width=".6"/>
+            </g>
+            <g fill="none" stroke="#3E3A2C" opacity=".26">
+              <circle cx="180" cy="730" r="44"/><circle cx="400" cy="730" r="44"/><circle cx="620" cy="730" r="44"/>
+              <circle cx="180" cy="730" r="20" opacity=".6"/><circle cx="400" cy="730" r="20" opacity=".6"/><circle cx="620" cy="730" r="20" opacity=".6"/>
+            </g>
+            <g fill="#3E3A2C" opacity=".2">
+              <ellipse cx="140" cy="880" rx="7" ry="4"/><ellipse cx="200" cy="900" rx="7" ry="4"/><ellipse cx="270" cy="876" rx="7" ry="4"/>
+              <ellipse cx="520" cy="892" rx="7" ry="4"/><ellipse cx="596" cy="874" rx="7" ry="4"/><ellipse cx="660" cy="902" rx="7" ry="4"/>
+            </g>
+          </svg>
+          <span class="stamp">Anaaj — the counter, before service</span>
+        </div>
+        <figcaption>Fourteen seats, one pass. Batters are dated on the jar and pulled in strict order.</figcaption>
+      </figure>
+
+      <div class="p-body rise" style="--d:140ms">
+        <p class="p-num">No. 02 &nbsp;/&nbsp; Restaurant Profile</p>
+        <h3>Anaaj</h3>
+        <p class="p-place"><b>Bengaluru, Karnataka</b> &nbsp;·&nbsp; Grain-led modern Indian &nbsp;·&nbsp; Two seatings nightly, fourteen covers</p>
+        <div class="orn short left"><span></span></div>
+
+        <div class="p-desc">
+          <p>Anaaj seats fourteen along a single counter of unpolished teak, in a room smaller than most kitchens on the same street. Rukmini Iyer built the restaurant around two things: grain — kodo, foxtail, little millet, red rice, wheats that dropped out of commercial milling decades ago — and the slow chemistry of ferment. Batters are aged for days and labelled like wine. The cooking is quiet and exact: a dosa the thickness of paper, roasted barley broth clarified until it reads as consommé, cultured buffalo butter smoked over rice husk. Portions are small, the pacing is deliberate, and dinner runs close to three hours. It suits people who want to taste the difference between two millets and are pleased, rather than embarrassed, when they can.</p>
+        </div>
+
+        <p class="label" style="margin-top:2.2rem">Signature Dishes</p>
+        <ul class="dishes">
+          <li><div><b>Kodo Dosa</b><span>Forty-hour batter, smoked cultured buffalo butter</span></div></li>
+          <li><div><b>Barley Broth</b><span>Roasted grain, charred spring onion, clarified twice</span></div></li>
+          <li><div><b>Red Rice Kanji</b><span>Fermented mango, curry-leaf oil, served cold</span></div></li>
+          <li><div><b>Little Millet Kheer</b><span>Palm jaggery, toasted sesame, no cream</span></div></li>
+        </ul>
+
+        <div class="atmos">
+          <p class="label">Dining Atmosphere</p>
+          <p>Bright, spare and close. One wall of labelled grain jars, fourteen stools facing the pass, and a room quiet enough that the kitchen's timing becomes part of the meal.</p>
+        </div>
+      </div>
+    </article>
+  </div>
+</section>
+
+<!-- ══════════════ SECTION 3 — BEFORE / AFTER ══════════════ -->
+<section class="band" id="revision">
+  <div class="wrap">
+    <div class="sec-head rise">
+      <p class="eyebrow">Section Three</p>
+      <h2>Improving an Existing Profile</h2>
+      <p class="lede">The same restaurant, the same facts, and nothing added that the original did not already support. Only the writing changes.</p>
+      <div class="orn"><span></span></div>
+    </div>
+
+    <div style="text-align:center" class="rise">
+      <div class="seg" role="group" aria-label="Comparison view">
+        <button type="button" data-view="before">Before</button>
+        <button type="button" data-view="after">After</button>
+        <button type="button" data-view="both" class="on">Side by Side</button>
+      </div>
+    </div>
+
+    <div class="compare" id="compare" data-view="both">
+      <div class="col before rise">
+        <header>
+          <h4>Before</h4>
+          <span class="wc">35 words &nbsp;·&nbsp; as supplied</span>
+        </header>
+        <p class="text">Pepper Vine is a good seafood restaurant in Fort Kochi. They serve tasty Kerala dishes with a fresh daily catch and traditional spices. The ambience is nice, the staff are friendly, and families are welcome.</p>
+        <p class="label" style="margin-top:auto;padding-top:1.6rem">Reader's takeaway — none</p>
+      </div>
+
+      <div class="col after rise" style="--d:140ms">
+        <header>
+          <h4>After</h4>
+          <span class="wc">124 words &nbsp;·&nbsp; rewritten</span>
+        </header>
+        <p class="text">Pepper Vine is a seafood house in Fort Kochi where the day's catch sets the menu — the board is rewritten rather than reprinted. The cooking sits in the traditional Kerala register: black pepper, curry leaf, green chilli, coconut and tamarind, used to sharpen the fish rather than cover it. Order whole and let the kitchen decide the treatment. The room is low-lit and unhurried, the sort of place where a table stays yours for the evening, and the staff will talk you through the catch without being asked twice. Children are genuinely welcome here rather than merely tolerated — a distinction most families learn to test for. Come early for the quieter half of the room; come late if you would rather have the noise.</p>
+        <p class="label" style="margin-top:auto;padding-top:1.6rem">Reader's takeaway — what to order, and when to arrive</p>
+      </div>
+    </div>
+
+    <div class="changes narrow rise">
+      <p class="eyebrow">What Changed</p>
+      <ul>
+        <li>Verdicts became evidence. &ldquo;Tasty&rdquo; and &ldquo;nice&rdquo; ask the reader to take the guide's word for it; a named spice register does not.</li>
+        <li>&ldquo;Fresh daily catch&rdquo; was turned into a reason to order differently, rather than a claim to skim past.</li>
+        <li>&ldquo;Families are welcome&rdquo; was given a testable meaning — the line a parent is actually reading for.</li>
+        <li>The entry now ends in a decision: when to walk in, and what to leave to the kitchen.</li>
+        <li>Rhythm was varied deliberately, so the paragraph reads aloud without flattening.</li>
+        <li>Nothing was invented. No awards, no chef biography, no prices, no history.</li>
+      </ul>
+      <p class="note">Editorial discipline: every element of the revision traces back to the supplied entry — location, cuisine, daily catch, Kerala spicing, atmosphere, service, families. A rewrite that adds unverified facts is not an improvement; it is a liability the guide has to defend later.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ SECTION 4 — LISTING ══════════════ -->
+<section class="band tint" id="listing">
+  <div class="wrap">
+    <div class="sec-head rise">
+      <p class="eyebrow">Section Four</p>
+      <h2>Restaurant Information</h2>
+      <p class="lede">The record behind the entry — structured so a reader can act on it and an editor can re-verify it.</p>
+      <div class="orn"><span></span></div>
+    </div>
+
+    <div class="panel rise">
+      <div class="panel-top">
+        <div>
+          <p class="eyebrow pale" style="margin-bottom:.7rem">Guide Entry &nbsp;·&nbsp; KL-0147</p>
+          <h3>Pepper Vine</h3>
+          <p class="sub">Seafood house &nbsp;·&nbsp; Fort Kochi</p>
+        </div>
+        <span class="verified">Verified &nbsp;·&nbsp; Editorial Desk</span>
+      </div>
+
+      <dl class="rows">
+        <div class="row">
+          <dt class="label">Cuisine</dt>
+          <dd>Coastal Keralan seafood<small>Malabar and Cochin traditions; pepper-led rather than chilli-led</small></dd>
+        </div>
+        <div class="row">
+          <dt class="label">Location</dt>
+          <dd>14 Bastion Lane, Fort Kochi, Kerala 682001<small>Ground floor of a converted spice godown; step-free entrance from the lane</small></dd>
+        </div>
+        <div class="row">
+          <dt class="label">Signature Dishes</dt>
+          <dd>
+            <ul class="dish-lines">
+              <li>Karimeen Pollichathu &nbsp;<i>— pearl spot, banana leaf, charred to order</i></li>
+              <li>Pepper Crab &nbsp;<i>— Tellicherry peppercorn, curry leaf, coconut oil</i></li>
+              <li>Meen Moilee &nbsp;<i>— coconut milk, green chilli, turmeric; deliberately mild</i></li>
+              <li>Chemmeen Manga Curry &nbsp;<i>— prawn and raw mango, seasonal</i></li>
+            </ul>
+          </dd>
+        </div>
+        <div class="row">
+          <dt class="label">Dining Style</dt>
+          <dd>
+            <ul class="chips">
+              <li>Relaxed fine dining</li><li>Reservations advised</li><li>Family friendly</li><li>Dinner &amp; late lunch</li><li>Smart casual</li>
+            </ul>
+          </dd>
+        </div>
+        <div class="row">
+          <dt class="label">Website</dt>
+          <dd><a href="#listing" onclick="return false;">peppervine.example</a><small>Illustrative address — reservations page and seasonal notes</small></dd>
+        </div>
+        <div class="row">
+          <dt class="label">Menu</dt>
+          <dd><a href="#listing" onclick="return false;">peppervine.example/menu</a><small>À la carte, rewritten daily against the catch · set seafood menu for four, by arrangement</small></dd>
+        </div>
+        <div class="row">
+          <dt class="label">Last Reviewed</dt>
+          <dd>14 September 2026<small>Hours, dish names and links confirmed at review · next verification due March 2027</small></dd>
+        </div>
+      </dl>
+
+      <div class="panel-foot">
+        <span class="label">Entry written &amp; maintained by the editorial desk</span>
+        <span class="label">Revision 4 &nbsp;·&nbsp; Accuracy confirmed</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ SECTION 5 — CLOSING ══════════════ -->
+<section class="band dark closing" id="closing">
+  <svg class="closing-art" viewBox="0 0 1400 600" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <defs>
+      <pattern id="jali2" width="64" height="110" patternUnits="userSpaceOnUse">
+        <path d="M32 3 C52 23 52 45 32 57 C12 45 12 23 32 3 Z" fill="none" stroke="#C9A961" stroke-width=".6" opacity=".4"/>
+        <path d="M32 57 C52 75 52 96 32 107 C12 96 12 75 32 57 Z" fill="none" stroke="#C9A961" stroke-width=".6" opacity=".22"/>
+      </pattern>
+    </defs>
+    <rect width="1400" height="600" fill="#12301E"/>
+    <rect width="1400" height="600" fill="url(#jali2)"/>
+  </svg>
+  <div class="wrap">
+    <p class="eyebrow pale rise">In Closing</p>
+    <h2 class="rise" style="--d:100ms">Every restaurant has a story worth telling.</h2>
+    <p class="rise narrow" style="--d:200ms">Thoughtful research. Distinctive writing. Restaurant profiles that remain relevant.</p>
+    <div class="colophon rise" style="--d:300ms">
+      <span>The Art of Indian Dining</span>
+      <span>Editorial Portfolio</span>
+      <span>Restaurant Research &amp; Copywriting</span>
+    </div>
+  </div>
+</section>
+
+<script>
+/* entrance animations */
+(function(){
+  var items = document.querySelectorAll('.rise');
+  if(!('IntersectionObserver' in window)){
+    items.forEach(function(el){ el.classList.add('in'); });
+    return;
+  }
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); }
+    });
+  },{ threshold:0.12, rootMargin:'0px 0px -8% 0px' });
+  items.forEach(function(el){ io.observe(el); });
+})();
+
+/* before / after comparison toggle */
+(function(){
+  var panel = document.getElementById('compare');
+  var btns = document.querySelectorAll('.seg button');
+  btns.forEach(function(b){
+    b.addEventListener('click', function(){
+      btns.forEach(function(x){ x.classList.toggle('on', x === b); });
+      panel.setAttribute('data-view', b.getAttribute('data-view'));
+    });
+  });
+})();
+</script>
+</body>
+</html>
