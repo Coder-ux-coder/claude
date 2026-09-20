@@ -1,0 +1,92 @@
+# Builds Shape for macOS, Windows and Linux when a version tag is pushed.
+#
+#   git tag shape-v1.0.0 && git push origin shape-v1.0.0
+#
+# Blender is not bundled: it is a separate free install, and the app asks for
+# it on first run. That keeps the download around 20 MB instead of 300 MB.
+
+name: Shape release
+
+on:
+  push:
+    tags: ["shape-v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            asset: shape-macos-arm64
+          - os: windows-latest
+            asset: shape-windows-x64
+          - os: ubuntu-latest
+            asset: shape-linux-x64
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: shape
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: python -m pip install --upgrade pip anthropic pyinstaller
+
+      - name: Check the guard still refuses what it should
+        run: python -c "import guard; assert guard.check('import os'); assert not guard.check('import bpy'); print('guard ok')"
+
+      - name: Build
+        run: pyinstaller --noconfirm shape.spec
+
+      - name: It starts
+        shell: bash
+        run: |
+          ./dist/shape --version
+          ./dist/shape --no-browser --port 7099 &
+          sleep 6
+          curl -fsS http://127.0.0.1:7099/settings > /dev/null
+          echo "the app answers"
+
+      - name: Name it
+        shell: bash
+        run: |
+          mkdir -p out
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cp dist/shape.exe "out/${{ matrix.asset }}.exe"
+          else
+            cp dist/shape "out/${{ matrix.asset }}"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: shape/out/*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: downloads
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: downloads/**/*
+          body: |
+            Download the file for your computer, then open it. Shape opens in your browser.
+
+            You will need two things on first run: [Blender](https://www.blender.org/download/),
+            which is free, and a Claude key from
+            [console.anthropic.com](https://console.anthropic.com/settings/keys). The app asks
+            for both and remembers them.
+
+            Your key and everything you make stay on your computer.

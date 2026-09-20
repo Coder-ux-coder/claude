@@ -105,20 +105,94 @@ figcaption{
 .keybox{border:1px solid var(--line);background:var(--card);border-radius:10px;
   padding:14px 16px;margin-bottom:20px;box-shadow:var(--shadow)}
 .keybox p{margin:0 0 9px;font-size:14px;color:var(--muted)}
+
+.setup{border:1px solid var(--line);background:var(--card);border-radius:12px;
+  padding:20px;margin-bottom:26px;box-shadow:var(--shadow)}
+.setup h2{margin:0 0 4px;font-size:19px;font-weight:600}
+.setup .why{margin:0 0 16px;color:var(--muted);font-size:15px}
+.field{margin-bottom:16px}
+.field label{display:block;margin-bottom:6px;font-size:14px;color:var(--muted)}
+.field .note{margin-top:6px;font-size:13px;color:var(--faint);line-height:1.5}
+.field a{color:var(--accent)}
+.status{display:flex;align-items:center;gap:8px;font-size:15px}
+.status .dot{width:8px;height:8px;border-radius:50%;background:var(--faint);flex:0 0 auto}
+.status.on .dot{background:var(--accent)}
+.status.off .dot{background:var(--bad)}
+.status code{font-family:var(--mono);font-size:12.5px;color:var(--muted);
+  overflow-wrap:anywhere}
+.choices{display:flex;gap:8px;flex-wrap:wrap}
+.choice{border:1px solid var(--line);background:transparent;border-radius:9px;
+  padding:9px 14px;font-size:14px;font-weight:500;color:var(--muted)}
+.choice[aria-pressed="true"]{border-color:var(--accent);color:var(--ink);
+  box-shadow:inset 0 0 0 1px var(--accent)}
+.gear{background:none;border:none;color:var(--muted);font-size:14px;font-weight:500;
+  padding:4px 0;text-decoration:underline;text-underline-offset:3px}
+.gear:hover{color:var(--ink)}
+.titlerow{display:flex;align-items:baseline;justify-content:space-between;gap:16px}
+
+#past{margin-top:40px;border-top:1px solid var(--line);padding-top:22px}
+#past h2{margin:0 0 12px;font-size:14px;font-weight:500;color:var(--muted)}
+.strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:10px}
+.past{position:relative;padding:0;border:1px solid var(--line);border-radius:10px;
+  overflow:hidden;background:var(--sunk);display:block;width:100%}
+.past img{display:block;width:100%;aspect-ratio:1;object-fit:cover}
+.past span{display:block;padding:7px 8px;font-size:12px;color:var(--muted);
+  text-align:left;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.past:hover{border-color:var(--accent)}
+.past:hover span{color:var(--ink)}
+.spend{font-family:var(--mono);font-size:13px;color:var(--faint);margin-top:14px}
 footer{margin-top:38px;color:var(--faint);font-size:13px;line-height:1.6}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <h1>Shape<span>.</span></h1>
+    <div class="titlerow">
+      <h1>Shape<span>.</span></h1>
+      <button class="gear" id="openSetup" type="button" hidden>Settings</button>
+    </div>
     <p class="blurb">Say what you want. Claude builds it in Blender and shows you.</p>
   </header>
 
-  <div class="keybox" id="keybox" hidden>
-    <p>Paste your Claude key to start. It is used for your request and never saved.</p>
-    <input type="password" id="key" placeholder="sk-ant-..." autocomplete="off" spellcheck="false">
-  </div>
+  <section class="setup" id="setup" hidden>
+    <h2 id="setupTitle">Connect your Claude account</h2>
+    <p class="why" id="setupWhy">Shape uses your own Claude account to write the
+      script that builds each object. You pay Claude directly for what you make.</p>
+
+    <div class="field">
+      <label for="key">Your Claude key</label>
+      <input type="password" id="key" placeholder="sk-ant-..." autocomplete="off" spellcheck="false">
+      <p class="note">Get one at <a href="https://console.anthropic.com/settings/keys"
+        target="_blank" rel="noreferrer">console.anthropic.com</a>. It is saved on this
+        computer only, in a file just your account can read, and is never sent anywhere
+        but Claude.</p>
+    </div>
+
+    <div class="field">
+      <label>Blender</label>
+      <div class="status" id="blenderStatus"><span class="dot"></span><span id="blenderText"></span></div>
+      <div id="blenderFix" hidden>
+        <input type="text" id="blenderPath" placeholder="/Applications/Blender.app/Contents/MacOS/Blender"
+               spellcheck="false" style="margin-top:8px">
+        <p class="note">Shape needs Blender to build things. It is free:
+          <a href="https://www.blender.org/download/" target="_blank" rel="noreferrer">blender.org/download</a>.
+          Install it and press Save, or type where it is.</p>
+      </div>
+    </div>
+
+    <div class="field" id="modelField">
+      <label>Which Claude</label>
+      <div class="choices" id="models"></div>
+      <p class="note">Most objects cost a few cents either way. Shape shows what each one cost.</p>
+    </div>
+
+    <div class="row">
+      <button class="go" id="saveSetup" type="button">Save</button>
+      <button class="plain" id="closeSetup" type="button" hidden>Close</button>
+      <button class="plain" id="forgetKey" type="button" hidden>Disconnect</button>
+    </div>
+    <p class="note" id="setupProblem" style="color:var(--bad)" hidden></p>
+  </section>
 
   <div class="stage" id="stage" hidden><span class="pulse"></span><span id="stageText">Starting</span></div>
 
@@ -144,8 +218,14 @@ footer{margin-top:38px;color:var(--faint);font-size:13px;line-height:1.6}
     <div class="tries" id="tries"></div>
   </form>
 
+  <section id="past" hidden>
+    <h2>Made before</h2>
+    <div class="strip" id="strip"></div>
+    <p class="spend" id="spend"></p>
+  </section>
+
   <footer>
-    Built by Claude, run by Blender on this machine. The script is checked before it runs.
+    Runs on this computer. Your key and everything you make stay here.
   </footer>
 </div>
 
@@ -158,14 +238,11 @@ const EXAMPLES = [
   'a stack of five river stones',
 ];
 
-let current = null;          // the job showing right now
-let changing = false;        // the next Make is a change to `current`
-let hasServerKey = false;
+let conf = null;       // what the app knows about this machine
+let current = null;    // the object on screen
+let changing = false;  // the next Make changes it rather than replacing it
 
-fetch('/state').then(r => r.json()).then(s => {
-  hasServerKey = s.hasKey;
-  $('keybox').hidden = s.hasKey;
-}).catch(() => { $('keybox').hidden = false; });
+const money = (n) => n < 0.01 ? 'under a cent' : '$' + n.toFixed(2);
 
 for (const text of EXAMPLES) {
   const b = document.createElement('button');
@@ -174,6 +251,105 @@ for (const text of EXAMPLES) {
   $('tries').appendChild(b);
 }
 
+/* ---------------------------------------------------------------- settings */
+const ready = () => conf && conf.keySet && conf.blenderOk;
+
+async function loadSettings() {
+  conf = await (await fetch('/settings')).json();
+  paintSetup();
+  $('openSetup').hidden = false;
+  if (!ready()) openSetup(true); else closeSetup();
+}
+
+function paintSetup() {
+  $('key').placeholder = conf.keySet ? 'Connected ' + conf.keyHint : 'sk-ant-...';
+  $('forgetKey').hidden = !conf.keySet;
+
+  // Rebuilt rather than appended to, so opening Settings twice does not
+  // leave two copies of the path on screen.
+  const st = $('blenderStatus');
+  st.className = 'status ' + (conf.blenderOk ? 'on' : 'off');
+  st.replaceChildren();
+  const dot = document.createElement('span');
+  dot.className = 'dot';
+  const text = document.createElement('span');
+  text.id = 'blenderText';
+  text.textContent = conf.blenderOk ? 'Found it' : 'Not found';
+  st.append(dot, text);
+  if (conf.blenderOk) {
+    const where = document.createElement('code');
+    where.textContent = conf.blender;
+    st.append(where);
+  }
+  $('blenderFix').hidden = conf.blenderOk;
+
+  const host = $('models');
+  host.innerHTML = '';
+  for (const m of conf.models) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'choice'; b.textContent = m.name;
+    b.setAttribute('aria-pressed', String(m.id === conf.model));
+    b.addEventListener('click', () => {
+      conf.model = m.id;
+      for (const other of host.children) other.setAttribute('aria-pressed', 'false');
+      b.setAttribute('aria-pressed', 'true');
+    });
+    host.appendChild(b);
+  }
+}
+
+function openSetup(firstRun) {
+  $('setup').hidden = false;
+  $('setupTitle').textContent = firstRun ? 'Connect your Claude account' : 'Settings';
+  $('setupWhy').hidden = !firstRun;
+  $('closeSetup').hidden = !!firstRun;
+  $('form').hidden = true;
+  $('result').hidden = true;
+  $('past').hidden = true;
+  $('setupProblem').hidden = true;
+  if (!conf.keySet) $('key').focus();
+}
+
+function closeSetup() {
+  $('setup').hidden = true;
+  $('form').hidden = false;
+  loadHistory();
+}
+
+$('openSetup').addEventListener('click', () => openSetup(false));
+$('closeSetup').addEventListener('click', closeSetup);
+
+$('saveSetup').addEventListener('click', async () => {
+  const payload = { model: conf.model };
+  const key = $('key').value.trim();
+  if (key) payload.key = key;
+  const where = $('blenderPath').value.trim();
+  if (where) payload.blender = where;
+
+  const res = await fetch('/settings', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    $('setupProblem').textContent = data.error;
+    $('setupProblem').hidden = false;
+    return;
+  }
+  $('key').value = '';
+  $('blenderPath').value = '';
+  await loadSettings();
+});
+
+$('forgetKey').addEventListener('click', async () => {
+  await fetch('/settings', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ forgetKey: true }),
+  });
+  await loadSettings();
+});
+
+/* ----------------------------------------------------------------- making */
 function show(state) {
   $('stage').hidden = state !== 'working';
   $('result').hidden = state !== 'done';
@@ -186,17 +362,10 @@ $('form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const prompt = $('prompt').value.trim();
   if (!prompt) return;
-  const key = $('key') ? $('key').value.trim() : '';
-  if (!hasServerKey && !key) {
-    $('problem').textContent = 'Add your Claude key first.';
-    show('failed');
-    return;
-  }
 
   show('working');
   $('stageText').textContent = 'Starting';
   const body = { prompt };
-  if (key) body.key = key;
   if (changing && current) body.changeOf = current;
 
   let id;
@@ -211,6 +380,7 @@ $('form').addEventListener('submit', async (e) => {
   } catch (err) {
     $('problem').textContent = err.message;
     show('failed');
+    if (/Claude account/i.test(err.message)) openSetup(true);
     return;
   }
 
@@ -222,9 +392,7 @@ async function poll(id, prompt) {
   for (;;) {
     await new Promise(r => setTimeout(r, 900));
     let job;
-    try {
-      job = await (await fetch('/job/' + id)).json();
-    } catch (_) { continue; }
+    try { job = await (await fetch('/job/' + id)).json(); } catch (_) { continue; }
 
     if (job.state === 'working') {
       $('stageText').textContent = job.stage || 'Working';
@@ -233,27 +401,33 @@ async function poll(id, prompt) {
     if (job.state === 'failed') {
       $('problem').textContent = job.error || 'That did not work.';
       show('failed');
+      if (/Blender/i.test(job.error || '') || /key/i.test(job.error || '')) {
+        loadSettings();
+      }
       return;
     }
-
-    current = id;
-    const r = job.result || {};
-    $('said').innerHTML = '<b></b>';
-    $('said').firstChild.textContent = prompt;
-    $('shot').src = '/out/' + id + '/view.png?t=' + Date.now();
-    $('shot').alt = prompt;
-    $('dlModel').href = '/out/' + id + '/model.glb';
-    $('dlModel').setAttribute('download', 'shape.glb');
-    const facts = [];
-    if (r.size_cm) facts.push('about ' + r.size_cm.join(' × ') + ' cm');
-    if (r.parts) facts.push(r.parts + (r.parts === 1 ? ' part' : ' parts'));
-    if (r.triangles) facts.push(r.triangles.toLocaleString() + ' triangles');
-    $('facts').textContent = facts.join('   ·   ');
+    display(id, { ...(job.card || {}), ...(job.result || {}), prompt });
     $('prompt').value = '';
-    $('promptLabel').textContent = 'What should it be?';
-    show('done');
+    loadHistory();
     return;
   }
+}
+
+function display(id, card) {
+  current = id;
+  $('said').textContent = card.prompt || '';
+  $('shot').src = '/out/' + id + '/view.png?t=' + Date.now();
+  $('shot').alt = card.prompt || '';
+  $('dlModel').href = '/out/' + id + '/model.glb';
+  $('dlModel').setAttribute('download', 'shape.glb');
+
+  const facts = [];
+  if (card.size_cm) facts.push('about ' + card.size_cm.join(' \u00d7 ') + ' cm');
+  if (card.parts) facts.push(card.parts + (card.parts === 1 ? ' part' : ' parts'));
+  if (typeof card.cost_usd === 'number') facts.push('cost ' + money(card.cost_usd));
+  $('facts').textContent = facts.join('   \u00b7   ');
+  $('promptLabel').textContent = 'What should it be?';
+  show('done');
 }
 
 $('change').addEventListener('click', () => {
@@ -272,7 +446,39 @@ $('reset').addEventListener('click', () => {
   show('empty');
 });
 
+/* ---------------------------------------------------------------- history */
+async function loadHistory() {
+  let items = [];
+  try { items = (await (await fetch('/history')).json()).items || []; } catch (_) { return; }
+  $('past').hidden = items.length === 0;
+  const strip = $('strip');
+  strip.innerHTML = '';
+  let total = 0;
+  for (const item of items) {
+    total += item.cost_usd || 0;
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'past'; b.title = item.prompt || '';
+    const img = document.createElement('img');
+    img.src = '/out/' + item.id + '/view.png';
+    img.alt = item.prompt || '';
+    img.loading = 'lazy';
+    const label = document.createElement('span');
+    label.textContent = item.prompt || 'untitled';
+    b.append(img, label);
+    b.addEventListener('click', () => {
+      display(item.id, item);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+    strip.appendChild(b);
+  }
+  $('spend').textContent = items.length
+    ? items.length + (items.length === 1 ? ' thing made, ' : ' things made, ')
+      + money(total) + ' of Claude so far'
+    : '';
+}
+
 show('empty');
+loadSettings();
 </script>
 </body>
 </html>
