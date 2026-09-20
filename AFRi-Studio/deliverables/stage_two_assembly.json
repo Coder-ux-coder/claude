@@ -1,0 +1,282 @@
+{
+  "fedora": {
+    "version_id": "ver_e360e7cb6f304c57",
+    "assets": {
+      "glb": "projects/afri_marigold/versions/cpt_f2d1e241426e4fbc/ver_e360e7cb6f304c57/viewer.glb",
+      "piece_a_stl": "projects/afri_marigold/versions/cpt_f2d1e241426e4fbc/ver_e360e7cb6f304c57/piece_a.stl",
+      "piece_b_stl": "projects/afri_marigold/versions/cpt_f2d1e241426e4fbc/ver_e360e7cb6f304c57/piece_b.stl",
+      "master_stl": "projects/afri_marigold/versions/cpt_f2d1e241426e4fbc/ver_e360e7cb6f304c57/master.stl",
+      "blend": "projects/afri_marigold/versions/cpt_f2d1e241426e4fbc/ver_e360e7cb6f304c57/scene.blend",
+      "07_fixing_underside": "projects/afri_marigold/versions/cpt_f2d1e241426e4fbc/ver_e360e7cb6f304c57/07_fixing_underside.png"
+    },
+    "stats": {
+      "verts": 130080,
+      "faces": 258892,
+      "area": 377.983565,
+      "volume": 18.257198,
+      "bounds_min": [
+        -3.1076,
+        -2.9686,
+        -0.0862
+      ],
+      "bounds_max": [
+        3.0595,
+        3.0451,
+        3.0434
+      ],
+      "petal_count": 315,
+      "layer_count": 9,
+      "diameter_mm": 61.67,
+      "height_mm": 31.3,
+      "build_seconds": 1.843,
+      "radius": 2.9000000000000004,
+      "as_built_triangles": 258892,
+      "master_triangles": 527784,
+      "piece_a_triangles": 266364,
+      "piece_b_triangles": 268756,
+      "pieces_triangles_total": 535120,
+      "triangles_added_by_split": 7336,
+      "cut_wall_triangles": 5990,
+      "consolidated": true,
+      "consolidation": {
+        "bodies_in": 317,
+        "bodies_out": 1,
+        "triangles_in": 258892,
+        "triangles_out": 527784,
+        "volume_soup_mm3": 18257.198,
+        "volume_solid_mm3": 17521.235,
+        "overlap_removed_mm3": 735.963,
+        "fragments_dropped": 856,
+        "fragment_volume_mm3": 0.772301,
+        "watertight": true,
+        "winding_consistent": true,
+        "seconds": 4.17
+      }
+    },
+    "validation": {
+      "checks": [
+        {
+          "name": "master_nonempty",
+          "passed": true,
+          "detail": "master has 254208 vertices, 527784 triangles",
+          "value": 527784,
+          "tolerance": null,
+          "severity": "info"
+        },
+        {
+          "name": "pieces_nonempty",
+          "passed": true,
+          "detail": "piece A 268348 tris, piece B 270588 tris",
+          "value": [
+            268348,
+            270588
+          ],
+          "tolerance": null,
+          "severity": "info"
+        },
+        {
+          "name": "split_is_geometric",
+          "passed": true,
+          "detail": "two independent meshes; 26 bodies were physically divided between them",
+          "value": 26,
+          "tolerance": null,
+          "severity": "info"
+        },
+        {
+          "name": "outward_normals",
+          "passed": true,
+          "detail": "every body that carries volume encloses it outward",
+          "value": 0,
+          "tolerance": null,
+          "severity": "info"
+        },
+        {
+          "name": "consistent_winding",
+          "passed": true,
+          "detail": "every shared edge is traversed in opposite directions by its two faces",
+          "value": 0,
+          "tolerance": null,
+          "severity": "info"
+        },
+        {
+          "name": "volume_conservation",
+          "passed": true,
+          "detail": "|V(A)+V(B) - V(master)| / V(master) = 0.000436%",
+          "value": 4.3632e-06,
+          "tolerance": 0.01,
+          "severity": "info"
+        },
+        {
+          "name": "area_conservation",
+          "passed": true,
+          "detail": "surface area matches to 0.0492% once the two new cut walls (26.214 sq units) are discounted",
+          "value": 0.00049246,
+          "tolerance": 0.02,
+          "severity": "info"
+        },
+        {
+          "name": "no_cross_contamination",
+          "passed": true,
+          "detail": "0 vertices of A past the boundary into B's side, 0 the other way. Worst excursion 0.0479 mm against a 0.2152 mm allowance (chord of the curved cut across the widest 3.755 mm edge span).",
+          "value": [
+            0,
+            0
+          ],
+          "tolerance": 0.02151726,
+          "severity": "info"
+        },
+        {
+          "name": "no_bridging_geometry",
+          "passed": true,
+          "detail": "0 connected components straddle the split line",
+          "value": 0,
+          "tolerance": null,
+          "severity": "info"
+        },
+        {
+          "name": "piece_a_closed",
+          "passed": true,
+          "detail": "piece A is a closed solid",
+          "value": 0,
+          "tolerance": null,
+          "severity": "info"
+        },
+        {
+          "name": "piece_a_manifold",
+          "passed": true,
+          "detail": "piece A is edge-manifold",
+          "value": 0,
+          "tolerance": null,
+          "severity": "info"
+        },
+        {
+          "name": "piece_b_closed",
+          "passed": true,
+          "detail": "piece B is a closed solid",
+          "value": 0,
+          "tolerance": null,
+          "severity": "info"
+        },
+        {
+          "name": "piece_b_manifold",
+          "passed": true,
+          "detail": "piece B is edge-manifold",
+          "value": 0,
+          "tolerance": null,
+          "severity": "info"
+        },
+        {
+          "name": "piece_a_has_boundary_surface",
+          "passed": true,
+          "detail": "piece A carries 2782 intentional boundary-wall triangles",
+          "value": 2782,
+          "tolerance": null,
+          "severity": "info"
+        },
+        {
+          "name": "piece_b_has_boundary_surface",
+          "passed": true,
+          "detail": "piece B carries 2834 intentional boundary-wall triangles",
+          "value": 2834,
+          "tolerance": null,
+          "severity": "info"
+        },
+        {
+          "name": "components_addressable",
+          "passed": true,
+          "detail": "both pieces have finite coordinates and can be exported independently",
+          "value": null,
+          "tolerance": null,
+          "severity": "info"
+        },
+        {
+          "name": "footprint_reconstruction",
+          "passed": true,
+          "detail": "A union B covers the master footprint to within 0.296% of cells on a 384x384 grid (313 differing of 105710)",
+          "value": 0.002961,
+          "tolerance": 0.02,
+          "severity": "info"
+        },
+        {
+          "name": "piece_a_degenerate_faces",
+          "passed": true,
+          "detail": "98 zero-area triangles (retained deliberately: removing one would re-open the surface it belongs to)",
+          "value": 98,
+          "tolerance": null,
+          "severity": "info"
+        },
+        {
+          "name": "piece_b_degenerate_faces",
+          "passed": true,
+          "detail": "88 zero-area triangles (retained deliberately: removing one would re-open the surface it belongs to)",
+          "value": 88,
+          "tolerance": null,
+          "severity": "info"
+        }
+      ],
+      "passed": 19,
+      "total": 19,
+      "errors": 0,
+      "warnings": 0,
+      "ok": true,
+      "seconds": 7.262,
+      "measurements": {
+        "boundary_chord_mm": 0.21517,
+        "max_edge_span_mm": 3.7547,
+        "worst_excursion_mm": 0.04785,
+        "master_volume": 17.521235,
+        "piece_a_volume": 8.413343,
+        "piece_b_volume": 9.107815,
+        "volume_balance": 0.4802,
+        "master_faces": 527784,
+        "piece_a_faces": 268348,
+        "piece_b_faces": 270588,
+        "boundary_area": 26.213877
+      },
+      "coherence": {
+        "piece_a": {
+          "bodies": 1,
+          "coherent": true,
+          "main_body_volume_mm3": 8413.343,
+          "main_body_fraction": 1.0,
+          "loose_fragments": 0,
+          "loose_fragment_volume_mm3": 0.0,
+          "dust_bodies": 0
+        },
+        "piece_b": {
+          "bodies": 1,
+          "coherent": true,
+          "main_body_volume_mm3": 9107.815,
+          "main_body_fraction": 1.0,
+          "loose_fragments": 0,
+          "loose_fragment_volume_mm3": 0.0,
+          "dust_bodies": 0
+        },
+        "consolidation": {
+          "bodies_in": 317,
+          "bodies_out": 1,
+          "triangles_in": 258892,
+          "triangles_out": 527784,
+          "volume_soup_mm3": 18257.198,
+          "volume_solid_mm3": 17521.235,
+          "overlap_removed_mm3": 735.963,
+          "fragments_dropped": 856,
+          "fragment_volume_mm3": 0.772301,
+          "watertight": true,
+          "winding_consistent": true,
+          "seconds": 4.17
+        },
+        "debris_removed": {
+          "piece_a": {
+            "removed_bodies": 14,
+            "removed_volume_mm3": 0.191775
+          },
+          "piece_b": {
+            "removed_bodies": 19,
+            "removed_volume_mm3": 0.158908
+          }
+        }
+      }
+    }
+  }
+}
