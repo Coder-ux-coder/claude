@@ -1,4 +1,4 @@
-"""Where Shape keeps things on your machine.
+"""Where Kiln keeps things on your machine.
 
 Nothing leaves it. The key sits in a file only your account can read, the
 objects you make sit beside it, and both live in the usual place for your
@@ -13,7 +13,7 @@ import shutil
 import stat
 from pathlib import Path
 
-APP = "Shape"
+APP = "Kiln"
 
 
 def _base(kind: str) -> Path:
@@ -25,7 +25,7 @@ def _base(kind: str) -> Path:
         return Path.home() / "Library" / "Application Support" / APP
     var = "XDG_CONFIG_HOME" if kind == "config" else "XDG_DATA_HOME"
     default = ".config" if kind == "config" else ".local/share"
-    return Path(os.environ.get(var, Path.home() / default)) / "shape"
+    return Path(os.environ.get(var, Path.home() / default)) / "kiln"
 
 
 CONFIG_DIR = _base("config")

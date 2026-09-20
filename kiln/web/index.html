@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Shape</title>
+<title>Kiln</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -148,7 +148,7 @@ footer{margin-top:38px;color:var(--faint);font-size:13px;line-height:1.6}
 <div class="wrap">
   <header>
     <div class="titlerow">
-      <h1>Shape<span>.</span></h1>
+      <h1>Kiln<span>.</span></h1>
       <button class="gear" id="openSetup" type="button" hidden>Settings</button>
     </div>
     <p class="blurb">Say what you want. Claude builds it in Blender and shows you.</p>
@@ -156,7 +156,7 @@ footer{margin-top:38px;color:var(--faint);font-size:13px;line-height:1.6}
 
   <section class="setup" id="setup" hidden>
     <h2 id="setupTitle">Connect your Claude account</h2>
-    <p class="why" id="setupWhy">Shape uses your own Claude account to write the
+    <p class="why" id="setupWhy">Kiln uses your own Claude account to write the
       script that builds each object. You pay Claude directly for what you make.</p>
 
     <div class="field">
@@ -174,7 +174,7 @@ footer{margin-top:38px;color:var(--faint);font-size:13px;line-height:1.6}
       <div id="blenderFix" hidden>
         <input type="text" id="blenderPath" placeholder="/Applications/Blender.app/Contents/MacOS/Blender"
                spellcheck="false" style="margin-top:8px">
-        <p class="note">Shape needs Blender to build things. It is free:
+        <p class="note">Kiln needs Blender to build things. It is free:
           <a href="https://www.blender.org/download/" target="_blank" rel="noreferrer">blender.org/download</a>.
           Install it and press Save, or type where it is.</p>
       </div>
@@ -183,7 +183,7 @@ footer{margin-top:38px;color:var(--faint);font-size:13px;line-height:1.6}
     <div class="field" id="modelField">
       <label>Which Claude</label>
       <div class="choices" id="models"></div>
-      <p class="note">Most objects cost a few cents either way. Shape shows what each one cost.</p>
+      <p class="note">Most objects cost a few cents either way. Kiln shows what each one cost.</p>
     </div>
 
     <div class="row">
@@ -419,7 +419,7 @@ function display(id, card) {
   $('shot').src = '/out/' + id + '/view.png?t=' + Date.now();
   $('shot').alt = card.prompt || '';
   $('dlModel').href = '/out/' + id + '/model.glb';
-  $('dlModel').setAttribute('download', 'shape.glb');
+  $('dlModel').setAttribute('download', 'kiln.glb');
 
   const facts = [];
   if (card.size_cm) facts.push('about ' + card.size_cm.join(' \u00d7 ') + ' cm');

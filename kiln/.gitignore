@@ -1,5 +1,5 @@
 .venv/
-jobs/
 dist/
 build/
 __pycache__/
+*.pyc

@@ -110,6 +110,6 @@ def write_script(request: str, previous: str | None = None, api_key: str | None 
         problems = guard.check(code)
 
     if problems:
-        raise RuntimeError("That script asked to do things this app does not allow: "
+        raise RuntimeError("That script asked to do things Kiln does not allow: "
                            + "; ".join(problems))
     return {"code": code, "model": model, "cost_usd": cost_of(spend, model), "tokens": spend}

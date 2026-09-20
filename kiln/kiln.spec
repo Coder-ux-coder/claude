@@ -1,6 +1,6 @@
 # PyInstaller recipe. One file, no Python needed on the machine it runs on.
 #
-#   pip install pyinstaller && pyinstaller shape.spec
+#   pip install pyinstaller && pyinstaller kiln.spec
 #
 # build.py ships as data, not as code: Blender runs it, this program never
 # imports it.
@@ -26,7 +26,7 @@ exe = EXE(
     a.binaries,
     a.zipfiles,
     a.datas,
-    name="shape",
+    name="kiln",
     console=True,            # shows the address, and closing it quits
     debug=False,
     strip=False,

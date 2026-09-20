@@ -1,4 +1,4 @@
-"""Shape's web server. Four kinds of request, no framework.
+"""Kiln's web server. Four kinds of request, no framework.
 
 It serves one page, takes the settings, runs a build, and hands back the
 picture and the model. It listens on localhost only: the app runs on your
@@ -60,7 +60,7 @@ def build(job_id, prompt, previous_code):
     blender = settings.find_blender()
     if not blender:
         set_state(job_id, state="failed", stage="",
-                  error="Blender is not installed, or Shape cannot find it. "
+                  error="Blender is not installed, or Kiln cannot find it. "
                         "Add its location in Settings.")
         return
     try:
@@ -104,7 +104,7 @@ def build(job_id, prompt, previous_code):
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "Shape"
+    server_version = "Kiln"
 
     def log_message(self, fmt, *args):
         sys.stderr.write(f"{self.command} {self.path.split('?')[0]}\n")

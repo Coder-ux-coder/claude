@@ -1,4 +1,4 @@
-"""Shape. Double-click this, or run it, and the app opens in your browser.
+"""Kiln. Double-click this, or run it, and the app opens in your browser.
 
 It picks a free port, starts the server on localhost, and opens the page. Your
 key and the objects you make stay on this machine.
@@ -20,18 +20,25 @@ import settings
 
 VERSION = "1.0.0"
 BANNER = r"""
-  ___ _
- / __| |_  __ _ _ __  ___
- \__ \ ' \/ _` | '_ \/ -_)
- |___/_||_\__,_| .__/\___|
-               |_|
+  _  _ _
+ | |/ (_) |
+ | ' /| | |_ __
+ | . \| | | '_ \
+ |_|\_\_|_|_| |_|
 """
 
 
 def free_port(preferred: int) -> int:
-    """The preferred port if it is free, otherwise any free one."""
+    """The preferred port if it is free, otherwise any free one.
+
+    The probe reuses addresses exactly as the server will. Without that, a port
+    still in TIME_WAIT from the last run reads as busy and Kiln quietly moves to
+    a random one -- so closing it and opening it again would hand you a
+    different address every time.
+    """
     for candidate in (preferred, 0):
         with socket.socket() as probe:
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             try:
                 probe.bind(("127.0.0.1", candidate))
                 return probe.getsockname()[1]
@@ -51,7 +58,7 @@ bpy.context.active_object.data.materials.append(m)
 
 
 def self_check() -> int:
-    """Build one known object, to prove Blender and this app agree.
+    """Build one known object, to prove Blender and Kiln agree.
 
     Nothing here touches Claude, so it costs nothing and works offline.
     """
@@ -86,18 +93,18 @@ def self_check() -> int:
               f"{(folder / 'model.glb').stat().st_size // 1024} KB model).")
     key = settings.get_key()
     print(f"  Claude:  {'connected ' + settings.key_hint() if key else 'not connected'}")
-    print("\n  Everything Shape needs is working.")
+    print("\n  Everything Kiln needs is working.")
     return 0
 
 
 def main():
-    parser = argparse.ArgumentParser(prog="shape", description="Make things in Blender.")
+    parser = argparse.ArgumentParser(prog="kiln", description="Make things in Blender by saying what you want.")
     parser.add_argument("--port", type=int, default=7000)
     parser.add_argument("--no-browser", action="store_true",
                         help="start the app without opening a window")
     parser.add_argument("--check", action="store_true",
                         help="build one test object and report whether it worked")
-    parser.add_argument("--version", action="version", version=f"Shape {VERSION}")
+    parser.add_argument("--version", action="version", version=f"Kiln {VERSION}")
     args = parser.parse_args()
 
     settings.ensure_dirs()
@@ -108,7 +115,7 @@ def main():
     url = f"http://127.0.0.1:{port}"
 
     print(BANNER)
-    print(f"  Shape {VERSION}")
+    print(f"  Kiln {VERSION}")
     print(f"  Open {url}")
     blender = settings.find_blender()
     print(f"  Blender: {blender or 'not found yet — the app will ask'}")

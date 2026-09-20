@@ -1,0 +1,104 @@
+# Builds Kiln for macOS, Windows and Linux when a version tag is pushed.
+#
+#   git tag v1.0.0 && git push origin v1.0.0
+#
+# Blender is not bundled: it is a separate free install and the app asks for it
+# on first run. That keeps the download around 17 MB instead of 300 MB.
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            asset: kiln-macos-arm64
+          - os: macos-13
+            asset: kiln-macos-intel
+          - os: windows-latest
+            asset: kiln-windows-x64
+          - os: ubuntu-latest
+            asset: kiln-linux-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: python -m pip install --upgrade pip anthropic pyinstaller
+
+      - name: The guard still refuses what it must
+        run: |
+          python -c "import guard; assert guard.check('import os'); assert guard.check('open(\"x\")'); assert not guard.check('import bpy'); print('guard ok')"
+
+      - name: Build
+        run: pyinstaller --noconfirm kiln.spec
+
+      - name: It starts and answers
+        shell: bash
+        run: |
+          ./dist/kiln --version
+          ./dist/kiln --no-browser --port 7099 &
+          sleep 8
+          curl -fsS http://127.0.0.1:7099/settings > /dev/null
+          echo "the app answers"
+
+      - name: Name it for this platform
+        shell: bash
+        run: |
+          mkdir -p out
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cp dist/kiln.exe "out/${{ matrix.asset }}.exe"
+          else
+            cp dist/kiln "out/${{ matrix.asset }}"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: out/*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: downloads
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: downloads/**/*
+          generate_release_notes: true
+          body: |
+            Download the file for your computer and open it. Kiln opens in your browser.
+
+            | Your computer | File |
+            | --- | --- |
+            | Mac (Apple Silicon) | `kiln-macos-arm64` |
+            | Mac (Intel) | `kiln-macos-intel` |
+            | Windows | `kiln-windows-x64.exe` |
+            | Linux | `kiln-linux-x64` |
+
+            **First run needs two things**, and Kiln asks for both:
+            [Blender](https://www.blender.org/download/), which is free, and a Claude key
+            from [console.anthropic.com](https://console.anthropic.com/settings/keys).
+
+            You pay Claude directly for what you make — usually a few cents an object,
+            and Kiln shows you the cost each time. Your key and everything you make stay
+            on your computer.
+
+            Not code-signed yet: macOS wants **right-click → Open** the first time,
+            Windows wants **More info → Run anyway**.
