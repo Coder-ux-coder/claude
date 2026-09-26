@@ -58,3 +58,4 @@ export * from "./workshop/release-manager.js";
 export * from "./workshop/worker.js";
 export * from "./workshop/mcp-gateway.js";
 export * from "./workshop/workshop.js";
+export * from "./gap/gap-resolver.js";

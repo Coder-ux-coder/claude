@@ -29,6 +29,12 @@ import { ConversationManager } from "./boss/conversation.js";
 import { NotificationRouter } from "./notify/router.js";
 import { ScheduleService } from "./scheduler/schedule-service.js";
 import type { Scheduler } from "./scheduler/scheduler.js";
+import type { SandboxRunner } from "./workshop/sandbox.js";
+import type { CodingWorker } from "./workshop/worker.js";
+import { ReleaseManager } from "./workshop/release-manager.js";
+import { HoldoutStore, WorkshopManager } from "./workshop/workshop.js";
+import { McpGateway } from "./workshop/mcp-gateway.js";
+import { GapResolver } from "./gap/gap-resolver.js";
 
 export interface JarvisOptions {
   dataDir: string | null;                  // %LOCALAPPDATA%\Jarvis on Windows; null = in-memory
@@ -40,6 +46,11 @@ export interface JarvisOptions {
   adapters?: AdapterRegistration[];        // replaces the default Anthropic adapter (tests, offline)
   defaultTaskBudgetUsd?: number;
   stepHandlers?: StepHandlers;
+  /**
+   * The Workshop (08 §13): a sandbox runner (W1 WSL on Windows) and coding workers. Without
+   * it, capability gaps are reported, never worked around.
+   */
+  workshop?: { runner: SandboxRunner; workers: CodingWorker[]; allowUnisolated?: boolean; preferredWorker?: string; mcp?: { host: string; urlHost?: string } };
   /** Start the scheduler's timer at start(); tests drive `scheduler.tick()` themselves. */
   runScheduler?: boolean;
   fetchImpl?: typeof fetch;
@@ -58,6 +69,8 @@ export class JarvisCore {
   readonly gateway: ModelGateway; readonly builder: ContextBuilder; readonly planner: Planner; readonly agent: AgentLoop;
   readonly steps: StepController; readonly conversation: ConversationManager;
   readonly notifications: NotificationRouter; readonly schedules: ScheduleService; readonly scheduler: Scheduler;
+  readonly holdouts: HoldoutStore; readonly releases: ReleaseManager | null; readonly workshop: WorkshopManager | null; readonly gaps: GapResolver;
+  readonly mcpGateway: McpGateway | null;
   recovery!: RecoverySummary;
   private background = new Set<Promise<unknown>>();
   private attentionTimer: NodeJS.Timeout | null = null;
@@ -121,6 +134,7 @@ export class JarvisCore {
         if (r.text && task.origin.conversation_id) this.episodic.addMessage({ conversation_id: task.origin.conversation_id, author: "jarvis", channel: "console", trust: "system", modality: "text", text: r.text });
         return { evidence_ids: r.evidence_ids, text: r.text };
       },
+      onGap: (task, step, message) => this.gaps.onStepGap(task, step, message),
       ...(opts.stepHandlers ?? {}),
     });
     this.notifications = new NotificationRouter(ctx, () => { const p = this.episodic.getProfile(); return { hours: p?.quiet_hours ?? null, tz: p?.timezone ?? "UTC" }; });
@@ -129,6 +143,16 @@ export class JarvisCore {
       runTask: t => this.track(this.conversation.planAndRun(t)), track: p => this.track(p) },
       this.leases);
     this.scheduler = this.schedules.scheduler;
+    // Workshop, Release Manager and Gap Resolver (08 §13, 07 §12.15).
+    this.holdouts = new HoldoutStore(join(root, "holdouts"));
+    const ws = opts.workshop;
+    this.releases = ws ? new ReleaseManager(ctx, this.registry, ws.runner, { tools: join(root, "tools"), runtime: join(ws.runner.hostRoot, "_runtime") }) : null;
+    if (this.releases) { this.releases.onExecutor = e => this.broker.registerExecutor(e); this.releases.restoreExecutors(); }
+    this.mcpGateway = ws?.mcp ? new McpGateway(ws.mcp.host, Date.now, ws.mcp.urlHost) : null;
+    this.workshop = ws && this.releases ? new WorkshopManager({ ctx, runner: ws.runner, workers: ws.workers, releases: this.releases, registry: this.registry, holdouts: this.holdouts,
+      ...(this.mcpGateway ? { gateway: this.mcpGateway } : {}), ...(ws.allowUnisolated ? { allowUnisolated: true } : {}), ...(ws.preferredWorker ? { preferredWorker: ws.preferredWorker } : {}) }) : null;
+    this.gaps = new GapResolver({ ctx, tasks: this.tasks, registry: this.registry, gateway: this.gateway, episodic: this.episodic, notifications: this.notifications, evidence: this.evidence,
+      holdouts: this.holdouts, ...(this.workshop ? { workshop: this.workshop } : {}), continueTask: id => this.continueTask(id), track: p => this.track(p) });
     this.scheduler.onCachedAlarm = a => this.track(this.notifications.deliverWithoutStore({ kind: "alarm", title: "Alarm", body: a.message, urgency: "high", schedule_id: a.schedule_id, channels: ["sound", "toast", "console", "speech"] }));
     this.conversation = new ConversationManager({ ctx, episodic: this.episodic, memory: this.memory, builder: this.builder, tasks: this.tasks, policy: this.policy, broker: this.broker,
       gateway: this.gateway, planner: this.planner, steps: this.steps, defaultTaskBudgetUsd: opts.defaultTaskBudgetUsd ?? 2,
@@ -199,6 +223,16 @@ export class JarvisCore {
     }));
   }
 
+  /** Your approval of a built tool that needed it; tasks waiting on it resume. */
+  approveBuild(workOrderId: string): { capability_id: string; version: string; resumed: string[] } {
+    if (!this.workshop) throw new JarvisError("unsupported_operation", "the Workshop isn't set up on this PC");
+    const rec = this.workshop.approve(workOrderId);
+    return { capability_id: rec.capability_id, version: rec.to_version, resumed: this.gaps.onReleased(rec.capability_id, rec.to_version) };
+  }
+
+  /** Starts network listeners that need async setup (the Workshop's MCP gateway). */
+  async startServices(): Promise<void> { if (this.mcpGateway) await this.mcpGateway.listen(); }
+
   /** Emergency stop (09 §14.2): halts dispatch everywhere; resuming needs you. */
   emergencyStop(reason = "emergency stop"): { cancelled: string[] } {
     const r = this.broker.halt(reason);
@@ -225,5 +259,5 @@ export class JarvisCore {
 
   close(): void { if (this.attentionTimer) clearInterval(this.attentionTimer); this.scheduler.stop(); this.notifications.close(); this.builder.close(); this.ctx.db.close(); }
   /** Stops timers, waits for background work, then closes. */
-  async shutdown(): Promise<void> { if (this.attentionTimer) clearInterval(this.attentionTimer); this.scheduler.stop(); await this.idle(); this.close(); }
+  async shutdown(): Promise<void> { if (this.attentionTimer) clearInterval(this.attentionTimer); this.scheduler.stop(); await this.idle(); await this.mcpGateway?.close(); this.close(); }
 }

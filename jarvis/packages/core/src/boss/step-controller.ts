@@ -11,7 +11,8 @@ export interface StepHandlers {
   /** "reason" steps: a bounded agent loop (the Agent Worker); returns evidence ids for the step. */
   reason?(task: TaskContract, step: PlanStep): Promise<{ evidence_ids: string[]; text: string }>;
   /** Gap Resolver hook for unsupported_operation (wired in Phase 8). */
-  onGap?(task: TaskContract, step: PlanStep, error: string): Promise<"blocked" | "resolved">;
+  /** "waiting_subtask": a build (or other resolution) is under way; the task waits for it (07 §12.15). */
+  onGap?(task: TaskContract, step: PlanStep, error: string): Promise<"blocked" | "resolved" | "waiting_subtask">;
   /** worker / skill steps (wired in Phases 8 and 10). */
   runWorker?(task: TaskContract, step: PlanStep): Promise<{ ok: boolean; evidence_ids: string[]; error?: string }>;
   sleep?(ms: number): Promise<void>;
@@ -90,6 +91,7 @@ export class StepController {
   }
 
   private async runTool(task: TaskContract, step: PlanStep): Promise<boolean> {
+    if (step.capability?.startsWith("gap:")) return this.gap(task, step, `This step needs a capability that doesn't exist yet: ${step.description}`);
     // Leases for declared resources (02 §7.8): an exclusive holder elsewhere means waiting_for_resource.
     const held = [];
     for (const r of step.resources) {
@@ -179,6 +181,11 @@ export class StepController {
   private async gap(task: TaskContract, step: PlanStep, message: string): Promise<boolean> {
     const r = this.h.onGap ? await this.h.onGap(task, step, message) : "blocked";
     if (r === "resolved") { this.tasks.updateStep(step.step_id, { status: "ready" }); return true; }
+    if (r === "waiting_subtask") {
+      this.tasks.updateStep(step.step_id, { status: "ready" });
+      if (this.tasks.require(task.task_id).status === "running") this.tasks.transition(task.task_id, "waiting", { wait_reason: "subtask", initiator: "gap_resolver", detail: message });
+      return false;
+    }
     this.tasks.updateStep(step.step_id, { status: "ready" });
     this.tasks.transition(task.task_id, "blocked", { initiator: "gap_resolver", detail: message });
     return false;

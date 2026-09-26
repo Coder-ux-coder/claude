@@ -27,7 +27,7 @@ type Component = "console" | "session" | "phone";
 /** Commands that change state: they honour idempotency keys (12 §17.6). Credential calls are excluded so no secret is ever hashed to disk; they are idempotent by design (store rotates in place). */
 export const MUTATING = new Set(["conversation.send", "task.control", "task.steer", "decision.respond", "memory.delete", "memory.accept", "memory.correct", "memory.markdown_apply",
   "memory.export", "memory.import", "rules.propose", "rules.confirm", "rules.revoke", "accounts.revoke", "schedules.control", "notifications.dismiss", "settings.set", "profile.set",
-  "emergency.stop", "emergency.resume"]);
+  "emergency.stop", "emergency.resume", "workshop.approve"]);
 interface Client { rpc: NdjsonRpc; component: Component | null; subs: Map<string, () => void>; id: number; challenge?: { component: string; cn: string; sn: string } }
 
 /** Mutual proof for the handshake (neither side ever sends the secret): HMAC(secret, role|client_nonce|server_nonce). */
@@ -343,6 +343,16 @@ export class CoordinatorServer {
       }
       case "notifications.needs_you": return j.notifications.needsYou();
       case "notifications.dismiss": j.notifications.dismiss(str(P<{ id: string }>(params).id, "id")); return { ok: true };
+      // ----- workshop and gaps (08 §13, 07 §12.15) -----
+      case "workshop.list": {
+        const rows = j.ctx.db.prepare("select work_order_id, task_id, status, worker, created_at, updated_at, validation_json from dev_orders order by created_at desc limit 50").all() as { work_order_id: string; task_id: string; status: string; worker: string; created_at: string; updated_at: string; validation_json: string | null }[];
+        return rows.map(r => { const v = r.validation_json ? JSON.parse(r.validation_json) as { capability_id: string; version: string; risk_class: string; ok: boolean; permission_delta: unknown; untested: string[]; confidence_limits: string; stages: { stage: number; name: string; ok: boolean; findings: unknown[] }[] } : null;
+          return { work_order_id: r.work_order_id, task_id: r.task_id, status: r.status, worker: r.worker, created_at: r.created_at, updated_at: r.updated_at,
+            ...(v ? { capability_id: v.capability_id, version: v.version, risk_class: v.risk_class, validated: v.ok, permission_delta: v.permission_delta, untested: v.untested, confidence_limits: v.confidence_limits, stages: v.stages } : {}) }; });
+      }
+      case "workshop.approve": return j.approveBuild(str(P<{ work_order_id: string }>(params).work_order_id, "work_order_id"));
+      case "workshop.status": return { configured: !!j.workshop, releases: j.releases ? j.releases.releases().slice(-20) : [] };
+      case "gaps.list": return j.gaps.list().slice(0, 50);
       // ----- usage (09 §14.1 Console v1: usage) -----
       case "usage.summary": {
         const p = P<{ since?: string }>(params);

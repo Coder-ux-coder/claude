@@ -7,6 +7,36 @@ import { CoordinatorServer } from "./ipc/coordinator-server.js";
 import { SessionBridge } from "./nep/session-bridge.js";
 import { ExecHostClient, RemoteExecHostExecutor } from "./nep/exec-host.js";
 import { componentPipe, pipePath } from "./nep/rpc.js";
+import { execFileSync } from "node:child_process";
+import { mkdirSync } from "node:fs";
+import { LocalProcessRunner, WslRunner } from "./workshop/sandbox.js";
+import { ClaudeCodeWorker } from "./workshop/worker.js";
+import type { JarvisOptions } from "./runtime.js";
+
+/** Names of installed WSL distros (`wsl.exe -l -q` prints UTF-16LE). */
+export function parseWslList(out: Buffer): string[] {
+  const text = out.includes(0) ? out.toString("utf16le") : out.toString("utf8");
+  return text.split(/\r?\n/).map(l => l.replace(/\0/g, "").trim()).filter(Boolean);
+}
+
+/**
+ * The Workshop, when it's set up (08 §13.3): the jarvis-workshop WSL distro on Windows; or,
+ * for development elsewhere, an explicitly requested local runner (not isolation).
+ * The MCP gateway binds to loopback only; WSL reaches it with mirrored networking.
+ */
+export function detectWorkshop(dataDir: string, env: NodeJS.ProcessEnv = process.env): JarvisOptions["workshop"] | undefined {
+  const workers = [new ClaudeCodeWorker({ ...(env.JARVIS_CLAUDE_BIN ? { binary: env.JARVIS_CLAUDE_BIN } : {}) })];
+  if (env.JARVIS_WORKSHOP_LOCAL === "1") {
+    const root = `${dataDir}/workshop`; mkdirSync(root, { recursive: true });
+    return { runner: new LocalProcessRunner(root), workers, allowUnisolated: true, mcp: { host: "127.0.0.1" } };
+  }
+  if (process.platform !== "win32") return undefined;
+  try {
+    const distros = parseWslList(execFileSync("wsl.exe", ["-l", "-q"], { timeout: 15_000, windowsHide: true }));
+    if (!distros.includes("jarvis-workshop")) return undefined;
+    return { runner: new WslRunner(), workers, mcp: { host: "127.0.0.1" } };
+  } catch { return undefined; }
+}
 
 /**
  * The Coordinator process (01 §3–4). Started by the Launcher, which writes the per-boot
@@ -51,8 +81,11 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     : MasterKeyProvider.fromFile(keyPath, new PlainFileWrapper());
   if (process.platform === "win32" && !exec) process.stderr.write("jarvis-core: WARNING master key is not DPAPI-protected (Exec Host missing)\n");
 
-  const core = new JarvisCore({ dataDir: args.dataDir, keys, runScheduler: true });
+  const workshop = detectWorkshop(args.dataDir);
+  if (!workshop) process.stderr.write("jarvis-core: Workshop not set up (no jarvis-workshop WSL distro); capability gaps will be reported, not built\n");
+  const core = new JarvisCore({ dataDir: args.dataDir, keys, runScheduler: true, ...(workshop ? { workshop } : {}) });
   const recovery = core.start();
+  await core.startServices();
   if (args.safeMode) core.broker.safeMode = true;
   if (exec) {
     const nepKey = keys.dataKey("nep_grants");

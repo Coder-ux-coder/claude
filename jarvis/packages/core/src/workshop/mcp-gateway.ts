@@ -16,7 +16,8 @@ export class McpGateway {
   private server: Server | null = null;
   private grants = new Map<string, Grant>();         // sha256(token) → grant
   port = 0;
-  constructor(private host = "127.0.0.1", private now: () => number = Date.now) {}
+  /** `publicHost`: the address workers use to reach this machine (from WSL2 it may differ from the bind address). */
+  constructor(private host = "127.0.0.1", private now: () => number = Date.now, private publicHost?: string) {}
 
   async listen(port = 0): Promise<void> {
     this.server = createServer((req, res) => { void this.handle(req, res).catch(() => { if (!res.headersSent) { res.writeHead(500); } res.end(); }); });
@@ -26,7 +27,7 @@ export class McpGateway {
   async close(): Promise<void> { await new Promise<void>(r => this.server ? this.server.close(() => r()) : r()); }
 
   /** A token for one work order; revoked when the order ends. */
-  issue(work_order_id: string, tools: GatewayTool[], ttlMs = 4 * 3_600_000, urlHost = this.host): { url: string; token: string; revoke(): void } {
+  issue(work_order_id: string, tools: GatewayTool[], ttlMs = 4 * 3_600_000, urlHost = this.publicHost ?? this.host): { url: string; token: string; revoke(): void } {
     const token = randomBytes(32).toString("base64url");
     const key = createHash("sha256").update(token).digest("hex");
     this.grants.set(key, { work_order_id, tools, expires: this.now() + ttlMs });

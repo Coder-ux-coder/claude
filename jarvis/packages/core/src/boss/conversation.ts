@@ -257,8 +257,11 @@ export class ConversationManager {
     try {
       const ctxPkg = this.d.builder.build({ kind: "task", task, text: task.objective });
       const steps = await this.d.planner.plan(task, ctxPkg);
-      for (const s of steps) if (s.criteria_ids?.length) this.d.episodic.setWorkingState(task.task_id, `criteria:${s.step_id}`, s.criteria_ids);
-      this.d.tasks.setPlan(task.task_id, steps.map(({ criteria_ids: _c, ...rest }) => rest));
+      for (const s of steps) {
+        if (s.criteria_ids?.length) this.d.episodic.setWorkingState(task.task_id, `criteria:${s.step_id}`, s.criteria_ids);
+        if (s.gap) this.d.episodic.setWorkingState(task.task_id, `gap:${s.step_id}`, s.gap);
+      }
+      this.d.tasks.setPlan(task.task_id, steps.map(({ criteria_ids: _c, gap: _g, ...rest }) => rest));
       this.d.tasks.transition(task.task_id, "planned", { initiator: "plan_validator" });
     } catch (e) {
       const code = e instanceof JarvisError ? e.code : "internal_error";

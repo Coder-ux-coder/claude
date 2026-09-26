@@ -157,6 +157,8 @@ export class Broker {
         if (ev.decision.decision === "allow") {
           const r = await this.invoke(cap, req, undefined, ev.decision, started);
           this.afterOutcome(cap.id, r, req.account);
+          // Reads support the step's criteria too (research results, computed values): tag their evidence.
+          if (r.status !== "error" && req.criteria?.length) this.tagCriteria(r.evidence.map(e => e.evidence_id), req.criteria, true);
           return r.status === "error" ? { status: "error", result: r } : { status: "done", result: r };
         }
         // A read that needs your decision (e.g. outside the task's scope) goes through the action lifecycle so it can wait for you.
@@ -383,10 +385,16 @@ export class Broker {
       const cmp = this.verifier.verifyAction(p.req.params, obs, fields.filter(f => f in obs));
       const missing = fields.filter(f => !(f in obs));
       this.actions.verify(actionId, cmp.matches && missing.length === 0, cmp.matches ? (missing.length ? `not read back: ${missing.join(", ")}` : "read-back matches the authorized parameters") : `mismatch: ${cmp.mismatches.join(", ")}`);
-      if (p.req.criteria?.length) for (const e of r.evidence) {
-        const rec = this.evidence.get(e.evidence_id);
-        if (rec) this.ctx.db.prepare("update evidence set criterion_id = coalesce(criterion_id, ?), record = ? where evidence_id = ?").run(p.req.criteria.length === 1 ? p.req.criteria[0] : null, JSON.stringify({ ...rec, data: { ...rec.data, criteria: p.req.criteria, matches: cmp.matches && missing.length === 0 } }), e.evidence_id);
-      }
+      if (p.req.criteria?.length) this.tagCriteria(r.evidence.map(e => e.evidence_id), p.req.criteria, cmp.matches && missing.length === 0);
+    }
+  }
+
+  /** Links an action's evidence to the success criteria its step supports (the Verifier counts only named evidence). */
+  private tagCriteria(evidenceIds: string[], criteria: string[], matches: boolean): void {
+    for (const id of evidenceIds) {
+      const rec = this.evidence.get(id);
+      if (rec) this.ctx.db.prepare("update evidence set criterion_id = coalesce(criterion_id, ?), record = ? where evidence_id = ?")
+        .run(criteria.length === 1 ? criteria[0] : null, JSON.stringify({ ...rec, data: { ...rec.data, criteria, matches } }), id);
     }
   }
 

@@ -61,6 +61,8 @@ export const PlanProposal = z.object({
   steps: z.array(z.object({
     id: z.string(), kind: z.enum(["tool", "skill", "worker", "ask_owner", "reason", "verify", "wait"]),
     description: z.string(), capability: z.string().optional(), params: z.record(z.string(), z.unknown()).optional(),
+    missing_capability: z.object({ intent: z.string(), inputs: z.string(), outputs: z.string(), effects: z.array(z.enum(EFFECT_CLASSES)) }).optional()
+      .describe('only with capability "gap": the capability this step needs that does not exist yet'),
     depends_on: z.array(z.string()), criteria_ids: z.array(z.string()).optional(), resources: z.array(z.string()).optional(),
   })).min(1),
 });
