@@ -120,12 +120,31 @@ test("Console in Chromium: chat, API key into the vault, emergency stop, a decis
     assert.equal(new URL(page.url()).hash, "", "the token is removed from the address bar");
     await page.getByTestId("key-banner").waitFor();
 
+    // Onboarding (first run): name, time zone, quiet hours
+    await page.getByTestId("onboarding").waitFor();
+    await page.getByTestId("ob-name").fill("HYPOTHETICAL Owner");
+    await page.getByTestId("ob-tz").fill("Europe/London");
+    await page.getByTestId("ob-save").click();
+    await page.getByTestId("onboarding").waitFor({ state: "detached" });
+    assert.equal(s.core.episodic.getProfile()?.timezone, "Europe/London");
+    assert.equal(s.core.episodic.getProfile()?.display_name, "HYPOTHETICAL Owner");
+
+    // Attach a file and send it
+    await page.getByTestId("file-input").setInputFiles({ name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("HYPOTHETICAL notes") });
+    await page.getByTestId("attachments").getByText("notes.txt").waitFor();
+    await page.getByTestId("composer").fill("Here are my notes");
+    await page.getByTestId("send").click();
+    await page.getByTestId("attachments").waitFor({ state: "detached" });
+    const inbox = join(s.dir, "artifacts", "inbox");
+    const saved = (await import("node:fs")).readdirSync(inbox).map(d => join(inbox, d, "notes.txt")).find(f => existsSync(f));
+    assert.ok(saved && readFileSync(saved, "utf8") === "HYPOTHETICAL notes");
+
     // Chat
     await page.getByTestId("composer").fill("Hello JARVIS");
     await page.getByTestId("send").click();
-    await page.getByTestId("msg-jarvis").first().waitFor();
-    assert.equal(await page.getByTestId("msg-jarvis").first().locator("p").textContent(), "Hello from JARVIS (fake).");
-    assert.equal(await page.getByTestId("msg-owner").first().locator("p").textContent(), "Hello JARVIS");
+    await page.getByText("Hello JARVIS", { exact: true }).waitFor();
+    await page.getByTestId("msg-jarvis").nth(1).waitFor();
+    assert.equal(await page.getByTestId("msg-jarvis").nth(1).locator("p").textContent(), "Hello from JARVIS (fake).");
 
     // Push-to-talk (fake microphone) → local STT → voice message
     const ptt = page.getByTestId("ptt");
@@ -177,6 +196,10 @@ test("Console in Chromium: chat, API key into the vault, emergency stop, a decis
     await page.getByTestId("tab-tasks").click();
     await page.getByText("HYPOTHETICAL: write a note").click();
     await page.getByTestId("task-detail").getByText("completed", { exact: true }).waitFor();
+
+    // Usage
+    await page.getByTestId("tab-usage").click();
+    assert.ok(Number(await page.getByTestId("usage-calls").textContent()) >= 3);
 
     assert.deepEqual(consoleErrors, [], "no page errors");
   } finally { await browser?.close(); await s.done(); }

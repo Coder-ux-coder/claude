@@ -5,6 +5,8 @@ import { NdjsonRpc } from "../nep/rpc.js";
 import type { JarvisCore } from "../runtime.js";
 import type { SessionBridge } from "../nep/session-bridge.js";
 import type { NotificationRecord } from "../notify/router.js";
+import type { Attachment } from "../boss/attachments.js";
+import { isValidZone } from "../scheduler/tz.js";
 
 export const COORDINATOR_PROTOCOL = "1.0";
 
@@ -105,11 +107,12 @@ export class CoordinatorServer {
     switch (method) {
       // ----- conversation -----
       case "conversation.send": {
-        const p = P<{ conversation_id?: string; content?: string; modality?: "text" | "voice"; transcript_confidence?: "high" | "medium" | "low" }>(params);
-        const text = str(p.content, "content");
+        const p = P<{ conversation_id?: string; content?: string; modality?: "text" | "voice"; transcript_confidence?: "high" | "medium" | "low"; attachments?: Attachment[] }>(params);
+        if (p.attachments !== undefined && !Array.isArray(p.attachments)) throw new JarvisError("invalid_input", "attachments must be a list");
+        const text = p.attachments?.length && !p.content ? "(attachments)" : str(p.content, "content");
         if (text.length > 20_000) throw new JarvisError("invalid_input", "message too long");
         const r = await j.conversation.handle({ ...(p.conversation_id ? { conversation_id: p.conversation_id } : {}), text, channel: p.modality === "voice" ? "console_voice" : "console_text",
-          owner_verified: ownerVerified, ...(p.transcript_confidence ? { transcript_confidence: p.transcript_confidence } : {}) }, { background: true });
+          owner_verified: ownerVerified, ...(p.transcript_confidence ? { transcript_confidence: p.transcript_confidence } : {}), ...(p.attachments?.length ? { attachments: p.attachments } : {}) }, { background: true });
         return r;
       }
       case "conversation.messages": {
@@ -217,6 +220,35 @@ export class CoordinatorServer {
       }
       case "notifications.needs_you": return j.notifications.needsYou();
       case "notifications.dismiss": j.notifications.dismiss(str(P<{ id: string }>(params).id, "id")); return { ok: true };
+      // ----- usage (09 §14.1 Console v1: usage) -----
+      case "usage.summary": {
+        const p = P<{ since?: string }>(params);
+        const since = p.since ?? new Date(j.ctx.clock.now() - 30 * 86_400_000).toISOString();
+        const entries = j.gateway.ledger({ since });
+        const sum = (k: "actual" | "estimated") => entries.filter(e => e.kind === k && e.amount?.currency === "USD").reduce((a, e) => a + (e.amount?.amount ?? 0), 0);
+        const byModel: Record<string, { calls: number; input_tokens: number; output_tokens: number }> = {};
+        for (const e of entries) {
+          const m = (byModel[e.adapter] ??= { calls: 0, input_tokens: 0, output_tokens: 0 });
+          m.calls++; m.input_tokens += e.tokens?.input ?? 0; m.output_tokens += e.tokens?.output ?? 0;
+        }
+        return { since, calls: entries.length, cost_usd: { actual: sum("actual"), estimated: sum("estimated") }, unknown_cost_calls: entries.filter(e => e.kind === "unknown").length,
+          by_model: byModel, budgets: j.gateway.budgets().map(b => ({ ...b, spent: j.gateway.spent(b) })), warnings: j.gateway.lifecycleWarnings() };
+      }
+      // ----- profile / onboarding -----
+      case "profile.get": return j.episodic.getProfile() ?? null;
+      case "profile.set": {
+        const p = P<Record<string, unknown>>(params);
+        const prev = j.episodic.getProfile();
+        const tz = typeof p.timezone === "string" ? p.timezone : prev?.timezone ?? "UTC";
+        if (!isValidZone(tz)) throw new JarvisError("invalid_input", `unknown timezone ${tz}`);
+        const base = prev ?? defaultProfile(tz);
+        const { owner_id: _o, schema: _s, revision: _r, updated_at: _u, ...rest } = { ...base, ...p, timezone: tz } as Record<string, unknown>;
+        let next;
+        try { next = j.episodic.setProfile(rest as never); }
+        catch (e) { throw new JarvisError("invalid_input", `profile: ${(e as Error).message.slice(0, 300)}`); }
+        if (prev && prev.timezone !== tz) j.scheduler.onOwnerTimezoneChanged(prev.timezone, tz);
+        return next;
+      }
       // ----- settings, status, safety -----
       case "settings.get": return j.getSettings();
       case "settings.set": { const p = P<{ key: string; value: unknown }>(params); j.setSetting(str(p.key, "key"), p.value); return { ok: true }; }
@@ -251,4 +283,22 @@ export class CoordinatorServer {
     const r = this.core.memory.require(id);
     return { id: r.id, type: r.type, text: r.text, status: r.status, sensitivity: r.sensitivity, scope: r.scope, confidence: r.confidence, provenance: { origin: r.provenance.origin, source_trust: r.provenance.source_trust }, updated_at: r.updated_at };
   }
+}
+
+/** First-run profile (onboarding); every field is editable in the Console. */
+export function defaultProfile(tz: string) {
+  return {
+    display_name: "Owner", timezone: tz, locale: "en-GB", languages: ["en"], units: "metric" as const,
+    working_hours: { tz, windows: [{ days: ["mon", "tue", "wed", "thu", "fri"] as ("mon" | "tue" | "wed" | "thu" | "fri")[], from: "09:00", to: "17:30" }] },
+    quiet_hours: { tz, windows: [{ days: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as ("mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun")[], from: "22:00", to: "07:00" }] },
+    assistant: { name: "JARVIS", tone: "calm and direct", verbosity: "brief" as const, humor: "light" as const },
+    notification_defaults: { channels: ["console", "toast"] as ("console" | "toast")[] },
+    privacy: {
+      // Owner decision: general data may go to the cloud model; secrets stay local (never in memory or context).
+      default_egress_by_sensitivity: { normal: { policy: "any_approved_provider" as const }, personal: { policy: "any_approved_provider" as const },
+        sensitive: { policy: "listed_providers" as const, providers: ["anthropic"] }, restricted: { policy: "local_only" as const } },
+      audio_retention: "none" as const, screenshot_retention_days: 7,
+    },
+    home_node_id: "node_local",
+  };
 }

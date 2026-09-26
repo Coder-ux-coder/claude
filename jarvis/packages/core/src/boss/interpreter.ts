@@ -57,11 +57,13 @@ export function crossCheck(intent: Intent, ownerText: string): { intent: Intent;
 export class IntentInterpreter {
   constructor(private gateway: ModelGateway) {}
 
-  async interpret(ownerText: string, ctx: { context?: ContextPackage; transcript?: NeutralMessage[]; untrusted?: string }): Promise<{ intents: Intent[]; downgraded: string[] }> {
-    const user = ctx.untrusted ? `${ownerText}\n\n${ctx.untrusted}` : ownerText;
+  async interpret(ownerText: string, ctx: { context?: ContextPackage; transcript?: NeutralMessage[]; untrusted?: string; images?: { media_type: string; data_base64: string }[] }): Promise<{ intents: Intent[]; downgraded: string[] }> {
+    // Untrusted material is fenced; a closing tag inside it can't end the fence early.
+    const user = ctx.untrusted ? `${ownerText}\n\n<untrusted>\n${ctx.untrusted.replace(/<\/?untrusted/gi, m => m.replace("<", "&lt;"))}\n</untrusted>` : ownerText;
+    const images = (ctx.images ?? []).map(i => ({ type: "image" as const, media_type: i.media_type, data_base64: i.data_base64 }));
     const res = await this.gateway.call<Intents>({
       role: "boss.reasoning", system: [{ kind: "instructions", text: INTERPRETER_SYSTEM, cacheable: true }], ...(ctx.context ? { context: ctx.context } : {}),
-      transcript: [...(ctx.transcript ?? []), { role: "user", content: [{ type: "text", text: user }] }],
+      transcript: [...(ctx.transcript ?? []), { role: "user", content: [...images, { type: "text", text: user }] }],
       schema: { zod: Intents, json: jsonOf(Intents) }, max_output_tokens: 8000,
     });
     if (res.stop === "refusal") return { intents: [{ kind: "reply", text: "I can't help with that one." }], downgraded: [] };

@@ -170,3 +170,44 @@ test("main.js: starts from the Launcher's stdin secret, serves the pipe, answers
   assert.ok(existsSync(join(dir, "data", "jarvis.db")));
   rmSync(dir, { recursive: true, force: true });
 });
+
+test("IPC: attachments — images reach the model as image blocks, files are saved safely, bad content is refused", async () => {
+  const h = await setup();
+  try {
+    const c = await h.connect("console");
+    const png = Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), randomBytes(32)]).toString("base64");
+    const r = await c.call<{ replies: string[]; message_id: string }>("conversation.send", { content: "What's in this picture?", attachments: [
+      { name: "photo.png", media_type: "image/png", data_base64: png },
+      { name: "..\\..\\evil<>name.txt", media_type: "text/plain", data_base64: Buffer.from("HYPOTHETICAL notes").toString("base64") }] });
+    assert.deepEqual(r.replies, ["Hello from JARVIS (fake)."]);
+    const req = h.fake.requests.at(-1)!;
+    const last = req.transcript.at(-1)!;
+    assert.equal(last.content[0]!.type, "image", "the image is sent to the model");
+    const text = last.content.find(x => x.type === "text") as { text: string };
+    assert.match(text.text, /<untrusted>[\s\S]*photo\.png[\s\S]*evil__name\.txt[\s\S]*<\/untrusted>/, "attachment note is fenced as data; names sanitized");
+    const inbox = join(h.dir, "artifacts", "inbox", r.message_id);
+    assert.equal(readFileSync(join(inbox, "evil__name.txt"), "utf8"), "HYPOTHETICAL notes");
+    assert.ok(!existsSync(join(h.dir, "evil<>name.txt")));
+    const fakePng = await c.call<{ replies: string[] }>("conversation.send", { content: "look", attachments: [{ name: "x.png", media_type: "image/png", data_base64: Buffer.from("not an image").toString("base64") }] });
+    assert.match(fakePng.replies[0]!, /not a valid image\/png image/);
+    await rejects(c.call("conversation.send", { content: "x", attachments: "nope" }), "invalid_input");
+  } finally { await h.done(); }
+});
+
+test("IPC: onboarding profile, timezone change moves floating schedules, usage summary", async () => {
+  const h = await setup();
+  try {
+    const c = await h.connect("console");
+    assert.equal(await c.call("profile.get", {}), null);
+    const p = await c.call<{ timezone: string; display_name: string; revision: number }>("profile.set", { display_name: "HYPOTHETICAL Owner", timezone: "Europe/London" });
+    assert.equal(p.timezone, "Europe/London"); assert.equal(p.revision, 1);
+    const s = h.core.scheduler.create({ kind: "alarm", owner_text: "x", tz: "Europe/London", start_local: "2026-09-28T07:00", rrule: "FREQ=DAILY", policy_revision: 0 });
+    await c.call("profile.set", { timezone: "Asia/Karachi" });
+    assert.equal(h.core.scheduler.get(s.schedule_id)!.time.tz, "Asia/Karachi");
+    await rejects(c.call("profile.set", { timezone: "Nowhere/Land" }), "invalid_input");
+    await rejects(c.call("profile.set", { units: "cubits" }), "invalid_input");
+    await c.call("conversation.send", { content: "hi" });
+    const u = await c.call<{ calls: number; by_model: Record<string, { calls: number }> }>("usage.summary", {});
+    assert.ok(u.calls >= 1); assert.ok(u.by_model["fake:boss"]!.calls >= 1);
+  } finally { await h.done(); }
+});

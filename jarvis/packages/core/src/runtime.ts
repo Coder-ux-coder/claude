@@ -130,7 +130,7 @@ export class JarvisCore {
     this.scheduler = this.schedules.scheduler;
     this.conversation = new ConversationManager({ ctx, episodic: this.episodic, memory: this.memory, builder: this.builder, tasks: this.tasks, policy: this.policy, broker: this.broker,
       gateway: this.gateway, planner: this.planner, steps: this.steps, defaultTaskBudgetUsd: opts.defaultTaskBudgetUsd ?? 2,
-      schedule: (intent, conv, m) => this.schedules.fromIntent(intent, conv, m) });
+      schedule: (intent, conv, m) => this.schedules.fromIntent(intent, conv, m), inboxDir: join(root, "artifacts", "inbox") });
   }
 
   /** Startup (01 §4.5): integrity, policy load, deterministic recovery scan, safe mode if needed. */

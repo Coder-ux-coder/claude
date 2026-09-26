@@ -53,3 +53,6 @@ dt { color: var(--muted); } dd { margin: 0; }
 table { width: 100%; border-collapse: collapse; } td, th { border-bottom: 1px solid var(--line); padding: 6px; text-align: left; }
 input[type="password"], input:not([type]) { font: inherit; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--text); min-width: 280px; }
 .ok { color: var(--ok); }
+.attachments { margin-bottom: 6px; }
+.onboarding label { display: flex; gap: 8px; align-items: center; }
+.onboarding input { min-width: 0; }
