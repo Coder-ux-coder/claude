@@ -79,10 +79,12 @@ The design and the research behind it are in `ARCHITECTURE.md`.
 
 ## Good to know
 
-- **Where the speed comes from:** parts that do not depend on each other are
-  built at the same time. A small job with one or two such parts gains little,
-  because planning and independent reviews take their own time. A larger
-  project with several independent parts gains the most.
+- **Solo or team is chosen for you.** Small jobs, or jobs that do not split
+  well, are built by one agent and checked by the others. That is the fastest
+  way to get reviewed, high-quality work. Jobs with several independent parts
+  get the full team, because only then does working in parallel beat the
+  extra coordination. (On a small test job, one agent took 9 minutes and the
+  full team 34.) Force either with `mode = "solo"` or `mode = "team"`.
 - Anthropic states that Pro/Max plan limits assume ordinary, individual use.
   Spreading one project across several of your own subscriptions is your call;
   never share logins with other people.

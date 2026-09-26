@@ -69,6 +69,22 @@ YOUR ROLE: LEAD. You own the plan, the shared design decisions and the final res
 """
 
 
+def solo_system(seat: str, seats: list[dict]) -> str:
+    return _common(seat, seats) + """
+
+YOUR ROLE: SOLO BUILDER. This job is small or does not split well, so you build all of it yourself — one writer
+is fastest and most consistent. The rest of the team checks your work: a reviewer with fresh eyes, then the CEO
+model. You own the whole result and the shared decisions.
+
+- Set the commands that prove the project works early (team_set_checks).
+- Work on the branch prepared for you; commit as you go; record progress with team_task_note.
+- Verify thoroughly before you submit: run the checks, walk through every acceptance criterion, and for anything
+  visual take a screenshot. Then submit with evidence (team_task_submit) and end your turn.
+- If review finds problems, you will get them as a message: fix, verify, resubmit.
+- At the end you will be asked for the plain-language report for the owner (team_project_done).
+"""
+
+
 def member_system(seat: str, seats: list[dict], lead: str) -> str:
     return _common(seat, seats) + f"""
 
@@ -172,8 +188,11 @@ REFINER_SCHEMA = {
         "acceptance_criteria": {"type": "array", "items": {"type": "string"}},
         "constraints": {"type": "array", "items": {"type": "string"}},
         "assumptions": {"type": "array", "items": {"type": "string"}},
+        "size": {"type": "string", "enum": ["small", "medium", "large"]},
+        "independent_parts": {"type": "integer"},
     },
-    "required": ["title", "goal", "deliverables", "acceptance_criteria", "constraints", "assumptions"],
+    "required": ["title", "goal", "deliverables", "acceptance_criteria", "constraints", "assumptions",
+                 "size", "independent_parts"],
     "additionalProperties": False,
 }
 
@@ -187,6 +206,12 @@ for (no "nice to have" additions), and do not drop anything they did ask for. Qu
 tests, clear errors), but quality is not extra scope. Write 4–10 acceptance criteria that are concrete and
 testable and that check only what was asked. Where something is ambiguous, choose the most sensible default and
 list it under assumptions (the team will not be able to ask).
+
+Also estimate, for planning:
+- size: the work for one expert engineer — "small" (under about an hour), "medium" (one to three hours), "large"
+  (more than that);
+- independent_parts: how many substantial parts could be built at the same time by different engineers without
+  editing the same files, once a shared foundation exists (1 if the work does not split well).
 
 Repository overview:
 {repo_summary}
@@ -220,6 +245,16 @@ Read the repository, then create the plan with the team tools (foundation task f
 checks; independent tasks with file scopes), and finish with team_plan_ready. Then end your turn: the
 orchestrator assigns your foundation task to you straight away (it arrives as a message), and nobody else can
 take it."""
+
+
+def kickoff_solo(brief: str, request: str) -> str:
+    return f"""The owner's project starts now. It is small enough that one builder is fastest, so you build it and
+the others will check your work.
+
+{brief}
+
+Owner's original words (for intent): \"\"\"{clip(request, 3000)}\"\"\"
+"""
 
 
 def kickoff_member(brief: str, lead: str) -> str:

@@ -2,6 +2,7 @@
 # Every value has a sensible default; delete what you do not need.
 
 [team]
+mode = "auto"            # "auto": one builder + reviewers for small jobs, the full team for big ones; or "solo" / "team"
 max_hours = 3            # hard stop for one run
 stall_minutes = 8        # an agent silent this long is nudged, then restarted
 ledger_minutes = 12      # no task moving for this long -> the lead must replan

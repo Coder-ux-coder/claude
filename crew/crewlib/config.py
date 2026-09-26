@@ -79,6 +79,7 @@ class SeatSpec:
 
 @dataclass
 class TeamSettings:
+    mode: str = "auto"  # auto | team | solo  (auto: solo for small or hard-to-split jobs)
     max_hours: float = 3.0
     max_cost_usd: float = 0.0  # 0 = no dollar cap (subscriptions are flat-rate)
     stall_minutes: float = 8.0
@@ -134,6 +135,8 @@ def load(explicit: str | None = None, seats: int | None = None) -> Config:
     team = TeamSettings(**_known(TeamSettings, data.get("team", {})))
     models = ModelPolicy(**_known(ModelPolicy, data.get("models", {})))
     models.validate()
+    if team.mode not in ("auto", "team", "solo"):
+        raise ConfigError('team.mode must be "auto", "team" or "solo"')
     if team.review not in ("cross", "same", "off"):
         raise ConfigError('team.review must be "cross", "same" or "off"')
     if team.deliver not in ("merge", "branch", "push"):

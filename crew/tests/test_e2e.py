@@ -147,6 +147,19 @@ class E2E(unittest.TestCase):
         self.assert_finished(orch, repo, 2)
         self.assertIn("conflicts with newer work", dump_chat(orch.store))
 
+    def test_auto_solo_mode_for_small_jobs(self):
+        cfg, run_dir, repo, rid = make_run({"tasks": 3, "size": "small", "parts": 1},
+                                           [("claude-1", "claude"), ("claude-2", "claude"), ("codex-1", "codex")])
+        orch = run_orch(cfg, run_dir, repo, rid)
+        self.assert_finished(orch, repo, 3)
+        st = orch.store
+        self.assertEqual(st.get("mode"), "solo")
+        self.assertEqual(len(st.tasks()), 1)
+        self.assertEqual({s["name"]: s["turns"] for s in st.seats() if s["role"] != "lead"},
+                         {"boole": 0, "curie": 0})  # the others only checked the work
+        self.assertTrue(st.events("review"))
+        self.assertIn("Final review: APPROVE", dump_chat(st))
+
     def test_stop_and_resume(self):
         cfg, run_dir, repo, rid = make_run({"tasks": 3}, [("claude-1", "claude"), ("claude-2", "claude")])
         orch = run_orch(cfg, run_dir, repo, rid,

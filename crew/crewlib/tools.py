@@ -422,7 +422,7 @@ def lesson_add(ctx: Ctx, a: dict) -> str:
     project = ctx.store.get("project_name", "")
     status = lessons_mod.add(a.get("category") or "process", text, evidence=a.get("evidence") or "",
                              source=f"agent:{ctx.seat}", project=project)
-    ctx.store.post(ctx.seat, "lesson", clip(text, 400))
+    ctx.store.post(ctx.seat, "lesson", clip(text, 1500))
     return f"Lesson {status}. Future teams will see it."
 
 

@@ -73,6 +73,16 @@ into a working agent's context, so nobody has to poll.
 
 ## 3. The run, step by step
 
+**Solo or team, decided per job.** The refiner also estimates the job's size and
+how many parts could be built at once. Small or hard-to-split jobs run in **solo
+mode**: one top agent writes everything and the others only check it (a
+clean-context reviewer, then the CEO model). That keeps writes single-threaded,
+which is what works best today, and gives single-agent speed with independent
+review. Only jobs with several independent parts run as a **full team**, because
+coordination has fixed costs (planning, reviews, integration) that only parallel
+work pays back. In our measurements on a small job, one agent alone took 9
+minutes where the full team took 34. `team.mode` can force either.
+
 1. **Refine.** A one-shot refiner turns your request (often voice-typed and
    rambling) into a brief: goal, deliverables, acceptance criteria,
    constraints, assumptions. Posted to the chat.

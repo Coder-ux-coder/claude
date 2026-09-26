@@ -24,6 +24,8 @@ MODES = {"spend": "plenty left", "normal": "on track", "conserve": "saving", "pa
 def friendly_activity(label: str, status: str) -> str:
     """Say what an agent is doing without showing commands or code."""
     l = (label or "").strip()
+    if status == "standby":
+        return "standing by to check the work"
     if status in ("idle", "stopped", "down", "waiting", "starting") and not l:
         return {"idle": "ready", "stopped": "stopped", "down": "unavailable", "waiting": "waiting for its subscription",
                 "starting": "starting"}.get(status, status)
@@ -101,6 +103,9 @@ def serve(run_dir: Path, port: int = 8765, host: str = "127.0.0.1") -> Threading
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
+            elif url.path == "/favicon.ico":
+                self.send_response(204)
+                self.end_headers()
             elif url.path == "/api/state":
                 after = int((parse_qs(url.query).get("after") or ["0"])[0] or 0)
                 self._json(state(store, run_dir, after))

@@ -167,6 +167,15 @@ class Brain:
         if "Foundation" in detail:
             files["app/__init__.py"] = "# package\n"
             files["tests/__init__.py"] = ""
+        elif not re.search(r"Feature (\d+)", detail):  # solo mode: the whole project is one task
+            files["app/__init__.py"] = "# package\n"
+            files["tests/__init__.py"] = ""
+            for i in range(1, int(SCEN.get("tasks", 3)) + 1):
+                files[f"app/feat{i}.py"] = f"def feat{i}():\n    return {i}\n"
+                files[f"tests/test_feat{i}.py"] = (f"import unittest\nfrom app.feat{i} import feat{i}\n\n\n"
+                                                   f"class T(unittest.TestCase):\n    def test(self):\n"
+                                                   f"        self.assertEqual(feat{i}(), {i})\n")
+            self.tool("team_set_checks", commands=[f"{sys.executable} -m unittest discover -s tests -q"])
         else:
             i = int(re.search(r"Feature (\d+)", detail).group(1))
             files[f"app/feat{i}.py"] = f"def feat{i}():\n    return {i}\n"
@@ -268,7 +277,8 @@ def claude_main(argv: list[str]) -> int:
             payload["structured_output"] = {
                 "title": "Feature pack", "goal": "Build a small package of features with tests.",
                 "deliverables": ["app package"], "acceptance_criteria": ["all tests pass"],
-                "constraints": [], "assumptions": ["Python standard library only"]}
+                "constraints": [], "assumptions": ["Python standard library only"],
+                "size": SCEN.get("size", "medium"), "independent_parts": int(SCEN.get("parts", 3))}
         out(payload)
 
     if stream_in:

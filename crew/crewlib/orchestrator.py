@@ -43,6 +43,7 @@ class SeatRT:
     last_nudge: float = 0.0
     idle_nudges: int = 0
     down: bool = False
+    benched: bool = False  # not used in this run (solo mode)
     stopping: bool = False
     restart_times: list[float] = field(default_factory=list)
     cooldown_until: float = 0.0
@@ -171,6 +172,8 @@ class Orchestrator:
 
     def _system_prompt(self, rt: SeatRT) -> str:
         seats = self.store.seats()
+        if rt.spec.role == "lead" and self.store.get("mode") == "solo":
+            return prompts.solo_system(rt.name, seats)
         if rt.spec.role == "lead":
             return prompts.lead_system(rt.name, seats)
         return prompts.member_system(rt.name, seats, self.lead_name)
@@ -254,7 +257,27 @@ class Orchestrator:
 
     # --------------------------------------------------------------- kickoff
 
+    def decide_mode(self) -> str:
+        """Solo for small or hard-to-split jobs (fastest, one writer); the full team only when parallel work pays."""
+        mode = self.cfg.team.mode
+        if mode == "auto":
+            brief = self.store.get("brief", {}) or {}
+            parts = int(brief.get("independent_parts") or 0)
+            if len(self.seats) < 2 or brief.get("size") == "small" or (parts and parts <= 2):
+                mode = "solo"
+            else:
+                mode = "team"
+        self.store.set("mode", mode)
+        return mode
+
     def kickoff(self) -> None:
+        if self.decide_mode() == "solo":
+            self.kickoff_solo()
+            return
+        brief = self.store.get("brief", {}) or {}
+        if self.cfg.team.mode == "auto":
+            self.say(f"This job has about {brief.get('independent_parts', 'several')} parts that can be built at the "
+                     "same time, so the whole team works on it.")
         self.set_phase("plan")
         self.store.set("plan_msg_id", self.store.last_message_id())
         brief = self.brief_text()
@@ -265,8 +288,34 @@ class Orchestrator:
                 self.start_seat(rt, prompts.kickoff_member(brief, self.lead_name))
         self.say(f"Team started: {', '.join(self.seats)}. {self.lead_name} is planning.")
 
-    def resume_seats(self) -> None:
+    def kickoff_solo(self) -> None:
+        """One builder, everyone else checks: single-agent speed with independent review kept."""
+        lead = self.seats[self.lead_name]
         for rt in self.seats.values():
+            if rt is not lead:
+                rt.benched = True
+                self.store.update_seat(rt.name, status="standby", note="checks and backs up this run")
+        brief = self.store.get("brief", {}) or {}
+        criteria = "\n".join(f"- {c}" for c in brief.get("acceptance_criteria") or []) or "Meets the brief."
+        task_id = self.store.create_task(
+            title=brief.get("title") or "The project", spec=self.brief_text(), acceptance=criteria,
+            scope=["**"], depends_on=[], size="L", kind="build", suggested_owner=lead.name, created_by="crew")
+        self.set_phase("build")
+        self.last_progress = now()
+        self.say(f"This job is small enough that one builder is fastest, so {lead.name} builds it and the others "
+                 "check it: a fresh reviewer, then the CEO model.")
+        task = self.store.task(task_id)
+        if self.give_task(lead, task, "normal"):
+            first = "\n\n".join([prompts.kickoff_solo(self.brief_text(), self.request), *lead.pending])
+            lead.pending.clear()
+            self.start_seat(lead, first)
+
+    def resume_seats(self) -> None:
+        solo = self.store.get("mode") == "solo"
+        for rt in self.seats.values():
+            if solo and rt.name != self.lead_name:
+                rt.benched = True
+                continue
             row = self.store.seat(rt.name) or {}
             task = self.store.task(row["current_task"]) if row.get("current_task") else None
             msg = "The run was resumed after an interruption. "
@@ -469,6 +518,7 @@ class Orchestrator:
         if not candidates:
             return False
         new = min(candidates, key=lambda r: scheduler._burn(accounts.get(r.account.name, {})))
+        new.benched = False
         self.release_task_of(new, f"{new.name} became the lead")
         if new.runner:
             new.stopping = True
@@ -567,7 +617,7 @@ class Orchestrator:
 
     def wake_waiting(self, modes: dict[str, str]) -> None:
         for rt in self.seats.values():
-            if rt.runner is None and not rt.down and modes.get(rt.account.name) != "parked" \
+            if rt.runner is None and not rt.down and not rt.benched and modes.get(rt.account.name) != "parked" \
                     and rt.cooldown_until <= now() and self.phase() in ("plan", "build", "deliver"):
                 session = (self.store.seat(rt.name) or {}).get("session_id")
                 self.start_seat(rt, None, resume_session=session)
@@ -1015,6 +1065,12 @@ class Orchestrator:
             self.store.set("completion_asked", now())
             self.store.set("completion_task_count", len(tasks))
             self._sync_lead_to_integration(lead)
+            if self.store.get("mode") == "solo":
+                lead.pending.append(
+                    "Every task is merged: your work passed its review. Your worktree shows the merged result. If you "
+                    "know of any remaining gap, fix it here and commit; otherwise call team_project_done now with the "
+                    "plain-language report for the owner (what was built, how to use it, what was verified, limits).")
+                return
             lead.pending.append(
                 "Every task is merged. Your worktree now shows the team's combined result. Verify the whole project "
                 "against the brief yourself (run it, test it, look at it). Fix small gaps directly on this branch "
