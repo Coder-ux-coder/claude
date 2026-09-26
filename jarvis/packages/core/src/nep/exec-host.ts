@@ -15,12 +15,19 @@ export function nepSignature(key: Buffer, nep: NepInvoke, paramsJson: string): s
 export class ExecHostClient {
   private constructor(private rpc: NdjsonRpc, readonly info: { host: string; version: string; platform: string; job_objects: boolean }) {}
 
-  static async connect(path: string, sessionSecret: string, grantKey: Buffer): Promise<ExecHostClient> {
+  /**
+   * Connects and says hello. With `grantKey`, also configures grant checking; without it,
+   * only DPAPI is usable until `configure` (the master key is unwrapped through DPAPI first).
+   */
+  static async connect(path: string, sessionSecret: string, grantKey?: Buffer): Promise<ExecHostClient> {
     const rpc = await NdjsonRpc.connect(path);
     const info = await rpc.call<ExecHostClient["info"]>("hello", { protocol_version: NEP_PROTOCOL_VERSION, component: "core", secret: sessionSecret });
-    await rpc.call("configure", { grant_key_hex: grantKey.toString("hex") });
-    return new ExecHostClient(rpc, info);
+    const c = new ExecHostClient(rpc, info);
+    if (grantKey) await c.configure(grantKey);
+    return c;
   }
+  configure(grantKey: Buffer): Promise<unknown> { return this.rpc.call("configure", { grant_key_hex: grantKey.toString("hex") }); }
+  get closed(): boolean { return this.rpc.closed; }
 
   /** Invokes with the params embedded byte-for-byte as signed. */
   invoke(nep: NepInvoke, paramsJson: string, secrets: Record<string, string>): Promise<{ status: "ok" | "error" | "partial"; effect_state: ExecResult["effect_state"]; output?: unknown; error?: StructuredError; evidence: Record<string, unknown>[] }> {

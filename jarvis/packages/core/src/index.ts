@@ -50,3 +50,4 @@ export * from "./scheduler/rrule.js";
 export * from "./scheduler/scheduler.js";
 export * from "./scheduler/schedule-service.js";
 export * from "./notify/router.js";
+export * from "./ipc/coordinator-server.js";

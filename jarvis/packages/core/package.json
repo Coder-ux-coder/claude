@@ -14,5 +14,18 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./rpc": {
+      "types": "./dist/nep/rpc.d.ts",
+      "default": "./dist/nep/rpc.js"
+    },
+    "./main": {
+      "default": "./dist/main.js"
+    }
   }
 }

@@ -1,7 +1,7 @@
 import { join } from "node:path";
-import type { Clock } from "@jarvis/shared";
+import { JarvisError, TERMINAL_TASK_STATUSES, type Clock, type TaskContract } from "@jarvis/shared";
 import { createContext, type CoreContext } from "./context.js";
-import type { MasterKeyWrapper } from "./crypto/keys.js";
+import type { KeyProvider, MasterKeyWrapper } from "./crypto/keys.js";
 import { TaskEngine } from "./tasks/task-engine.js";
 import { ActionService } from "./tasks/actions.js";
 import { LeaseManager } from "./tasks/leases.js";
@@ -33,7 +33,8 @@ import type { Scheduler } from "./scheduler/scheduler.js";
 export interface JarvisOptions {
   dataDir: string | null;                  // %LOCALAPPDATA%\Jarvis on Windows; null = in-memory
   clock?: Clock;
-  keyWrapper?: MasterKeyWrapper;           // DPAPI through the Exec Host on Windows
+  keyWrapper?: MasterKeyWrapper;           // synchronous wrapper (dev); on Windows pass `keys` unwrapped via DPAPI
+  keys?: KeyProvider;
   bossModel?: string;                      // default claude-opus-5-5 (owner decision)
   bossEffort?: "low" | "medium" | "high" | "xhigh" | "max";
   adapters?: AdapterRegistration[];        // replaces the default Anthropic adapter (tests, offline)
@@ -70,7 +71,7 @@ export class JarvisCore {
   async idle(): Promise<void> { while (this.background.size) await Promise.all([...this.background]); }
 
   constructor(readonly opts: JarvisOptions) {
-    this.ctx = createContext({ dataDir: opts.dataDir, ...(opts.clock ? { clock: opts.clock } : {}), ...(opts.keyWrapper ? { keyWrapper: opts.keyWrapper } : {}) });
+    this.ctx = createContext({ dataDir: opts.dataDir, ...(opts.clock ? { clock: opts.clock } : {}), ...(opts.keyWrapper ? { keyWrapper: opts.keyWrapper } : {}), ...(opts.keys ? { keys: opts.keys } : {}) });
     const ctx = this.ctx;
     this.tasks = new TaskEngine(ctx); this.actions = new ActionService(ctx); this.leases = new LeaseManager(ctx);
     this.tasks.actions = this.actions; this.tasks.leases = this.leases;
@@ -154,6 +155,65 @@ export class JarvisCore {
     if (this.opts.runScheduler) this.scheduler.start(); else this.scheduler.tick();
     this.track(this.notifications.resumeAfterRestart());
     return this.recovery;
+  }
+
+  // ---------- operations shared by every client (12 §17.6 UI ↔ Coordinator) ----------
+
+  /** Your answer to a decision request; the waiting step gets the outcome, then the task continues. */
+  async respondDecision(input: { decision_request_id: string; option_id: string; proposal_fingerprint: string; owner_verified: boolean }): Promise<{ status: string; task_id: string }> {
+    const req = this.policy.getDecisionRequest(input.decision_request_id);
+    if (!req) throw new JarvisError("invalid_input", `unknown decision request ${input.decision_request_id}`);
+    const out = await this.broker.onDecision(input.decision_request_id, input.option_id, input.proposal_fingerprint, input.owner_verified);
+    const stepId = req.action_ids.map(id => { try { return this.actions.get(id).step_id; } catch { return null; } }).find(Boolean);
+    const step = stepId ? this.tasks.getStep(stepId) : undefined;
+    const task = this.tasks.require(req.task_id);
+    if (step && step.status === "waiting") {
+      await this.steps.applyOutcome(task, step, out);
+      this.continueTask(task.task_id);
+    }
+    return { status: out.status, task_id: req.task_id };
+  }
+
+  /** pause / resume / cancel from a client; resume restarts the step loop. */
+  controlTask(taskId: string, op: "pause" | "resume" | "cancel"): TaskContract {
+    if (op === "pause") return this.tasks.pause(taskId);
+    if (op === "cancel") { this.tasks.cancel(taskId); return this.tasks.require(taskId); }
+    const t = this.tasks.resume(taskId);
+    this.continueTask(taskId);
+    return t;
+  }
+
+  /** Runs the task loop in the background; a settled task's report goes to its conversation. */
+  continueTask(taskId: string): void {
+    this.track(this.steps.run(taskId).then(t => {
+      const conv = t.origin.conversation_id;
+      if (conv && (TERMINAL_TASK_STATUSES.has(t.status) || t.status === "blocked"))
+        this.episodic.addMessage({ conversation_id: conv, author: "jarvis", channel: "console", trust: "system", modality: "text", text: this.conversation.report(t.task_id) });
+    }));
+  }
+
+  /** Emergency stop (09 §14.2): halts dispatch everywhere; resuming needs you. */
+  emergencyStop(reason = "emergency stop"): { cancelled: string[] } {
+    const r = this.broker.halt(reason);
+    this.leases.revoke(l => l.resource.startsWith("desktop:"), "emergency_stop");
+    return r;
+  }
+
+  static SETTING_KEY = /^(ui|voice|notifications|console)\.[a-z0-9_.]{1,64}$/;
+  getSettings(): Record<string, unknown> {
+    const rows = this.ctx.db.prepare("select key, value from settings where key not like 'internal.%'").all() as { key: string; value: string }[];
+    return Object.fromEntries(rows.filter(r => JarvisCore.SETTING_KEY.test(r.key)).map(r => [r.key, JSON.parse(r.value)]));
+  }
+  /** Client-editable preferences only; secrets go to the vault, never to settings. */
+  setSetting(key: string, value: unknown): void {
+    if (!JarvisCore.SETTING_KEY.test(key)) throw new JarvisError("invalid_input", `not a client setting: ${key}`);
+    const json = JSON.stringify(value ?? null);
+    if (json.length > 4096) throw new JarvisError("invalid_input", "setting value too large");
+    if (this.vault.redactor.redact(json) !== json) throw new JarvisError("invalid_input", "that looks like a secret; store it in the vault instead");
+    this.ctx.tx(() => {
+      this.ctx.db.prepare("insert into settings(key, value, updated_at) values (?,?,?) on conflict(key) do update set value = excluded.value, updated_at = excluded.updated_at").run(key, json, this.ctx.clock.iso());
+      this.ctx.events.append({ type: "settings.changed", summary: key, data: { key } });
+    });
   }
 
   close(): void { this.scheduler.stop(); this.notifications.close(); this.builder.close(); this.ctx.db.close(); }

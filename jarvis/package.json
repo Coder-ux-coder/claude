@@ -11,7 +11,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "tsc -b packages/shared packages/core",
+    "build": "tsc -b packages/shared packages/core && npm run build -w @jarvis/console",
     "test": "node --import tsx --test --test-reporter=dot \"packages/*/test/**/*.test.ts\"",
     "schemas": "tsx packages/shared/scripts/export-schemas.ts",
     "review": "tsc -b packages/shared packages/core && tsx packages/shared/scripts/export-schemas.ts --check && tsx tools/spec-conformance.ts && npm test"

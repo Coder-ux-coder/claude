@@ -1,0 +1,25 @@
+{
+  "name": "@jarvis/console",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "JARVIS Console: Electron shell + React renderer, and a dev web bridge for testing in a browser",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc -p tsconfig.renderer.json --noEmit && tsc -p tsconfig.node.json --noEmit"
+  },
+  "dependencies": {
+    "@jarvis/core": "0.1.0",
+    "@jarvis/shared": "0.1.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "electron": "44.4.5",
+    "esbuild": "^0.28.2",
+    "playwright-core": "1.56.1"
+  }
+}

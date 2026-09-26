@@ -3,6 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 echo "== TypeScript build";      npx tsc -b packages/shared packages/core
+echo "== Console typecheck + bundle"; (cd packages/console && npx tsc -p tsconfig.renderer.json && npx tsc -p tsconfig.node.json && node scripts/build.mjs >/dev/null)
 echo "== Schema export check";   npx tsx packages/shared/scripts/export-schemas.ts --check
 echo "== Spec conformance";      npx tsx tools/spec-conformance.ts > /tmp/jv-conf.txt || { cat /tmp/jv-conf.txt; exit 1; }; tail -1 /tmp/jv-conf.txt
 if command -v dotnet >/dev/null; then

@@ -18,12 +18,13 @@ export class NdjsonRpc {
   private pending = new Map<string, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
   onRequest: Handler | null = null;
   onNotification: ((method: string, params: unknown) => void) | null = null;
+  onClose: (() => void) | null = null;
   closed = false;
 
   constructor(private sock: Socket) {
     sock.setEncoding("utf8");
     sock.on("data", (d: string) => this.onData(d));
-    sock.on("close", () => { this.closed = true; for (const p of this.pending.values()) p.reject(new JarvisError("unavailable_device", "connection closed")); this.pending.clear(); });
+    sock.on("close", () => { this.closed = true; for (const p of this.pending.values()) p.reject(new JarvisError("unavailable_device", "connection closed")); this.pending.clear(); this.onClose?.(); });
     sock.on("error", () => { /* surfaced through close */ });
   }
 
