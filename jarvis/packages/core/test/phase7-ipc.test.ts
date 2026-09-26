@@ -226,6 +226,10 @@ test("review 2: idempotency keys make retried commands safe; expired deadlines a
     // Concurrent duplicates join the same run.
     const [x, y] = await Promise.all([c.call<{ message_id: string }>("conversation.send", { content: "twin", idempotency_key: "idk_test_000002" }), c.call<{ message_id: string }>("conversation.send", { content: "twin", idempotency_key: "idk_test_000002" })]);
     assert.equal(x.message_id, y.message_id);
+    const slow = c.call("conversation.send", { content: "same key", idempotency_key: "idk_test_000003" });
+    await rejects(c.call("conversation.send", { content: "other content", idempotency_key: "idk_test_000003" }), "conflict");
+    await slow;
+    await rejects(c.call("hello", { protocol_version: "1.1", component: "session", secret: SECRET }), "conflict");
     await rejects(c.call("task.list", { deadline: "2026-09-26T11:59:00Z" }), "timeout");
     assert.deepEqual(await c.call("task.list", { deadline: "2026-09-26T12:05:00Z" }), []);
   } finally { await h.done(); }

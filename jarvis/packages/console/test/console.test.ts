@@ -264,3 +264,44 @@ test("Coordinator link: reconnects after the Coordinator restarts and resumes ev
     assert.ok(all.every(sq => seqs.includes(sq)), "the event raised while disconnected was replayed");
   } finally { link.stop(); await server.close(); await core.shutdown(); rmSync(dir, { recursive: true, force: true }); }
 });
+
+test("end to end with the real entry points: core main.js + bridge dev-main.js + Chromium", { skip: (!existsSync(join(DIST, "index.html")) && "build first") || (!existsSync(CHROMIUM) && "no Chromium") }, async () => {
+  const { spawn } = await import("node:child_process");
+  const coreMain = join(import.meta.dirname, "..", "..", "core", "dist", "main.js");
+  const bridgeMain = join(import.meta.dirname, "..", "dist", "bridge", "dev-main.js");
+  assert.ok(existsSync(coreMain) && existsSync(bridgeMain), "build first");
+  const dir = mkdtempSync(join(tmpdir(), "jv-e2e-"));
+  const user = `je${process.pid}${randomBytes(3).toString("hex")}`;
+  const env = { ...process.env, USER: user, USERNAME: user, JARVIS_DEV_SESSION_SECRET: randomBytes(24).toString("hex") };
+  const core = spawn(process.execPath, [coreMain, "--data-dir", dir], { env, stdio: ["pipe", "pipe", "pipe"] });
+  let coreErr = ""; core.stderr.on("data", d => { coreErr += d; });
+  const bridge = spawn(process.execPath, [bridgeMain], { env, stdio: ["ignore", "pipe", "pipe"] });
+  let out = "", bridgeErr = ""; bridge.stdout.on("data", d => { out += d; }); bridge.stderr.on("data", d => { bridgeErr += d; });
+  let browser: Browser | null = null;
+  try {
+    for (let i = 0; i < 100 && !/http:\/\/127\.0\.0\.1:\d+\/#token=\w+/.test(out); i++) await new Promise(r => setTimeout(r, 100));
+    const url = /http:\/\/127\.0\.0\.1:\d+\/#token=\w+/.exec(out)?.[0];
+    assert.ok(url, `bridge did not start: ${bridgeErr}`);
+    browser = await chromium.launch({ executablePath: CHROMIUM });
+    const page = await browser.newPage();
+    const errors: string[] = []; page.on("pageerror", e => errors.push(e.message));
+    await page.goto(url);
+    await page.getByTestId("onboarding").waitFor({ timeout: 15_000 });
+    await page.getByTestId("ob-save").click();
+    await page.getByTestId("composer").fill("What's on today?");
+    await page.getByTestId("send").click();
+    await page.getByText(/the Anthropic API key is missing/).waitFor({ timeout: 15_000 });
+    await page.getByTestId("tab-settings").click();
+    await page.getByTestId("api-key").fill("sk-ant-HYPOTHETICAL-" + randomBytes(12).toString("hex"));
+    await page.getByTestId("save-key").click();
+    await page.getByText("A key is stored.").waitFor();
+    assert.deepEqual(errors, []);
+  } finally {
+    await browser?.close();
+    bridge.kill();
+    const code = await new Promise<number | null>(res => { core.once("exit", c => res(c)); core.kill("SIGTERM"); });
+    assert.equal(code, 0, `core exit: ${coreErr}`);
+    assert.ok(existsSync(join(dir, "vault", "vault.bin")), "the key went to the vault file");
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

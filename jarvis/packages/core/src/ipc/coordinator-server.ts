@@ -134,6 +134,7 @@ export class CoordinatorServer {
   }
 
   private async dispatch(c: Client, method: string, params: unknown): Promise<unknown> {
+    if ((method === "hello" || method === "hello.finish") && c.component) throw new JarvisError("conflict", "already connected; open a new connection to change role");
     if (method === "hello") return this.hello(c, P(params));
     if (method === "hello.finish") return this.helloFinish(c, P(params));
     if (!c.component) throw new JarvisError("auth_required", "say hello first");
@@ -151,7 +152,7 @@ export class CoordinatorServer {
     return this.idempotent(key, method, params, () => this.consoleMethod(c, method, params));
   }
 
-  private inflight = new Map<string, Promise<unknown>>();
+  private inflight = new Map<string, { method: string; hash: string; p: Promise<unknown> }>();
   /** Same key + same method and params → the first result; same key with different content → conflict. Kept 24 hours. */
   private async idempotent(key: string, method: string, params: unknown, run: () => Promise<unknown>): Promise<unknown> {
     const db = this.core.ctx.db;
@@ -163,7 +164,10 @@ export class CoordinatorServer {
       return JSON.parse(prev.result);
     }
     const running = this.inflight.get(key);
-    if (running) return running;
+    if (running) {
+      if (running.method !== method || running.hash !== hash) throw new JarvisError("conflict", "that idempotency key is in use by a different command");
+      return running.p;
+    }
     const p = run().then(result => {
       const json = JSON.stringify(result ?? null);
       if (json.length <= 1_000_000) {
@@ -173,7 +177,7 @@ export class CoordinatorServer {
       }
       return result;
     }).finally(() => this.inflight.delete(key));
-    this.inflight.set(key, p);
+    this.inflight.set(key, { method, hash, p });
     return p;
   }
 
