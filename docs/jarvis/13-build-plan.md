@@ -55,6 +55,8 @@ M4 and M5 can run in parallel with M3 when two people are available.
 13. **SQLite.** The Node binding with FTS5, WAL, and the backup API. Loading `sqlite-vec` on Windows.
 14. **Emergency-stop latency.**
 
+**Kit.** The runnable Phase 0 kit is in [`jarvis/phase0/`](../../jarvis/phase0/README.md). Its README maps each spike above to a step, or marks it as still open.
+
 **Acceptance evidence.** A verification report listing every assumption as confirmed, refuted, or design-changed, plus updates to the decision log ([15](15-decisions-and-traceability.md)). Prototypes are archived, not shipped.
 
 **Incomplete by design.** No product.

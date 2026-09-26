@@ -1,0 +1,21 @@
+{
+  "name": "jarvis-phase0-spikes",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "JARVIS Phase 0 spikes: SQLite, browser profile, boss-model eval",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "sqlite": "node sqlite-spike.mjs",
+    "browser": "node browser-spike.mjs",
+    "boss-eval": "node boss-eval/run.mjs",
+    "boss-eval:mock": "node boss-eval/run.mjs --mock"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.128.0",
+    "better-sqlite3": "^13.0.3",
+    "playwright": "^1.63.0",
+    "sqlite-vec": "^0.1.9",
+    "zod": "^4.6.5"
+  }
+}
