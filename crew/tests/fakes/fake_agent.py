@@ -208,7 +208,78 @@ class Brain:
 # ------------------------------------------------------------------- claude mode
 
 
+def assistant_main(argv: list[str]) -> int:
+    """The app's Assistant: a persistent conversation with word-by-word streaming and device tools."""
+    def opt(name, default=None):
+        return argv[argv.index(name) + 1] if name in argv else default
+
+    model = opt("--model", "claude-opus-5-5")
+    sid = opt("--resume") or str(uuid.uuid4())
+    devices = None
+    cfg = opt("--mcp-config")
+    if cfg and Path(cfg).is_file():
+        server = json.loads(Path(cfg).read_text()).get("mcpServers", {}).get("crew_devices")
+        if server:
+            devices = Mcp(server["command"], server["args"], server.get("env", {}))
+
+    def out(obj):
+        sys.stdout.write(json.dumps(obj) + "\n")
+        sys.stdout.flush()
+
+    def stream_text(text: str) -> None:
+        out({"type": "stream_event", "event": {"type": "content_block_start", "index": 0,
+                                                "content_block": {"type": "text", "text": ""}}, "session_id": sid})
+        for word in re.findall(r"\S+\s*", text):
+            out({"type": "stream_event", "event": {"type": "content_block_delta", "index": 0,
+                                                    "delta": {"type": "text_delta", "text": word}}, "session_id": sid})
+            time.sleep(float(SCEN.get("word_delay", 0.03)))
+
+    def tool(name: str, **args) -> str:
+        out({"type": "assistant", "message": {"content": [{"type": "tool_use", "name": f"mcp__crew_devices__{name}",
+                                                          "input": args}]}, "session_id": sid})
+        if devices is None:
+            return "no devices"
+        text, _ = devices.call(name, **args)
+        return text
+
+    out({"type": "system", "subtype": "init", "session_id": sid, "model": model, "cwd": os.getcwd(),
+         "mcp_servers": [{"name": "crew_devices", "status": "connected"}] if devices else []})
+    for line in sys.stdin:
+        if not line.strip():
+            continue
+        msg = json.loads(line)
+        if msg.get("type") != "user":
+            continue
+        content = msg["message"]["content"]
+        text = content if isinstance(content, str) else "".join(b.get("text", "") for b in content)
+        low = text.lower()
+        started = time.time()
+        if "open" in low and ("website" in low or "http" in low or "page" in low and "browser" in low):
+            url = (re.findall(r"https?://\S+", text) or ["https://example.com"])[0]
+            tool("browser_open", url=url)
+            seen = tool("browser_read")
+            title = (re.findall(r'"title": "([^"]*)"', seen) or ["the page"])[0]
+            answer = f"I opened **{title}** in the browser.\n\n- It loaded without problems.\n- You can see it in the side panel."
+        elif "make" in low and "page" in low:
+            Path("page.html").write_text("<!doctype html><title>Demo</title><h1>Hello from the assistant</h1>", encoding="utf-8")
+            answer = "I made a small web page for you. Open it from the card below."
+        elif "attached" in low:
+            names = re.findall(r"attachments/[\w.-]+", text)
+            answer = f"I looked at {', '.join(names) or 'your file'}. It arrived safely."
+        else:
+            answer = ("Here is a short answer.\n\n## Summary\n\n- **First**, the main point.\n- **Second**, a supporting point.\n\n"
+                      "| Item | Value |\n|---|---|\n| Speed | Fast |\n\nThat is all.")
+        stream_text(answer)
+        out({"type": "assistant", "message": {"content": [{"type": "text", "text": answer}]}, "session_id": sid})
+        out({"type": "result", "subtype": "success", "is_error": False, "result": answer, "session_id": sid,
+             "total_cost_usd": 0.01, "duration_ms": int((time.time() - started) * 1000)})
+    return 0
+
+
 def claude_main(argv: list[str]) -> int:
+    if "--include-partial-messages" in argv:
+        return assistant_main(argv)
+
     def opt(name, default=None):
         return argv[argv.index(name) + 1] if name in argv else default
 

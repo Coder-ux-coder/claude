@@ -1262,7 +1262,8 @@ class Orchestrator:
                          "checked it.")
         else:
             active = sum(1 for rt in self.seats.values() if not rt.benched)
-            lines.append(f"- Time: {elapsed}, with {active} agents working in parallel.")
+            lines.append(f"- Time: {elapsed}, with {active} agents working in parallel." if active > 1 else
+                         f"- Time: {elapsed}, with one agent building and others checking.")
         pieces = len(merged)
         lines.append(f"- {pieces} {'piece' if pieces == 1 else 'pieces'} of work built, each checked by a reviewer "
                      f"who had not written it ({first_pass} approved at the first review).")

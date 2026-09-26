@@ -172,6 +172,12 @@ def _claude_common_args(setup: ClaudeSetup, seat: str, role: str, system_file: P
         team_env["CREW_TASK"] = str(task_id)
     mcp = {"mcpServers": {"crew_team": {"type": "stdio", "command": py, "args": ["-m", "crewlib.mcp_server"],
                                          "env": team_env}}}
+    if os.environ.get("CREW_APP_URL") and os.environ.get("CREW_APP_TOKEN"):
+        # Started from the Crew app: agents may also use its browser (and the owner's phone), visibly.
+        mcp["mcpServers"]["crew_devices"] = {
+            "type": "stdio", "command": py, "args": ["-m", "crewapp.devices_mcp"],
+            "env": {"CREW_APP_URL": os.environ["CREW_APP_URL"], "CREW_APP_TOKEN": os.environ["CREW_APP_TOKEN"],
+                    "PYTHONPATH": str(CREW_ROOT)}}
     (files / "mcp.json").write_text(json.dumps(mcp, indent=1), encoding="utf-8")
     hook_cmd = f'"{py}" -m crewlib.hook'
     settings: dict = {"model": setup.model}
@@ -207,7 +213,10 @@ def _claude_common_args(setup: ClaudeSetup, seat: str, role: str, system_file: P
             "--permission-mode", setup.permission_mode]
     if system_file is not None:
         args += ["--append-system-prompt-file", str(system_file)]
-    for pack in (SKILLS_PACK, setup.run_dir.parent.parent / "skills"):
+    active = setup.run_dir.parent.parent / "skills-active"  # built by the app: only switched-on skills
+    packs = (active,) if (active / ".claude-plugin" / "plugin.json").is_file() else \
+        (SKILLS_PACK, setup.run_dir.parent.parent / "skills")
+    for pack in packs:
         if (pack / ".claude-plugin" / "plugin.json").is_file():
             args += ["--plugin-dir", str(pack)]
     env = {

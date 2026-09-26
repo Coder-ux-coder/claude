@@ -90,24 +90,30 @@ def cmd_start(args) -> int:
     if not request or not request.strip():
         sys.exit("Tell the team what you want, e.g.  crew start \"a website for my bakery with an order form\"")
     cfg = config_mod.load(args.config, seats=args.seats)
-    run_id = new_run_id(request)
+    if args.mode:
+        cfg.team.mode = args.mode
+    run_id = args.run_id or new_run_id(request)
     run_dir = runs_dir() / run_id
-    run_dir.mkdir(parents=True)
+    run_dir.mkdir(parents=True, exist_ok=bool(args.run_id))
     if args.repo and re.match(r"^(https?://|git@|ssh://)", args.repo):
         repo = gitops.clone(args.repo, run_dir / "repo")
     else:
         target = Path(args.repo).expanduser() if args.repo else crew_home() / "projects" / run_id
         repo = gitops.ensure_repo(target.resolve())
     (runs_dir() / "LATEST").write_text(run_id)
-    return _run(cfg, run_dir, repo, request, run_id, resume=False, open_web=not args.no_web)
+    return _run(cfg, run_dir, repo, request, run_id, resume=False, open_web=not args.no_web,
+                headless=args.headless)
 
 
-def _run(cfg, run_dir: Path, repo: Path, request: str, run_id: str, resume: bool, open_web: bool) -> int:
+def _run(cfg, run_dir: Path, repo: Path, request: str, run_id: str, resume: bool, open_web: bool,
+         headless: bool = False) -> int:
     from .orchestrator import Orchestrator
 
     orch = Orchestrator(cfg, run_dir, repo, request, run_id, resume=resume)
     server = None
     try:
+        if headless:  # started by the Crew app, which shows the run itself
+            raise OSError("headless")
         from .web import serve
 
         server = serve(run_dir, port=cfg.team.web_port)
@@ -119,7 +125,8 @@ def _run(cfg, run_dir: Path, repo: Path, request: str, run_id: str, resume: bool
             except Exception:
                 pass
     except OSError as exc:
-        print(c(f"(live view unavailable: {exc})", "2"))
+        if not headless:
+            print(c(f"(live view unavailable: {exc})", "2"))
     print(c(f"Team: {', '.join(s.name for s in cfg.seats)} · project folder: {repo}", "2"))
     stop = threading.Event()
     threading.Thread(target=follow_chat, args=(orch.store, stop, orch.store.last_message_id() if resume else 0),
@@ -147,7 +154,8 @@ def cmd_resume(args) -> int:
     store.set("stop_requested", None)
     cfg = config_mod.load(args.config)
     repo = Path(store.get("repo"))
-    return _run(cfg, run_dir, repo, store.get("goal", ""), run_dir.name, resume=True, open_web=not args.no_web)
+    return _run(cfg, run_dir, repo, store.get("goal", ""), run_dir.name, resume=True, open_web=not args.no_web,
+                headless=args.headless)
 
 
 def cmd_say(args) -> int:
@@ -271,6 +279,15 @@ def cmd_doctor(args) -> int:
     return 0 if ok else 1
 
 
+def cmd_app(args) -> int:
+    try:
+        from crewapp.server import main as app_main
+    except ImportError:
+        sys.path.insert(0, str(CREW_DIR))
+        from crewapp.server import main as app_main
+    return app_main(port=args.port, phone=args.phone, open_window=not args.no_open)
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="crew", description="A team of AI agents that builds what you ask for.")
     ap.add_argument("--config", help="settings file (default: ./crew.toml or ~/.crew/crew.toml)")
@@ -282,12 +299,22 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--repo", help="existing project folder or git URL (default: a new folder)")
     p.add_argument("--seats", type=int, help="number of agents (default: one per subscription)")
     p.add_argument("--no-web", action="store_true", help="do not open the live view in a browser")
+    p.add_argument("--headless", action="store_true", help="no live view at all (used by the Crew app)")
+    p.add_argument("--run-id", help=argparse.SUPPRESS)
+    p.add_argument("--mode", choices=("auto", "solo", "team"), help="solo builder or full team (default: auto)")
     p.set_defaults(fn=cmd_start)
 
     p = sub.add_parser("resume", help="continue a stopped run")
     p.add_argument("run", nargs="?")
     p.add_argument("--no-web", action="store_true")
+    p.add_argument("--headless", action="store_true", help=argparse.SUPPRESS)
     p.set_defaults(fn=cmd_resume)
+
+    p = sub.add_parser("app", help="open the Crew app (desktop and phone)")
+    p.add_argument("--port", type=int, default=8765)
+    p.add_argument("--phone", action="store_true", help="also allow your phone to connect (pairing required)")
+    p.add_argument("--no-open", action="store_true", help="do not open a browser window")
+    p.set_defaults(fn=cmd_app)
 
     p = sub.add_parser("say", help="send the team a message")
     p.add_argument("message", nargs="+")
