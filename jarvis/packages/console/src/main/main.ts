@@ -41,6 +41,7 @@ function createWindow(showNow: boolean): BrowserWindow {
   w.removeMenu();
   w.webContents.on("will-navigate", e => e.preventDefault());
   w.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  w.webContents.on("will-attach-webview", e => e.preventDefault());
   w.on("close", e => { if (!quitting) { e.preventDefault(); w.hide(); } });        // closing hides to the tray
   void w.loadFile(RENDERER);
   return w;

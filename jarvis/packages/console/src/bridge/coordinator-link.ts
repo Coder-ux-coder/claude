@@ -1,4 +1,4 @@
-import { NdjsonRpc } from "@jarvis/core/rpc";
+import { NdjsonRpc, coordinatorHandshake } from "@jarvis/core/rpc";
 import { JarvisError } from "@jarvis/shared";
 import { randomUUID } from "node:crypto";
 import type { JarvisEventEnvelope } from "../shared/api.js";
@@ -49,8 +49,8 @@ export class CoordinatorLink {
   private async connectLoop(): Promise<NdjsonRpc> {
     for (let attempt = 0; !this.stopped; attempt++) {
       try {
-        const rpc = await NdjsonRpc.connect(this.path, 3000);
-        await rpc.call("hello", { protocol_version: "1.0", component: "console", secret: this.secret }, 10_000);
+        const rpc = await NdjsonRpc.connect(this.path, 3000, { maxLine: 48 * 1024 * 1024 });
+        await coordinatorHandshake(rpc, this.secret, "console");        // the secret itself never crosses the pipe
         rpc.onNotification = (m, p) => {
           if (m !== "event") return;
           const env = p as JarvisEventEnvelope;

@@ -144,7 +144,12 @@ function Conversation({ api, speaker, tick, onError }: ViewProps & { speaker: Sp
         let bin = ""; for (let i = 0; i < b.length; i += 0x8000) bin += String.fromCharCode(...b.subarray(i, i + 0x8000));
         return { name: f.name, media_type: f.type || "application/octet-stream", data_base64: btoa(bin), size: f.size };
       }));
-      setFiles(x => [...x, ...read].slice(0, 8));
+      setFiles(x => {
+        const next = [...x, ...read].slice(0, 8);
+        // One message carries at most 32 MB of attachments (the Coordinator's request limit).
+        if (next.reduce((a, f) => a + f.size, 0) > 32 * 1024 * 1024) { onError("Attachments in one message must total under 32 MB."); return x; }
+        return next;
+      });
     } catch (e) { onError(errText(e)); }
     if (fileInput.current) fileInput.current.value = "";
   };

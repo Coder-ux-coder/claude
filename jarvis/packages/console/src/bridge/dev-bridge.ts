@@ -15,7 +15,7 @@ export interface DevBridgeOptions {
 
 export const CSP = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'";
 const TYPES: Record<string, string> = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png", ".map": "application/json" };
-const MAX_BODY = 25 * 1024 * 1024;
+const MAX_BODY = 48 * 1024 * 1024;               // matches the Coordinator's request limit
 
 /**
  * Development/test host for the Console renderer in an ordinary browser. The Electron

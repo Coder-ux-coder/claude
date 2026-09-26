@@ -10,6 +10,7 @@ export const IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "ima
 export const MAX_ATTACHMENTS = 8;
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;         // the model's per-image limit
 export const MAX_FILE_BYTES = 25 * 1024 * 1024;
+export const MAX_TOTAL_BYTES = 32 * 1024 * 1024;
 
 /** A safe single file name: no directories, no reserved characters or Windows device names. */
 export function safeName(name: string): string {
@@ -29,6 +30,8 @@ export function saveAttachments(inboxDir: string, messageId: string, list: Attac
   const dir = join(inboxDir, messageId);
   const used = new Set<string>();
   const out: SavedAttachment[] = [];
+  const total = list.reduce((n, a) => n + (typeof a?.data_base64 === "string" ? Math.floor(a.data_base64.length * 3 / 4) : 0), 0);
+  if (total > MAX_TOTAL_BYTES) throw new JarvisError("invalid_input", "attachments in one message must total under 32 MB");
   for (const a of list) {
     if (typeof a?.data_base64 !== "string" || typeof a.name !== "string" || typeof a.media_type !== "string") throw new JarvisError("invalid_input", "attachment needs name, media_type and data_base64");
     if (!/^[A-Za-z0-9+/]*={0,2}$/.test(a.data_base64)) throw new JarvisError("invalid_input", `${a.name}: not base64`);

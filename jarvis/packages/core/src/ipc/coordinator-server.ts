@@ -1,6 +1,7 @@
 import { createServer, type Server, type Socket } from "node:net";
 import { existsSync, unlinkSync } from "node:fs";
-import { JarvisError, canonicalJson, newId, safeEqualHex, sha256, type JarvisEvent } from "@jarvis/shared";
+import { JarvisError, canonicalJson, hmac, newId, safeEqualHex, sha256, type JarvisEvent } from "@jarvis/shared";
+import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 import { existsSync as exists, mkdirSync } from "node:fs";
 import { NdjsonRpc } from "../nep/rpc.js";
@@ -10,7 +11,9 @@ import type { NotificationRecord } from "../notify/router.js";
 import type { Attachment } from "../boss/attachments.js";
 import { isValidZone } from "../scheduler/tz.js";
 
-export const COORDINATOR_PROTOCOL = "1.0";
+export const COORDINATOR_PROTOCOL = "1.1";
+/** One request line; bounds a message with attachments (32 MB of files is ~43 MB as base64). */
+export const MAX_REQUEST_BYTES = 48 * 1024 * 1024;
 
 export interface CoordinatorServerOptions {
   path: string;                        // pipePath(componentPipe("core"))
@@ -25,7 +28,12 @@ type Component = "console" | "session" | "phone";
 export const MUTATING = new Set(["conversation.send", "task.control", "task.steer", "decision.respond", "memory.delete", "memory.accept", "memory.correct", "memory.markdown_apply",
   "memory.export", "memory.import", "rules.propose", "rules.confirm", "rules.revoke", "accounts.revoke", "schedules.control", "notifications.dismiss", "settings.set", "profile.set",
   "emergency.stop", "emergency.resume"]);
-interface Client { rpc: NdjsonRpc; component: Component | null; subs: Map<string, () => void>; id: number }
+interface Client { rpc: NdjsonRpc; component: Component | null; subs: Map<string, () => void>; id: number; challenge?: { component: string; cn: string; sn: string } }
+
+/** Mutual proof for the handshake (neither side ever sends the secret): HMAC(secret, role|client_nonce|server_nonce). */
+export function handshakeProof(secret: string, role: "server" | "client", clientNonce: string, serverNonce: string): string {
+  return hmac(Buffer.from(sha256(secret), "hex"), `${role}|${clientNonce}|${serverNonce}`);
+}
 
 const P = <T>(p: unknown): T => (p ?? {}) as T;
 const str = (v: unknown, name: string): string => { if (typeof v !== "string" || !v) throw new JarvisError("invalid_input", `${name} is required`); return v; };
@@ -69,7 +77,7 @@ export class CoordinatorServer {
   }
 
   private accept(sock: Socket): void {
-    const c: Client = { rpc: new NdjsonRpc(sock), component: null, subs: new Map(), id: ++this.nextId };
+    const c: Client = { rpc: new NdjsonRpc(sock, { maxLine: MAX_REQUEST_BYTES }), component: null, subs: new Map(), id: ++this.nextId };
     this.clients.add(c);
     // An unauthenticated connection gets 10 seconds to say hello.
     const t = setTimeout(() => { if (!c.component) c.rpc.close(); }, 10_000); t.unref();
@@ -82,16 +90,44 @@ export class CoordinatorServer {
     };
   }
 
-  private hello(c: Client, p: { protocol_version?: string; component?: string; secret?: string }) {
+  /**
+   * Handshake. Preferred (1.1): `hello {client_nonce}` → server nonce + server proof (the
+   * client checks it before revealing anything), then `hello.finish {client_proof}`; the
+   * secret never crosses the pipe, so a process squatting the pipe name learns nothing.
+   * Legacy (1.0, the C# Session Agent, whose pipe client already verifies the server's
+   * owner with CurrentUserOnly): `hello {secret}`.
+   */
+  private hello(c: Client, p: { protocol_version?: string; component?: string; secret?: string; client_nonce?: string }) {
     const major = String(p.protocol_version ?? "").split(".")[0];
     if (major !== COORDINATOR_PROTOCOL.split(".")[0]) throw new JarvisError("unsupported_operation", `protocol ${p.protocol_version} not supported; server speaks ${COORDINATOR_PROTOCOL}`);
+    if (p.component !== "console" && p.component !== "session") throw new JarvisError("invalid_input", `unknown component ${p.component}`);
+    if (typeof p.client_nonce === "string") {
+      if (!/^[0-9a-f]{32,128}$/.test(p.client_nonce)) throw new JarvisError("invalid_input", "client_nonce must be 32–128 hex characters");
+      const sn = randomBytes(24).toString("hex");
+      c.challenge = { component: p.component, cn: p.client_nonce, sn };
+      return { protocol_version: COORDINATOR_PROTOCOL, server_nonce: sn, server_proof: handshakeProof(this.opts.secret, "server", p.client_nonce, sn) };
+    }
     // Constant-time comparison of hashes, so length differences leak nothing either.
     if (typeof p.secret !== "string" || !safeEqualHex(sha256(p.secret), sha256(this.opts.secret))) {
       setTimeout(() => c.rpc.close(), 10).unref();
       throw new JarvisError("auth_required", "bad session secret");
     }
-    if (p.component !== "console" && p.component !== "session") throw new JarvisError("invalid_input", `unknown component ${p.component}`);
-    c.component = p.component;
+    return this.admit(c, p.component);
+  }
+
+  private helloFinish(c: Client, p: { client_proof?: string }) {
+    const ch = c.challenge;
+    c.challenge = undefined;                       // one attempt per challenge
+    if (!ch || typeof p.client_proof !== "string" || !/^[0-9a-f]{64}$/.test(p.client_proof) || !safeEqualHex(p.client_proof, handshakeProof(this.opts.secret, "client", ch.cn, ch.sn))) {
+      setTimeout(() => c.rpc.close(), 10).unref();
+      throw new JarvisError("auth_required", "bad handshake proof");
+    }
+    return this.admit(c, ch.component as "console" | "session");
+  }
+
+  private admit(c: Client, component: "console" | "session") {
+    c.component = component;
+    const p = { component };
     this.core.ctx.events.append({ type: "ipc.connected", summary: p.component, data: { component: p.component, client: c.id } });
     setImmediate(() => this.core.track(this.core.notifications.flush()));   // a new client can show what was waiting
     return { protocol_version: COORDINATOR_PROTOCOL, server: "jarvis-core", safe_mode: this.core.broker.safeMode, halted: this.core.broker.isHalted() };
@@ -99,6 +135,7 @@ export class CoordinatorServer {
 
   private async dispatch(c: Client, method: string, params: unknown): Promise<unknown> {
     if (method === "hello") return this.hello(c, P(params));
+    if (method === "hello.finish") return this.helloFinish(c, P(params));
     if (!c.component) throw new JarvisError("auth_required", "say hello first");
     if (method === "ping") return { ok: true, at: this.core.ctx.clock.iso() };
     const meta = (params && typeof params === "object" ? params : {}) as { deadline?: unknown; idempotency_key?: unknown };

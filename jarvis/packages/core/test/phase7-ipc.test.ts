@@ -49,7 +49,7 @@ test("IPC: hello with the session secret is required; wrong secret and wrong pro
     await rejects(old.call("hello", { protocol_version: "2.0", component: "console", secret: SECRET }), "unsupported_operation");
     const ok = await h.connect(null);
     const hi = await ok.call<{ protocol_version: string; halted: boolean }>("hello", { protocol_version: "1.3", component: "console", secret: SECRET });
-    assert.equal(hi.protocol_version, "1.0"); assert.equal(hi.halted, false);
+    assert.equal(hi.protocol_version, "1.1"); assert.equal(hi.halted, false);
     await rejects(ok.call("no.such.method", {}), "unsupported_operation");
   } finally { await h.done(); }
 });
@@ -277,5 +277,56 @@ test("F22: status.get shows the unavailable database instead of failing", async 
     (h.core.ctx.db as { prepare: unknown }).prepare = realPrepare;
     assert.equal(st.database, "unavailable"); assert.equal(st.safe_mode, true);
     assert.equal((await c.call<{ database: string }>("status.get", {})).database, "ok");
+  } finally { await h.done(); }
+});
+
+test("review 3: mutual handshake — the secret never crosses the pipe; a squatting server learns nothing; forged proofs fail", async () => {
+  const { coordinatorHandshake } = await import("../src/nep/rpc.js");
+  const { handshakeProof } = await import("../src/ipc/coordinator-server.js");
+  const { createServer } = await import("node:net");
+  const h = await setup();
+  try {
+    // Real server: admitted.
+    const ok = await h.connect(null);
+    const hi = await coordinatorHandshake(ok, SECRET, "console");
+    assert.equal(hi.protocol_version, "1.1");
+    assert.equal((await ok.call<{ halted: boolean }>("status.get", {})).halted, false);
+    // Client with the wrong secret: refuses the server's proof and never sends one.
+    const wrong = await h.connect(null);
+    await rejects(coordinatorHandshake(wrong, "f".repeat(48), "console"), "auth_required");
+    // Forged client proof and finish-without-challenge are refused.
+    const forged = await h.connect(null);
+    const r = await forged.call<{ server_nonce: string }>("hello", { protocol_version: "1.1", component: "console", client_nonce: "a".repeat(48) });
+    assert.ok(r.server_nonce);
+    await rejects(forged.call("hello.finish", { client_proof: handshakeProof("not-the-secret", "client", "a".repeat(48), r.server_nonce) }), "auth_required");
+    const noChallenge = await h.connect(null);
+    await rejects(noChallenge.call("hello.finish", { client_proof: "0".repeat(64) }), "auth_required");
+    // A process squatting a pipe name: records everything the client sends.
+    const squatPath = pipePath(`jarvis-squat-${process.pid}-${randomBytes(3).toString("hex")}`);
+    let seen = "";
+    const squat = createServer(sock => { sock.setEncoding("utf8"); sock.on("data", (d: string) => { seen += d;
+      for (const line of d.split("\n").filter(Boolean)) { const m = JSON.parse(line); if (m.method === "hello") sock.write(JSON.stringify({ jsonrpc: "2.0", id: m.id, result: { server_nonce: "b".repeat(48), server_proof: "c".repeat(64) } }) + "\n"); } }); });
+    await new Promise<void>(res => squat.listen(squatPath, () => res()));
+    const victim = await NdjsonRpc.connect(squatPath);
+    await rejects(coordinatorHandshake(victim, SECRET, "console"), "auth_required");
+    squat.close();
+    assert.ok(!seen.includes(SECRET), "the squatter never saw the secret");
+    assert.ok(!seen.includes("hello.finish"), "no client proof was offered to an unproven server");
+  } finally { await h.done(); }
+});
+
+test("review 3: attachments up to the documented limit travel over the pipe; over it, a clear error", async () => {
+  const h = await setup();
+  try {
+    const c = await NdjsonRpc.connect(h.path, 5000, { maxLine: 48 * 1024 * 1024 });
+    await c.call("hello", { protocol_version: "1.1", component: "console", secret: SECRET });
+    const big = randomBytes(20 * 1024 * 1024).toString("base64");
+    const r = await c.call<{ replies: string[] }>("conversation.send", { content: "big file", attachments: [{ name: "data.bin", media_type: "application/octet-stream", data_base64: big }] });
+    assert.deepEqual(r.replies, ["Hello from JARVIS (fake)."]);
+    const two = await c.call<{ replies: string[] }>("conversation.send", { content: "too much", attachments: [
+      { name: "a.bin", media_type: "application/octet-stream", data_base64: randomBytes(17 * 1024 * 1024).toString("base64") },
+      { name: "b.bin", media_type: "application/octet-stream", data_base64: randomBytes(17 * 1024 * 1024).toString("base64") }] });
+    assert.match(two.replies[0]!, /total under 32 MB/);
+    c.close();
   } finally { await h.done(); }
 });

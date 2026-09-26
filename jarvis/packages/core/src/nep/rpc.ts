@@ -21,18 +21,20 @@ export class NdjsonRpc {
   onClose: (() => void) | null = null;
   closed = false;
 
-  constructor(private sock: Socket) {
+  private maxLine: number;
+  constructor(private sock: Socket, opts: { maxLine?: number } = {}) {
+    this.maxLine = opts.maxLine ?? NdjsonRpc.MAX_LINE;
     sock.setEncoding("utf8");
     sock.on("data", (d: string) => this.onData(d));
     sock.on("close", () => { this.closed = true; for (const p of this.pending.values()) p.reject(new JarvisError("unavailable_device", "connection closed")); this.pending.clear(); this.onClose?.(); });
     sock.on("error", () => { /* surfaced through close */ });
   }
 
-  static connect(path: string, timeoutMs = 5000): Promise<NdjsonRpc> {
+  static connect(path: string, timeoutMs = 5000, opts: { maxLine?: number } = {}): Promise<NdjsonRpc> {
     return new Promise((resolve, reject) => {
       const s = connect(path);
       const t = setTimeout(() => { s.destroy(); reject(new JarvisError("unavailable_device", `cannot reach ${path}`)); }, timeoutMs);
-      s.once("connect", () => { clearTimeout(t); resolve(new NdjsonRpc(s)); });
+      s.once("connect", () => { clearTimeout(t); resolve(new NdjsonRpc(s, opts)); });
       s.once("error", e => { clearTimeout(t); reject(new JarvisError("unavailable_device", `cannot reach ${path}: ${e.message}`)); });
     });
   }
@@ -40,7 +42,7 @@ export class NdjsonRpc {
   static MAX_LINE = 16 * 1024 * 1024;
   private onData(d: string): void {
     this.buf += d;
-    if (this.buf.length > NdjsonRpc.MAX_LINE && this.buf.indexOf("\n") < 0) { this.buf = ""; this.sock.destroy(); return; }
+    if (this.buf.length > this.maxLine && this.buf.indexOf("\n") < 0) { this.buf = ""; this.sock.destroy(); return; }
     let i: number;
     while ((i = this.buf.indexOf("\n")) >= 0) {
       const line = this.buf.slice(0, i); this.buf = this.buf.slice(i + 1);
@@ -84,4 +86,22 @@ export class NdjsonRpc {
   }
   notify(method: string, params: unknown): void { this.send({ jsonrpc: "2.0", method, params }); }
   close(): void { this.sock.end(); }
+}
+
+/**
+ * Client side of the Coordinator handshake (protocol 1.1): verifies the server's proof
+ * before sending its own, so the session secret never crosses the pipe.
+ */
+export async function coordinatorHandshake(rpc: NdjsonRpc, secret: string, component: "console" | "session"): Promise<{ protocol_version: string; safe_mode?: boolean; halted?: boolean }> {
+  const { createHmac, createHash, randomBytes: rb, timingSafeEqual } = await import("node:crypto");
+  const key = createHash("sha256").update(secret).digest();
+  const proof = (role: string, cn: string, sn: string) => createHmac("sha256", key).update(`${role}|${cn}|${sn}`).digest("hex");
+  const cn = rb(24).toString("hex");
+  const r = await rpc.call<{ server_nonce?: string; server_proof?: string }>("hello", { protocol_version: "1.1", component, client_nonce: cn }, 10_000);
+  const expected = r.server_nonce ? proof("server", cn, r.server_nonce) : "";
+  if (!r.server_nonce || typeof r.server_proof !== "string" || r.server_proof.length !== expected.length || !timingSafeEqual(Buffer.from(r.server_proof), Buffer.from(expected))) {
+    rpc.close();
+    throw new JarvisError("auth_required", "the Coordinator could not prove it knows the session secret (wrong secret, or not the real Coordinator)");
+  }
+  return rpc.call("hello.finish", { client_proof: proof("client", cn, r.server_nonce) }, 10_000);
 }
