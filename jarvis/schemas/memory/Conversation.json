@@ -1,0 +1,93 @@
+{
+  "$id": "https://jarvis.local/schemas/memory/Conversation.json",
+  "title": "Conversation",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "channel": {
+      "type": "string",
+      "enum": [
+        "console",
+        "toast",
+        "sound",
+        "speech",
+        "calendar_mirror",
+        "phone_push",
+        "email_self"
+      ]
+    },
+    "started_at": {
+      "type": "string"
+    },
+    "last_message_at": {
+      "type": "string"
+    },
+    "summary_id": {
+      "type": "string"
+    },
+    "task_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "provider_sessions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "adapter": {
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "adapter",
+          "session_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "retention": {
+      "type": "object",
+      "properties": {
+        "policy": {
+          "type": "string",
+          "enum": [
+            "keep",
+            "until",
+            "task_end",
+            "days"
+          ]
+        },
+        "value": {
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "review_at": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "policy"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "id",
+    "channel",
+    "started_at",
+    "last_message_at",
+    "task_ids",
+    "retention"
+  ],
+  "additionalProperties": false
+}

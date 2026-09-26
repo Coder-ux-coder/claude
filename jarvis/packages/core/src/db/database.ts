@@ -23,7 +23,7 @@ export function openDatabase(opts: OpenOptions): OpenResult {
     if (!opts.readonly && opts.path !== ":memory:") db.pragma("journal_mode = WAL");
     db.pragma("foreign_keys = ON");
     db.pragma("busy_timeout = 5000");
-    db.pragma("synchronous = NORMAL");
+    db.pragma("synchronous = FULL");   // 03 §9.3
     integrity = String(db.pragma("quick_check", { simple: true }));
   } catch (e) {
     // Fail closed (03 §9.9, F22): callers treat this as "policy and memory unavailable".

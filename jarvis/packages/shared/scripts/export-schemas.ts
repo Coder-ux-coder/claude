@@ -17,6 +17,10 @@ const entries: Record<string, z.ZodType> = {
   "capability/CapabilityDescriptor": S.CapabilityDescriptor, "capability/CapabilityHealth": S.CapabilityHealth,
   "capability/ToolResult": S.ToolResult, "capability/StructuredError": S.StructuredError,
   "worker/WorkOrder": S.WorkOrder, "worker/WorkerResult": S.WorkerResult,
+  "memory/MemoryRecord": S.MemoryRecord, "memory/OwnerProfile": S.OwnerProfile, "memory/Project": S.Project, "memory/Commitment": S.Commitment,
+  "memory/Entity": S.Entity, "memory/Relationship": S.Relationship, "memory/Conversation": S.Conversation, "memory/Message": S.Message,
+  "memory/ExperienceRecord": S.ExperienceRecord, "memory/MemoryCorrection": S.MemoryCorrection, "memory/DerivedSummary": S.DerivedSummary,
+  "memory/MemoryProposal": S.MemoryProposal,
   "nep/NepInvoke": S.NepInvoke, "nep/NepEvent": S.NepEvent, "nep/NepCancel": S.NepCancel,
   ...((S as unknown as { EXTRA_SCHEMAS?: Record<string, z.ZodType> }).EXTRA_SCHEMAS ?? {}),
 };

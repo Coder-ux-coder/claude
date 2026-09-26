@@ -1,0 +1,246 @@
+{
+  "$id": "https://jarvis.local/schemas/memory/Entity.json",
+  "title": "Entity",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "schema": {
+      "type": "string",
+      "const": "jarvis.entity/1"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "person",
+        "organization",
+        "org_unit",
+        "place",
+        "account",
+        "device",
+        "resource",
+        "product",
+        "other"
+      ]
+    },
+    "names": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "primary",
+              "alias",
+              "handle"
+            ]
+          }
+        },
+        "required": [
+          "value",
+          "kind"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "identifiers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "system": {
+            "type": "string",
+            "enum": [
+              "email",
+              "phone",
+              "url",
+              "path",
+              "gdrive_file_id",
+              "service_id",
+              "other"
+            ]
+          },
+          "value": {
+            "type": "string"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "system",
+          "value",
+          "verified"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "attributes": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
+    },
+    "provenance": {
+      "type": "object",
+      "properties": {
+        "origin": {
+          "type": "string",
+          "enum": [
+            "stated",
+            "observed",
+            "derived",
+            "inferred",
+            "imported"
+          ]
+        },
+        "source_refs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "message",
+                  "evidence",
+                  "artifact",
+                  "event",
+                  "owner_edit"
+                ]
+              },
+              "ref": {
+                "type": "string"
+              },
+              "locator": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "ref"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "source_trust": {
+          "type": "string",
+          "enum": [
+            "owner_verified",
+            "owner_unverified",
+            "trusted_service",
+            "external_content",
+            "worker_claim",
+            "system"
+          ]
+        },
+        "recorded_by": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "origin",
+        "source_refs",
+        "source_trust",
+        "recorded_by"
+      ],
+      "additionalProperties": false
+    },
+    "sensitivity": {
+      "type": "string",
+      "enum": [
+        "normal",
+        "personal",
+        "sensitive",
+        "restricted"
+      ]
+    },
+    "egress": {
+      "type": "object",
+      "properties": {
+        "policy": {
+          "type": "string",
+          "enum": [
+            "any_approved_provider",
+            "listed_providers",
+            "local_only"
+          ]
+        },
+        "providers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "policy"
+      ],
+      "additionalProperties": false
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "merged",
+        "deleted"
+      ]
+    },
+    "merged_into": {
+      "type": "string"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "times": {
+      "type": "object",
+      "properties": {
+        "created_at": {
+          "type": "string"
+        },
+        "observed_at": {
+          "type": "string"
+        },
+        "last_verified_at": {
+          "type": "string"
+        },
+        "valid_from": {
+          "type": "string"
+        },
+        "valid_until": {
+          "type": "string"
+        },
+        "expires_at": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "created_at"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "id",
+    "schema",
+    "kind",
+    "names",
+    "identifiers",
+    "provenance",
+    "sensitivity",
+    "egress",
+    "status",
+    "revision",
+    "times"
+  ],
+  "additionalProperties": false
+}

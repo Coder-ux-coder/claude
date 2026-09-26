@@ -1,0 +1,224 @@
+{
+  "$id": "https://jarvis.local/schemas/memory/ExperienceRecord.json",
+  "title": "ExperienceRecord",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "schema": {
+      "type": "string",
+      "const": "jarvis.experience/1"
+    },
+    "task_id": {
+      "type": "string"
+    },
+    "goal_class": {
+      "type": "string"
+    },
+    "skill_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "skill_id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "skill_id",
+          "version"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "capability_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "environment": {
+      "type": "object",
+      "properties": {
+        "node_id": {
+          "type": "string"
+        },
+        "app_versions": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "site_fingerprints": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "account_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "node_id",
+        "account_ids"
+      ],
+      "additionalProperties": false
+    },
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "verified_success",
+        "partial",
+        "failed",
+        "cancelled",
+        "unknown"
+      ]
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "duration_s": {
+      "type": "number"
+    },
+    "cost": {
+      "type": "object",
+      "properties": {
+        "cost_usd": {
+          "type": "number"
+        },
+        "tokens": {
+          "type": "number"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "actual",
+            "estimated",
+            "unknown"
+          ]
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "failure_classes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "gap_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "owner_feedback": {
+      "type": "object",
+      "properties": {
+        "rating": {
+          "type": "string",
+          "enum": [
+            "good",
+            "bad"
+          ]
+        },
+        "correction_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "correction_ids"
+      ],
+      "additionalProperties": false
+    },
+    "lesson_candidate_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "sensitivity": {
+      "type": "string",
+      "enum": [
+        "normal",
+        "personal",
+        "sensitive",
+        "restricted"
+      ]
+    },
+    "retention": {
+      "type": "object",
+      "properties": {
+        "policy": {
+          "type": "string",
+          "enum": [
+            "keep",
+            "until",
+            "task_end",
+            "days"
+          ]
+        },
+        "value": {
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "review_at": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "policy"
+      ],
+      "additionalProperties": false
+    },
+    "created_at": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "schema",
+    "task_id",
+    "goal_class",
+    "skill_refs",
+    "capability_refs",
+    "environment",
+    "outcome",
+    "evidence_refs",
+    "duration_s",
+    "cost",
+    "failure_classes",
+    "gap_ids",
+    "lesson_candidate_ids",
+    "sensitivity",
+    "retention",
+    "created_at"
+  ],
+  "additionalProperties": false
+}

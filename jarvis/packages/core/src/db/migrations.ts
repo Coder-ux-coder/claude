@@ -152,4 +152,58 @@ create table artifacts (
 );
 `,
   },
+  {
+    version: 2, name: "memory",
+    sql: `
+create table owner_profile (owner_id text primary key, revision integer not null, profile text not null, updated_at text not null);
+
+create table memory_records (
+  id text primary key,
+  type text not null,
+  status text not null,
+  canonical_key text not null,              -- subjects + predicate/domain + scope (03 §9.11 dedup)
+  domain text,                              -- predicate (fact) or domain (preference)
+  scope_level text not null,
+  project_id text, task_id text,
+  sensitivity text not null,
+  valid_from text, valid_until text, expires_at text,
+  revision integer not null,
+  updated_at text not null,
+  record text not null                      -- json MemoryRecord; sensitive/restricted text+content sealed (AES-256-GCM); purged when deleted
+);
+create index memory_key on memory_records(canonical_key, status);
+create index memory_domain on memory_records(domain, status);
+create table memory_scope_entities (record_id text not null references memory_records(id), entity_id text not null, primary key (record_id, entity_id));
+create index memory_scope_entity on memory_scope_entities(entity_id);
+create table memory_subjects (record_id text not null references memory_records(id), entity_id text not null, primary key (record_id, entity_id));
+create virtual table memory_fts using fts5(text, record_id unindexed, tokenize = 'unicode61 remove_diacritics 2');
+
+create table entities (id text primary key, kind text not null, status text not null, revision integer not null, entity text not null);
+create table entity_names (entity_id text not null references entities(id), value text not null, norm text not null, kind text not null);
+create index entity_names_norm on entity_names(norm);
+create table entity_identifiers (entity_id text not null references entities(id), system text not null, value text not null, norm text not null);
+create index entity_identifiers_norm on entity_identifiers(system, norm);
+create table relationships (id text primary key, from_entity_id text not null, to_entity_id text not null, type text not null, status text not null, relationship text not null);
+create index rel_from on relationships(from_entity_id, type, status);
+create index rel_to on relationships(to_entity_id, type, status);
+
+create table projects (id text primary key, status text not null, name text not null, project text not null);
+create table commitments (id text primary key, status text not null, project_id text, commitment text not null);
+create table commitment_parties (commitment_id text not null, entity_id text not null);
+
+create table conversations (id text primary key, channel text not null, started_at text not null, last_message_at text not null, conversation text not null);
+create table messages (id text primary key, conversation_id text not null references conversations(id), author text not null, trust text not null, created_at text not null, message text not null);
+create index messages_conv on messages(conversation_id, created_at);
+
+create table experiences (id text primary key, task_id text not null, goal_class text not null, outcome text not null, created_at text not null, experience text not null);
+create virtual table experience_fts using fts5(goal_class, summary, experience_id unindexed);
+
+create table memory_corrections (id text primary key, applied_at text not null, correction text not null);
+create table derived_summaries (id text primary key, kind text not null, subject_ref text not null, state text not null, summary text not null);
+create table summary_inputs (summary_id text not null references derived_summaries(id), record_id text not null, revision integer not null);
+create index summary_inputs_record on summary_inputs(record_id);
+create table memory_proposals (proposal_id text primary key, status text not null, error text, created_at text not null, proposal text not null);
+create table task_working_state (task_id text not null, key text not null, value text not null, expires_at text, primary key (task_id, key));
+`,
+  },
 ];

@@ -1,0 +1,126 @@
+{
+  "$id": "https://jarvis.local/schemas/memory/MemoryCorrection.json",
+  "title": "MemoryCorrection",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "schema": {
+      "type": "string",
+      "const": "jarvis.memory_correction/1"
+    },
+    "target_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "wrong_value",
+        "wrong_scope",
+        "outdated",
+        "should_not_remember",
+        "merge_duplicates",
+        "split",
+        "wrong_entity"
+      ]
+    },
+    "owner_statement_ref": {
+      "type": "string"
+    },
+    "before": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "record_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "record_id",
+          "revision"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "after": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "record_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "record_id",
+          "revision"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "generalization_limit": {
+      "type": "string"
+    },
+    "invalidated_derivations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "propagated_to": {
+      "type": "object",
+      "properties": {
+        "task_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "work_order_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "task_ids",
+        "work_order_ids"
+      ],
+      "additionalProperties": false
+    },
+    "applied_at": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "schema",
+    "target_ids",
+    "kind",
+    "owner_statement_ref",
+    "before",
+    "after",
+    "generalization_limit",
+    "invalidated_derivations",
+    "propagated_to",
+    "applied_at"
+  ],
+  "additionalProperties": false
+}

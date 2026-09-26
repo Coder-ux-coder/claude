@@ -1,0 +1,87 @@
+{
+  "$id": "https://jarvis.local/schemas/memory/MemoryProposal.json",
+  "title": "MemoryProposal",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "proposal_id": {
+      "type": "string"
+    },
+    "proposed_by": {
+      "type": "string"
+    },
+    "operation": {
+      "type": "string",
+      "enum": [
+        "create",
+        "update",
+        "supersede",
+        "link",
+        "delete"
+      ]
+    },
+    "target_id": {
+      "type": "string"
+    },
+    "record": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
+    },
+    "basis": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "message",
+              "evidence",
+              "artifact",
+              "event",
+              "owner_edit"
+            ]
+          },
+          "ref": {
+            "type": "string"
+          },
+          "locator": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "ref"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "source_trust": {
+      "type": "string",
+      "enum": [
+        "owner_verified",
+        "owner_unverified",
+        "trusted_service",
+        "external_content",
+        "worker_claim",
+        "system"
+      ]
+    },
+    "rationale": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "proposal_id",
+    "proposed_by",
+    "operation",
+    "record",
+    "basis",
+    "source_trust",
+    "rationale"
+  ],
+  "additionalProperties": false
+}

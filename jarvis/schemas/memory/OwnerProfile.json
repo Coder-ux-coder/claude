@@ -1,0 +1,294 @@
+{
+  "$id": "https://jarvis.local/schemas/memory/OwnerProfile.json",
+  "title": "OwnerProfile",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "owner_id": {
+      "type": "string",
+      "const": "owner"
+    },
+    "schema": {
+      "type": "string",
+      "const": "jarvis.owner_profile/1"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "updated_at": {
+      "type": "string"
+    },
+    "display_name": {
+      "type": "string"
+    },
+    "pronouns": {
+      "type": "string"
+    },
+    "timezone": {
+      "type": "string"
+    },
+    "locale": {
+      "type": "string"
+    },
+    "languages": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "units": {
+      "type": "string",
+      "enum": [
+        "metric",
+        "imperial",
+        "mixed"
+      ]
+    },
+    "working_hours": {
+      "type": "object",
+      "properties": {
+        "tz": {
+          "type": "string"
+        },
+        "windows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "days": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "mon",
+                    "tue",
+                    "wed",
+                    "thu",
+                    "fri",
+                    "sat",
+                    "sun"
+                  ]
+                }
+              },
+              "from": {
+                "type": "string"
+              },
+              "to": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "days",
+              "from",
+              "to"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "tz",
+        "windows"
+      ],
+      "additionalProperties": false
+    },
+    "quiet_hours": {
+      "type": "object",
+      "properties": {
+        "tz": {
+          "type": "string"
+        },
+        "windows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "days": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "mon",
+                    "tue",
+                    "wed",
+                    "thu",
+                    "fri",
+                    "sat",
+                    "sun"
+                  ]
+                }
+              },
+              "from": {
+                "type": "string"
+              },
+              "to": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "days",
+              "from",
+              "to"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "tz",
+        "windows"
+      ],
+      "additionalProperties": false
+    },
+    "assistant": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "tone": {
+          "type": "string"
+        },
+        "verbosity": {
+          "type": "string",
+          "enum": [
+            "brief",
+            "normal",
+            "detailed"
+          ]
+        },
+        "humor": {
+          "type": "string",
+          "enum": [
+            "none",
+            "light"
+          ]
+        },
+        "voice_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "tone",
+        "verbosity",
+        "humor"
+      ],
+      "additionalProperties": false
+    },
+    "notification_defaults": {
+      "type": "object",
+      "properties": {
+        "digest_time": {
+          "type": "string"
+        },
+        "channels": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "console",
+              "toast",
+              "sound",
+              "speech",
+              "calendar_mirror",
+              "phone_push",
+              "email_self"
+            ]
+          }
+        }
+      },
+      "required": [
+        "channels"
+      ],
+      "additionalProperties": false
+    },
+    "privacy": {
+      "type": "object",
+      "properties": {
+        "default_egress_by_sensitivity": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "personal",
+              "sensitive",
+              "restricted"
+            ]
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "policy": {
+                "type": "string",
+                "enum": [
+                  "any_approved_provider",
+                  "listed_providers",
+                  "local_only"
+                ]
+              },
+              "providers": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "policy"
+            ],
+            "additionalProperties": false
+          },
+          "required": [
+            "normal",
+            "personal",
+            "sensitive",
+            "restricted"
+          ]
+        },
+        "audio_retention": {
+          "type": "string",
+          "enum": [
+            "none",
+            "24h"
+          ]
+        },
+        "screenshot_retention_days": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "default_egress_by_sensitivity",
+        "audio_retention",
+        "screenshot_retention_days"
+      ],
+      "additionalProperties": false
+    },
+    "home_node_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "owner_id",
+    "schema",
+    "revision",
+    "updated_at",
+    "display_name",
+    "timezone",
+    "locale",
+    "languages",
+    "units",
+    "working_hours",
+    "quiet_hours",
+    "assistant",
+    "notification_defaults",
+    "privacy",
+    "home_node_id"
+  ],
+  "additionalProperties": false
+}

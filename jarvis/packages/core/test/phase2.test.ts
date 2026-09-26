@@ -8,6 +8,7 @@ import { JarvisError, MINUTE } from "@jarvis/shared";
 import { harness, contract, runningTask } from "./helpers/fixtures.js";
 import { runRecoveryScan } from "../src/tasks/recovery.js";
 import { openDatabase } from "../src/db/database.js";
+import { MIGRATIONS } from "../src/db/migrations.js";
 import { seal, open, MasterKeyProvider } from "../src/crypto/keys.js";
 
 const code = (fn: () => unknown) => { try { fn(); return "none"; } catch (e) { return e instanceof JarvisError ? e.code : `other:${(e as Error).message}`; } };
@@ -235,11 +236,12 @@ test("migrations are recorded and idempotent", () => {
   const dir = mkdtempSync(join(tmpdir(), "jv-"));
   try {
     const p = join(dir, "j.db");
-    const a = openDatabase({ path: p }); assert.equal(a.schemaVersion, 1); assert.equal(a.integrity, "ok"); a.db.close();
+    const latest = Math.max(...MIGRATIONS.map(m => m.version));
+    const a = openDatabase({ path: p }); assert.equal(a.schemaVersion, latest); assert.equal(a.integrity, "ok"); a.db.close();
     const b = openDatabase({ path: p }); assert.equal(b.pendingMigrations, 0);
     assert.equal(String(b.db.pragma("journal_mode", { simple: true })), "wal");
     b.db.close();
-    const raw = new Database(p); assert.equal((raw.prepare("select count(*) c from schema_migrations").get() as { c: number }).c, 1); raw.close();
+    const raw = new Database(p); assert.equal((raw.prepare("select count(*) c from schema_migrations").get() as { c: number }).c, MIGRATIONS.length); raw.close();
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 

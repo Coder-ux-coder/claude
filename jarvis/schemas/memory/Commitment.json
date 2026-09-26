@@ -1,0 +1,192 @@
+{
+  "$id": "https://jarvis.local/schemas/memory/Commitment.json",
+  "title": "Commitment",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "schema": {
+      "type": "string",
+      "const": "jarvis.commitment/1"
+    },
+    "text": {
+      "type": "string"
+    },
+    "holder": {
+      "type": "string",
+      "enum": [
+        "owner",
+        "jarvis",
+        "third_party"
+      ]
+    },
+    "counterparty_entity_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "certainty": {
+      "type": "string",
+      "enum": [
+        "explicit",
+        "tentative"
+      ]
+    },
+    "due": {
+      "type": "object",
+      "properties": {
+        "local": {
+          "type": "string"
+        },
+        "tz": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "local",
+        "tz"
+      ],
+      "additionalProperties": false
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "open",
+        "done",
+        "cancelled",
+        "snoozed",
+        "missed"
+      ]
+    },
+    "linked_schedule_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "linked_task_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "project_id": {
+      "type": "string"
+    },
+    "provenance": {
+      "type": "object",
+      "properties": {
+        "origin": {
+          "type": "string",
+          "enum": [
+            "stated",
+            "observed",
+            "derived",
+            "inferred",
+            "imported"
+          ]
+        },
+        "source_refs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "message",
+                  "evidence",
+                  "artifact",
+                  "event",
+                  "owner_edit"
+                ]
+              },
+              "ref": {
+                "type": "string"
+              },
+              "locator": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "ref"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "source_trust": {
+          "type": "string",
+          "enum": [
+            "owner_verified",
+            "owner_unverified",
+            "trusted_service",
+            "external_content",
+            "worker_claim",
+            "system"
+          ]
+        },
+        "recorded_by": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "origin",
+        "source_refs",
+        "source_trust",
+        "recorded_by"
+      ],
+      "additionalProperties": false
+    },
+    "times": {
+      "type": "object",
+      "properties": {
+        "created_at": {
+          "type": "string"
+        },
+        "observed_at": {
+          "type": "string"
+        },
+        "last_verified_at": {
+          "type": "string"
+        },
+        "valid_from": {
+          "type": "string"
+        },
+        "valid_until": {
+          "type": "string"
+        },
+        "expires_at": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "created_at"
+      ],
+      "additionalProperties": false
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    }
+  },
+  "required": [
+    "id",
+    "schema",
+    "text",
+    "holder",
+    "counterparty_entity_ids",
+    "certainty",
+    "status",
+    "linked_schedule_ids",
+    "linked_task_ids",
+    "provenance",
+    "times",
+    "revision"
+  ],
+  "additionalProperties": false
+}

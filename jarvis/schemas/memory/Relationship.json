@@ -1,0 +1,161 @@
+{
+  "$id": "https://jarvis.local/schemas/memory/Relationship.json",
+  "title": "Relationship",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "schema": {
+      "type": "string",
+      "const": "jarvis.relationship/1"
+    },
+    "from_entity_id": {
+      "type": "string"
+    },
+    "to_entity_id": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "works_at",
+        "member_of",
+        "client_of",
+        "reports_to",
+        "located_in",
+        "owns",
+        "contact_for",
+        "family",
+        "other"
+      ]
+    },
+    "qualifiers": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
+    },
+    "valid_from": {
+      "type": "string"
+    },
+    "valid_until": {
+      "type": "string"
+    },
+    "provenance": {
+      "type": "object",
+      "properties": {
+        "origin": {
+          "type": "string",
+          "enum": [
+            "stated",
+            "observed",
+            "derived",
+            "inferred",
+            "imported"
+          ]
+        },
+        "source_refs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "message",
+                  "evidence",
+                  "artifact",
+                  "event",
+                  "owner_edit"
+                ]
+              },
+              "ref": {
+                "type": "string"
+              },
+              "locator": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "ref"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "source_trust": {
+          "type": "string",
+          "enum": [
+            "owner_verified",
+            "owner_unverified",
+            "trusted_service",
+            "external_content",
+            "worker_claim",
+            "system"
+          ]
+        },
+        "recorded_by": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "origin",
+        "source_refs",
+        "source_trust",
+        "recorded_by"
+      ],
+      "additionalProperties": false
+    },
+    "confidence": {
+      "type": "object",
+      "properties": {
+        "level": {
+          "type": "string",
+          "enum": [
+            "confirmed",
+            "high",
+            "medium",
+            "low"
+          ]
+        },
+        "basis": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "level",
+        "basis"
+      ],
+      "additionalProperties": false
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "ended",
+        "disputed",
+        "deleted"
+      ]
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    }
+  },
+  "required": [
+    "id",
+    "schema",
+    "from_entity_id",
+    "to_entity_id",
+    "type",
+    "provenance",
+    "confidence",
+    "status",
+    "revision"
+  ],
+  "additionalProperties": false
+}

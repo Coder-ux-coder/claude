@@ -31,6 +31,10 @@ const pairs: Record<string, z.ZodType> = (globalThis as any).__PAIRS ?? {
   ToolInvocation: S.ToolInvocation, ResourceLease: S.ResourceLease, UsageReport: S.UsageReport,
   CapabilityDescriptor: S.CapabilityDescriptor, CapabilityHealth: S.CapabilityHealth, ToolResult: S.ToolResult,
   StructuredError: S.StructuredError, WorkOrder: S.WorkOrder, WorkerResult: S.WorkerResult, NepInvoke: S.NepInvoke,
+  MemoryRecord: S.MemoryRecord, FactContent: S.FactContent, PreferenceContent: S.PreferenceContent, LessonContent: S.LessonContent,
+  OwnerProfile: S.OwnerProfile, Project: S.Project, Commitment: S.Commitment, Entity: S.Entity, Relationship: S.Relationship,
+  Conversation: S.Conversation, Message: S.Message, ExperienceRecord: S.ExperienceRecord, MemoryCorrection: S.MemoryCorrection,
+  DerivedSummary: S.DerivedSummary, MemoryProposal: S.MemoryProposal,
   Money: S.Money, Retention: S.Retention, Provenance: S.Provenance, SourceRef: S.SourceRef, RecordTimes: S.RecordTimes,
   ...((S as any).SPEC_PAIRS ?? {}),
 };

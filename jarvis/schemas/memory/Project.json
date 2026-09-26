@@ -1,0 +1,306 @@
+{
+  "$id": "https://jarvis.local/schemas/memory/Project.json",
+  "title": "Project",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "schema": {
+      "type": "string",
+      "const": "jarvis.project/1"
+    },
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "paused",
+        "completed",
+        "archived"
+      ]
+    },
+    "goals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "target_date": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "met",
+              "dropped"
+            ]
+          }
+        },
+        "required": [
+          "text",
+          "status"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "stakeholders": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "entity_id": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "entity_id",
+          "role"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "resources": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "path_prefix": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "path_prefix"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "account": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "account"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "site": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "site"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "entity": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "entity"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "app": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "app"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "recipient_set": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "recipient_set"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "convention_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "properties": {
+        "origin": {
+          "type": "string",
+          "enum": [
+            "stated",
+            "observed",
+            "derived",
+            "inferred",
+            "imported"
+          ]
+        },
+        "source_refs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "message",
+                  "evidence",
+                  "artifact",
+                  "event",
+                  "owner_edit"
+                ]
+              },
+              "ref": {
+                "type": "string"
+              },
+              "locator": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "ref"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "source_trust": {
+          "type": "string",
+          "enum": [
+            "owner_verified",
+            "owner_unverified",
+            "trusted_service",
+            "external_content",
+            "worker_claim",
+            "system"
+          ]
+        },
+        "recorded_by": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "origin",
+        "source_refs",
+        "source_trust",
+        "recorded_by"
+      ],
+      "additionalProperties": false
+    },
+    "sensitivity": {
+      "type": "string",
+      "enum": [
+        "normal",
+        "personal",
+        "sensitive",
+        "restricted"
+      ]
+    },
+    "egress": {
+      "type": "object",
+      "properties": {
+        "policy": {
+          "type": "string",
+          "enum": [
+            "any_approved_provider",
+            "listed_providers",
+            "local_only"
+          ]
+        },
+        "providers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "policy"
+      ],
+      "additionalProperties": false
+    },
+    "times": {
+      "type": "object",
+      "properties": {
+        "created_at": {
+          "type": "string"
+        },
+        "observed_at": {
+          "type": "string"
+        },
+        "last_verified_at": {
+          "type": "string"
+        },
+        "valid_from": {
+          "type": "string"
+        },
+        "valid_until": {
+          "type": "string"
+        },
+        "expires_at": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "created_at"
+      ],
+      "additionalProperties": false
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    }
+  },
+  "required": [
+    "id",
+    "schema",
+    "name",
+    "status",
+    "goals",
+    "stakeholders",
+    "resources",
+    "convention_ids",
+    "provenance",
+    "sensitivity",
+    "egress",
+    "times",
+    "revision"
+  ],
+  "additionalProperties": false
+}

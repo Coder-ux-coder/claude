@@ -1,0 +1,85 @@
+{
+  "$id": "https://jarvis.local/schemas/memory/Message.json",
+  "title": "Message",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "conversation_id": {
+      "type": "string"
+    },
+    "author": {
+      "type": "string",
+      "enum": [
+        "owner",
+        "jarvis",
+        "system"
+      ]
+    },
+    "channel": {
+      "type": "string",
+      "enum": [
+        "console",
+        "toast",
+        "sound",
+        "speech",
+        "calendar_mirror",
+        "phone_push",
+        "email_self"
+      ]
+    },
+    "trust": {
+      "type": "string",
+      "enum": [
+        "owner_verified",
+        "owner_unverified",
+        "system"
+      ]
+    },
+    "modality": {
+      "type": "string",
+      "enum": [
+        "text",
+        "voice",
+        "image",
+        "file"
+      ]
+    },
+    "content_ref": {
+      "type": "string"
+    },
+    "transcript_confidence": {
+      "type": "string",
+      "enum": [
+        "high",
+        "medium",
+        "low"
+      ]
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "redaction_state": {
+      "type": "string",
+      "enum": [
+        "none",
+        "redacted",
+        "purged"
+      ]
+    }
+  },
+  "required": [
+    "id",
+    "conversation_id",
+    "author",
+    "channel",
+    "trust",
+    "modality",
+    "content_ref",
+    "created_at",
+    "redaction_state"
+  ],
+  "additionalProperties": false
+}
