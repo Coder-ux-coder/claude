@@ -38,6 +38,21 @@ TOOLS = [
     ("browser_back", "Go back to the previous page.", _obj({})),
     ("browser_device", "Show pages as a desktop or as a phone (for checking mobile layouts).",
      _obj({"device": {"type": "string", "enum": ["desktop", "phone"]}}, ["device"])),
+    ("computer_screenshot", "See the owner's Windows screen as a picture. Take one before acting and after each "
+                            "step. Positions for the other computer tools are pixels of the latest picture.", _obj({})),
+    ("computer_click", "Click on the Windows screen at x, y (pixels of the latest screenshot). button: left, right or "
+                       "middle; double=true for a double-click.",
+     _obj({"x": N, "y": N, "button": {"type": "string", "enum": ["left", "right", "middle"]}, "double": B}, ["x", "y"])),
+    ("computer_drag", "Drag with the mouse from x1, y1 to x2, y2 (pixels of the latest screenshot).",
+     _obj({"x1": N, "y1": N, "x2": N, "y2": N}, ["x1", "y1", "x2", "y2"])),
+    ("computer_type", "Type text where the cursor is on the computer. Any language, Urdu included. New lines press "
+                      "Enter.", _obj({"text": S}, ["text"])),
+    ("computer_key", "Press a key or a combination on the computer: enter, esc, tab, ctrl+s, alt+tab, win+r, f5, "
+                     "ctrl+shift+esc …", _obj({"keys": S}, ["keys"])),
+    ("computer_scroll", "Scroll where the mouse pointer is: direction up or down, amount in wheel steps (default 3).",
+     _obj({"direction": {"type": "string", "enum": ["up", "down"]}, "amount": N}, ["direction"])),
+    ("computer_open", "Open something on the computer: an app by name (excel, word, notepad, calculator…), a file, a "
+                      "folder, or a web address.", _obj({"target": S}, ["target"])),
     ("phone_status", "Is the owner's Android phone connected?", _obj({})),
     ("phone_screenshot", "See the phone's screen as a picture.", _obj({})),
     ("phone_screen", "List what is on the phone's screen (text, buttons) with tap positions.", _obj({})),
@@ -96,7 +111,9 @@ def main() -> None:
             result = {"protocolVersion": params.get("protocolVersion") or "2025-06-18",
                       "capabilities": {"tools": {"listChanged": False}},
                       "serverInfo": {"name": "crew-devices", "version": "1.0"},
-                      "instructions": "The owner's browser (in the Crew app) and Android phone. They watch live."}
+                      "instructions": "The owner's browser (in the Crew app), Windows computer and Android phone. "
+                                            "The owner watches live and can stop computer control by moving "
+                                            "the mouse pointer into the top-left corner."}
         elif method == "tools/list":
             result = {"tools": [{"name": n, "description": d, "inputSchema": s} for n, d, s in TOOLS]}
         elif method == "tools/call":

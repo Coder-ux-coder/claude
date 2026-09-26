@@ -5,7 +5,7 @@ import { $, $$, h, icon, btn, api, store, bus, fail, toast, markdown, isSmall, d
 import { home } from './js/pages/home.js';
 import { assistant } from './js/pages/chat.js';
 import { projects, project } from './js/pages/projects.js';
-import { browserPage, phonePage, capturesPage, skillsPage, morePage } from './js/pages/misc.js';
+import { browserPage, phonePage, computerPage, capturesPage, skillsPage, morePage } from './js/pages/misc.js';
 import { settingsPage, applyLook } from './js/pages/settings.js';
 import { mountLive } from './js/devices.js';
 
@@ -16,6 +16,7 @@ const ROUTES = [
   [/^\/projects\/([\w.-]+)$/, project, 'projects', 'Project'],
   [/^\/browser$/, browserPage, 'browser', 'Browser'],
   [/^\/phone$/, phonePage, 'phone', 'Phone'],
+  [/^\/computer$/, computerPage, 'computer', 'Computer'],
   [/^\/captures$/, capturesPage, 'captures', 'Captures'],
   [/^\/skills$/, skillsPage, 'skills', 'Skills'],
   [/^\/settings(?:\/(\w+))?$/, settingsPage, 'settings', 'Settings'],

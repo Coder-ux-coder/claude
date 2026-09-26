@@ -1,7 +1,7 @@
 // The Assistant: a conversation that streams word by word, uses the browser and
 // the phone, makes files you can preview, reads answers aloud and talks with you.
 
-import { $, h, icon, btn, iconBtn, api, stream, opened, toast, fail, confirmBox, dialog, store, bus, markdown, ago,
+import { h, icon, btn, iconBtn, api, stream, opened, toast, fail, confirmBox, dialog, store, bus, markdown, ago,
   autosize, isSmall, copyText, bytes } from '../ui.js';
 import { dictate, canDictate, canSpeak, speech, conversation, stopDictation } from '../voice.js';
 
@@ -194,6 +194,10 @@ class ChatPage {
     if (!isSmall()) {
       if (label === 'Using the browser') bus.emit('panel:open', 'browser');
       if (label === 'Using your phone') bus.emit('panel:open', 'phone');
+    }
+    if (label === 'Using your computer' && !L.warned) {
+      L.warned = true;
+      toast('The assistant is using your computer. To stop it, push the mouse pointer into the top-left corner.', { ms: 8000 });
     }
     this.scrollDown();
   }

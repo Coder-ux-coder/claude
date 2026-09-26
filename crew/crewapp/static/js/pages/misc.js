@@ -28,6 +28,17 @@ export function phonePage(view) {
   return mountLive('phone', holder, 'page');
 }
 
+export function computerPage(view) {
+  const box = h('div', { class: 'page-live' },
+    h('div', { class: 'live-head' }, h('h2', { class: 'grow' }, 'Your computer'),
+      h('span', { class: 'muted small' }, store.isLocal ? 'Most useful from your phone: see and use this computer from anywhere in the house.'
+        : 'Tap to click, drag to move things, type to write. Push the mouse into the top-left corner to stop the assistant.')));
+  const holder = h('div', { style: { display: 'flex', flexDirection: 'column', flex: '1', minHeight: '0' } });
+  box.append(holder);
+  view.append(box);
+  return mountLive('computer', holder, 'page');
+}
+
 // ------------------------------------------------------------------ captures
 
 export function capturesPage(view) {
@@ -146,6 +157,7 @@ export function morePage(view) {
     h('div', { class: 'more-list' },
       item('#/browser', 'globe', 'Browser', 'The browser you share with the assistant'),
       item('#/phone', 'phone', 'Phone control', 'See and control an Android phone'),
+      item('#/computer', 'monitor', 'Your computer', 'See and use your Windows computer from here'),
       item('#/skills', 'sparkles', 'Skills', 'Ways of working the team follows'),
       item('#/settings', 'settings', 'Settings', 'Models, subscriptions, voice, look'),
       item('#/settings/lessons', 'bulb', 'Lessons learned', 'What the team has learned so far'),

@@ -56,7 +56,7 @@ class RunManager:
         else:
             kwargs["start_new_session"] = True
         log = open(run_dir / "app-run.log", "ab")
-        proc = subprocess.Popen([sys.executable, "-m", "crewlib", *args], cwd=str(CREW_ROOT), env=env,
+        proc = subprocess.Popen([sys.executable, "-X", "utf8", "-m", "crewlib", *args], cwd=str(CREW_ROOT), env=env,
                                 stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT, **kwargs)
         self.procs[run_id] = proc
 

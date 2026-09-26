@@ -34,11 +34,26 @@ class Screen {
         this.canvas.height = img.naturalHeight;
       }
       this.ctx.drawImage(img, 0, 0);
+      this.last = img;
       this.frames++;
       this.onframe && this.onframe();
     } catch (e) { /* a broken frame: skip it */ }
     this.busy = false;
     if (this.latest) this.next();
+  }
+
+  // Draw the last picture again: a recording needs a steady stream of frames even when nothing moves.
+  repaint() {
+    if (this.last) this.ctx.drawImage(this.last, 0, 0);
+  }
+
+  // A video stream of this screen, for recording.
+  stream(fps) {
+    const ms = this.canvas.captureStream(fps);
+    const timer = setInterval(() => this.repaint(), Math.round(1000 / fps));
+    ms.getVideoTracks().forEach((t) => t.addEventListener('ended', () => clearInterval(timer)));
+    ms.stopRepaint = () => clearInterval(timer);
+    return ms;
   }
 
   rel(e) {
@@ -101,6 +116,7 @@ export class Recorder {
   async finish() {
     clearInterval(this.timer);
     this.pill && this.pill.remove();
+    if (this.stream.stopRepaint) this.stream.stopRepaint();
     if (this.stopTracks) this.stream.getTracks().forEach((t) => t.stop());
     const blob = new Blob(this.chunks, { type: this.mime.split(';')[0] });
     this.onstop && this.onstop();
@@ -270,7 +286,7 @@ export class LiveBrowser {
 
   toggleRecord() {
     if (this.recorder && this.recorder.recording) { this.recorder.stop(); return; }
-    const ms = this.screen.canvas.captureStream(24);
+    const ms = this.screen.stream(20);
     this.recorder = new Recorder(ms, 'the browser', { onstop: () => this.recBtn.classList.remove('on') });
     if (this.recorder.start()) this.recBtn.classList.add('on');
   }
@@ -457,7 +473,7 @@ export class LivePhone {
 
   toggleRecord() {
     if (this.recorder && this.recorder.recording) { this.recorder.stop(); return; }
-    this.recorder = new Recorder(this.screen.canvas.captureStream(12), 'the phone', { onstop: () => this.recBtn.classList.remove('on') });
+    this.recorder = new Recorder(this.screen.stream(12), 'the phone', { onstop: () => this.recBtn.classList.remove('on') });
     if (this.recorder.start()) this.recBtn.classList.add('on');
   }
 
@@ -475,6 +491,161 @@ export class LivePhone {
     clearInterval(this.poll);
     this.poll = setInterval(async () => { // who is driving (you or the assistant)
       try { const s = await api('/api/phone/status'); this.banner && this.banner.classList.toggle('hidden', s.driver !== 'assistant'); } catch (e) { /* ignore */ }
+    }, 2500);
+  }
+
+  disconnect() {
+    if (this.es) { this.es.close(); this.es = null; }
+    clearInterval(this.poll);
+  }
+
+  mount(container) {
+    container.append(this.root);
+    this.refresh();
+  }
+
+  unmount() {
+    this.root.remove();
+    if (!(this.recorder && this.recorder.recording)) this.disconnect();
+  }
+}
+
+// ------------------------------------------------------------------ the owner's Windows computer
+
+const COMPUTER_KEYS = { Enter: 'enter', Backspace: 'backspace', Tab: 'tab', Escape: 'esc', Delete: 'delete', ArrowUp: 'up',
+  ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', Home: 'home', End: 'end', PageUp: 'pageup', PageDown: 'pagedown' };
+
+export class LiveComputer {
+  constructor() {
+    this.screen = new Screen();
+    this.queue = Promise.resolve();
+    this.es = null;
+    this.recorder = null;
+    this.rightNext = false;
+    this.root = h('div', { class: 'livebox' });
+    this.bindInput();
+  }
+
+  send(action, body = {}) {
+    this.queue = this.queue.then(() => api('/api/computer/' + action, { method: 'POST', body })).catch(fail);
+    return this.queue;
+  }
+
+  bindInput() {
+    const c = this.screen.canvas;
+    let down = null;
+    c.addEventListener('contextmenu', (e) => e.preventDefault());
+    c.addEventListener('pointerdown', (e) => { down = { ...this.screen.rel(e), button: e.button }; c.focus({ preventScroll: true }); });
+    c.addEventListener('pointerup', (e) => {
+      if (!down) return;
+      const up = this.screen.rel(e);
+      const right = down.button === 2 || this.rightNext;
+      if (Math.hypot(up.x - down.x, up.y - down.y) < 0.01) {
+        this.send('click', { xr: down.x, yr: down.y, button: right ? 'right' : 'left' });
+      } else {
+        this.send('drag', { xr1: down.x, yr1: down.y, xr2: up.x, yr2: up.y });
+      }
+      if (this.rightNext) this.setRightNext(false);
+      down = null;
+    });
+    c.addEventListener('dblclick', (e) => { const p = this.screen.rel(e); this.send('click', { xr: p.x, yr: p.y, double: true }); });
+    let wt = null, wheel = 0;
+    c.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      wheel += e.deltaY;
+      clearTimeout(wt);
+      wt = setTimeout(() => { const d = wheel; wheel = 0; this.send('scroll', { direction: d > 0 ? 'down' : 'up', amount: Math.min(15, Math.max(1, Math.round(Math.abs(d) / 100))) }); }, 120);
+    }, { passive: false });
+    let typed = '', tt = null;
+    const flush = () => { if (typed) { const t = typed; typed = ''; this.send('type', { text: t }); } };
+    c.addEventListener('keydown', (e) => {
+      if (e.ctrlKey || e.altKey || e.metaKey) {
+        if (e.key.length === 1 || COMPUTER_KEYS[e.key]) {
+          e.preventDefault();
+          flush();
+          const mods = [e.ctrlKey && 'ctrl', e.altKey && 'alt', e.shiftKey && 'shift', e.metaKey && 'win'].filter(Boolean);
+          this.send('key', { keys: [...mods, COMPUTER_KEYS[e.key] || e.key.toLowerCase()].join('+') });
+        }
+        return;
+      }
+      if (e.key.length === 1) { e.preventDefault(); typed += e.key; clearTimeout(tt); tt = setTimeout(flush, 90); }
+      else if (COMPUTER_KEYS[e.key]) { e.preventDefault(); clearTimeout(tt); flush(); this.send('key', { keys: COMPUTER_KEYS[e.key] }); }
+    });
+  }
+
+  setRightNext(on) {
+    this.rightNext = on;
+    this.rightBtn && this.rightBtn.classList.toggle('on', on);
+  }
+
+  async refresh() {
+    let st;
+    try { st = await api('/api/computer/status'); } catch (e) { st = { available: false, reason: e.message }; }
+    this.disconnect();
+    if (!st.available) {
+      this.root.replaceChildren(h('div', { class: 'screen-wrap' }, h('div', { class: 'placeholder' }, icon('monitor'),
+        h('h3', null, 'Computer control is not available here'), h('div', null, st.reason || ''),
+        btn('Check again', () => this.refresh(), { cls: 'sm' }))));
+      return;
+    }
+    this.showLive(st);
+  }
+
+  showLive(st) {
+    this.recBtn = btn('', () => this.toggleRecord(), { cls: 'icon ghost rec', ic: 'record', title: 'Record the screen' });
+    this.rightBtn = btn('Right-click', () => this.setRightNext(!this.rightNext), { cls: 'sm ghost', title: 'Make the next tap a right-click' });
+    this.typeInput = h('input', {
+      type: 'text', placeholder: 'Type here (any language), then Enter to send it to the computer', 'aria-label': 'Text for the computer',
+      onkeydown: (e) => { if (e.key === 'Enter') { e.preventDefault(); const v = this.typeInput.value; this.typeInput.value = ''; if (v) this.send('type', { text: v }); } },
+    });
+    this.typebar = h('div', { class: 'typebar' + (isSmall() ? '' : ' hidden') }, this.typeInput,
+      btn('Enter', () => this.send('key', { keys: 'enter' }), { cls: 'sm ghost' }));
+    const bar = h('div', { class: 'screen-bar' },
+      h('span', { class: 'pill ok' }, h('span', { class: 'dot ok' }), `Your computer · ${st.width}×${st.height}`),
+      h('span', { class: 'grow' }),
+      iconBtn('keyboard', 'Type on the computer', () => { this.typebar.classList.toggle('hidden'); this.typeInput.focus(); }),
+      iconBtn('camera', 'Screenshot', async () => {
+        try { const info = await api('/api/computer/screenshot', { method: 'POST', body: {} }); bus.emit('captures'); toast('Screenshot saved in Captures.', { action: 'Open', onAction: () => openViewer(info) }); } catch (e) { fail(e); }
+      }),
+      this.recBtn);
+    this.banner = h('div', { class: 'ai-banner hidden' }, h('span', { class: 'pill live' }, 'The assistant is using your computer — push the mouse into the top-left corner to stop it'));
+    this.note = h('div', { class: 'placeholder' }, h('div', { class: 'typing' }, h('i'), h('i'), h('i')), h('div', null, 'Showing your screen…'));
+    this.screen.canvas.classList.add('hidden');
+    this.screen.frames = 0;
+    this.screen.onframe = () => { if (this.screen.frames === 1) { this.note.classList.add('hidden'); this.screen.canvas.classList.remove('hidden'); } };
+    const keys = h('div', { class: 'phone-side' },
+      btn('Esc', () => this.send('key', { keys: 'esc' }), { cls: 'sm' }),
+      btn('Tab', () => this.send('key', { keys: 'tab' }), { cls: 'sm' }),
+      btn('Start', () => this.send('key', { keys: 'win' }), { cls: 'sm' }),
+      btn('Switch app', () => this.send('key', { keys: 'alt+tab' }), { cls: 'sm' }),
+      btn('Undo', () => this.send('key', { keys: 'ctrl+z' }), { cls: 'sm ghost' }),
+      btn('Scroll up', () => this.send('scroll', { direction: 'up', amount: 5 }), { cls: 'sm ghost' }),
+      btn('Scroll down', () => this.send('scroll', { direction: 'down', amount: 5 }), { cls: 'sm ghost' }),
+      this.rightBtn);
+    this.root.replaceChildren(bar, h('div', { class: 'screen-wrap' }, this.banner, this.note, this.screen.canvas), this.typebar, keys);
+    this.connect();
+  }
+
+  toggleRecord() {
+    if (this.recorder && this.recorder.recording) { this.recorder.stop(); return; }
+    this.recorder = new Recorder(this.screen.stream(8), 'the computer', { onstop: () => this.recBtn.classList.remove('on') });
+    if (this.recorder.start()) this.recBtn.classList.add('on');
+  }
+
+  connect() {
+    if (this.es) return;
+    this.es = stream('/api/computer/events', {
+      frame: (d) => this.screen.draw(d.data, d.mime),
+      status: (d) => {
+        if (d.available === false) {
+          this.note.replaceChildren(icon('info'), h('div', null, d.reason || 'The screen is not available.'), btn('Check again', () => this.refresh(), { cls: 'sm' }));
+          this.note.classList.remove('hidden');
+        }
+      },
+    });
+    clearInterval(this.poll);
+    this.poll = setInterval(async () => {
+      try { const s = await api('/api/computer/status'); this.banner && this.banner.classList.toggle('hidden', s.driver !== 'assistant'); } catch (e) { /* ignore */ }
     }, 2500);
   }
 

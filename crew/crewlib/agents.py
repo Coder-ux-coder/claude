@@ -81,7 +81,34 @@ def default_codex_home() -> Path:
 
 def which(name: str) -> str | None:
     override = os.environ.get(f"CREW_{name.upper()}_BIN")
-    return override or shutil.which(name)
+    if override:
+        return override
+    found = shutil.which(name)
+    if os.name == "nt":
+        found = _windows_program(name, found)
+    return found
+
+
+def _windows_program(name: str, found: str | None) -> str | None:
+    """Find the real program on Windows: installers may not have refreshed PATH yet, and npm's
+    codex.cmd wrapper would pass arguments through cmd.exe (which mangles quotes and newlines)."""
+    home = Path.home()
+    if name == "claude" and not found:
+        local = Path(os.environ.get("LOCALAPPDATA", str(home / "AppData" / "Local")))
+        for candidate in (home / ".local" / "bin" / "claude.exe", local / "Programs" / "claude" / "claude.exe"):
+            if candidate.is_file():
+                return str(candidate)
+    if name == "codex":
+        appdata = Path(os.environ.get("APPDATA", str(home / "AppData" / "Roaming")))
+        shim = Path(found) if found else appdata / "npm" / "codex.cmd"
+        scope = shim.parent / "node_modules" / "@openai"
+        if scope.is_dir():
+            exes = sorted(scope.rglob("codex.exe")) or sorted(p for p in scope.rglob("codex-*.exe"))
+            if exes:
+                return str(exes[-1])
+        if shim.is_file():
+            return str(shim)
+    return found
 
 
 @dataclass

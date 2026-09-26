@@ -32,7 +32,7 @@ from crewlib import lessons
 from crewlib.util import atomic_write, crew_home
 
 from . import browser as browser_mod
-from . import captures, chat, phone as phone_mod, settings, skills
+from . import captures, chat, computer as computer_mod, phone as phone_mod, settings, skills
 from .runs import RunManager
 from .sse import hub
 
@@ -61,8 +61,9 @@ class App:
         self.chats = chat.ChatManager(app_url=url, app_token=self.internal_token)
         self.browser = browser_mod.service
         self.phone = phone_mod.service
+        self.computer = computer_mod.service
         self._auth_cache: dict[str, tuple[float, dict]] = {}
-        self.lan_servers: list[ThreadingHTTPServer] = []
+        self.lan_servers: list = []
         skills.build_active_pack()
 
     @staticmethod
@@ -137,7 +138,7 @@ class App:
         args = [exe, "auth", "login"] if tool == "claude" else [exe, "login"]
         self._auth_cache.pop(name, None)
         if os.name == "nt":  # a small console window guides the sign-in, the browser opens by itself
-            subprocess.Popen(["cmd", "/c", "start", f"Sign in: {name}", "cmd", "/k", *args], env=env)
+            subprocess.Popen(["cmd", "/k", *args], env=env, creationflags=0x00000010)  # a new, visible console
         else:
             subprocess.Popen(args, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                              stderr=subprocess.DEVNULL, start_new_session=True)
@@ -175,11 +176,10 @@ class App:
         failed = []
         for ip in self.lan_ips():
             try:
-                srv = ThreadingHTTPServer((ip, self.port), Handler)
+                srv = CrewServer((ip, self.port), Handler)
             except OSError:
                 failed.append(ip)
                 continue
-            srv.daemon_threads = True
             threading.Thread(target=srv.serve_forever, daemon=True, name=f"crew-lan-{ip}").start()
             self.lan_servers.append(srv)
         self.phone_access = bool(self.lan_servers)
@@ -261,7 +261,7 @@ class Handler(BaseHTTPRequestHandler):
         if not getattr(self, "_head", False):
             self.wfile.write(data)
 
-    def _sse(self, topic: str, initial: list[tuple[str, dict]] | None = None) -> None:
+    def _sse(self, topic: str, initial: list[tuple[str, dict]] | None = None, on_ready=None) -> None:
         q = hub.subscribe(topic)
         try:
             self.send_response(200)
@@ -273,6 +273,8 @@ class Handler(BaseHTTPRequestHandler):
             for event, data in initial or []:
                 self.wfile.write(f"event: {event}\ndata: {json.dumps(data)}\n\n".encode())
             self.wfile.flush()
+            if on_ready:  # runs once this viewer is listening, so nothing it sends is missed
+                threading.Thread(target=on_ready, daemon=True).start()
             while True:
                 try:
                     payload = q.get(timeout=15)
@@ -316,7 +318,8 @@ class Handler(BaseHTTPRequestHandler):
             if method == "GET":
                 return self.static(path)
             return self._error(404, "Not found.")
-        except (ValueError, KeyError, phone_mod.PhoneError, browser_mod.BrowserUnavailable) as exc:
+        except (ValueError, KeyError, phone_mod.PhoneError, browser_mod.BrowserUnavailable,
+                computer_mod.ComputerError) as exc:
             return self._error(400, str(exc))
         except Exception as exc:
             traceback.print_exc()
@@ -571,10 +574,12 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 self.app.browser.start()
                 hub.publish("browser", "meta", self.app.browser.status())
+                self.app.browser.kick()
             except browser_mod.BrowserUnavailable as exc:
                 hub.publish("browser", "error", {"message": str(exc)})
-        threading.Thread(target=boot, daemon=True).start()
-        return self._sse("browser", [("meta", self.app.browser.status())])
+            except Exception:  # a picture that could not be taken is not worth an error message
+                pass
+        return self._sse("browser", [("meta", self.app.browser.status())], on_ready=boot)
 
     @route("POST", r"/api/browser/(\w+)")
     def api_browser_action(self, action):
@@ -607,6 +612,24 @@ class Handler(BaseHTTPRequestHandler):
             self.app.phone.reverse(self.app.port)
             return self._json({"url": f"http://localhost:{self.app.port}"})
         return self._json(phone_action(self.app.phone, action, b, "you"))
+
+    # ------------------------------------------------------------- computer
+
+    @route("GET", "/api/computer/status")
+    def api_computer_status(self):
+        return self._json(self.app.computer.status())
+
+    @route("GET", "/api/computer/events")
+    def api_computer_events(self):
+        self.app.computer.ensure_stream()
+        return self._sse("computer", [("status", self.app.computer.status())])
+
+    @route("POST", r"/api/computer/(\w+)")
+    def api_computer_action(self, action):
+        if action == "screenshot":
+            data, mime, _, _ = self.app.computer.screenshot(max_width=3840)
+            return self._json(captures.save(data, ".jpg" if mime == "image/jpeg" else ".png", label="computer"))
+        return self._json(self.app.computer.act(action, self._body(), "you"))
 
     # ------------------------------------------------------------- captures
 
@@ -703,13 +726,17 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json({"image": base64.b64encode(data).decode(), "mime": "image/jpeg",
                                        "text": f"{self.app.browser.title} — {self.app.browser.url}"})
                 return self._json({"result": browser_action(self.app.browser, action, b, "assistant")})
+            if group == "computer":
+                if action == "screenshot":
+                    return self._json(self.app.computer.shot_for_assistant())
+                return self._json({"result": self.app.computer.act(action, b, "assistant")})
             if group == "phone":
                 if action == "screenshot":
                     png = self.app.phone.screenshot()
                     data, mime = phone_mod.shrink(png)
                     return self._json({"image": base64.b64encode(data).decode(), "mime": mime})
                 return self._json({"result": phone_action(self.app.phone, action, b, "assistant")})
-        except (ValueError, phone_mod.PhoneError, browser_mod.BrowserUnavailable) as exc:
+        except (ValueError, phone_mod.PhoneError, browser_mod.BrowserUnavailable, computer_mod.ComputerError) as exc:
             return self._json({"error": str(exc)})
         except Exception as exc:
             return self._json({"error": f"{type(exc).__name__}: {exc}"})
@@ -796,18 +823,69 @@ def open_app_window(url: str) -> None:
     webbrowser.open(url)
 
 
-def main(port: int = 8765, phone: bool = False, open_window: bool = True) -> int:
-    app = App(port, False)
-    Handler.app = app
+class CrewServer(ThreadingHTTPServer):
+    daemon_threads = True
+    allow_reuse_address = os.name != "nt"  # on Windows that option would let two programs share one port
+
+    def server_bind(self):
+        if os.name == "nt" and hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        super().server_bind()
+
+
+def _is_crew(port: int) -> bool:
+    import urllib.request
     try:
-        server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-    except OSError:
-        url = f"http://localhost:{port}"
-        print(f"Crew is already running: {url}")
-        if open_window:
-            open_app_window(url)
-        return 0
-    server.daemon_threads = True
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/health", timeout=3) as resp:
+            return "version" in json.loads(resp.read() or b"{}")
+    except Exception:
+        return False
+
+
+def _log_when_windowless() -> None:
+    """Started from the desktop icon there is no console: keep messages in ~/.crew/app.log."""
+    if sys.stdout is None or sys.stderr is None:
+        log = open(crew_home() / "app.log", "a", encoding="utf-8", buffering=1)
+        sys.stdout = sys.stdout or log
+        sys.stderr = sys.stderr or log
+
+
+def _alert(message: str) -> None:
+    print(message, file=sys.stderr)
+    if os.name == "nt":
+        try:
+            import ctypes
+            ctypes.windll.user32.MessageBoxW(None, message, "Crew", 0x40)
+        except Exception:
+            pass
+
+
+def main(port: int = 8765, phone: bool = False, open_window: bool = True) -> int:
+    _log_when_windowless()
+    server = None
+    for candidate in range(port, port + 10):
+        try:
+            server = CrewServer(("127.0.0.1", candidate), Handler)
+            port = candidate
+            break
+        except OSError:
+            if _is_crew(candidate):  # already running: just show it
+                url = f"http://localhost:{candidate}"
+                print(f"Crew is already running: {url}")
+                if open_window:
+                    open_app_window(url)
+                return 0
+    if server is None:
+        _alert(f"Crew could not start: ports {port}-{port + 9} are all taken by other programs.")
+        return 1
+    try:
+        app = App(port, False)
+    except Exception as exc:
+        traceback.print_exc()
+        server.server_close()
+        _alert(f"Crew could not start: {exc}\n\nDetails are in {crew_home() / 'app.log'}")
+        return 1
+    Handler.app = app
     url = f"http://localhost:{port}"
     if phone or settings.load()["app"].get("phone_enabled"):
         app.set_phone_access(True)

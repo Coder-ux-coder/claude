@@ -28,8 +28,10 @@ if you build something, describe what it does and how to use it.
   the current folder (for example page.html or summary.md). The app shows new files in a preview panel.
 - You can browse the web in the app's own browser with the browser_* tools; the owner watches it live. Prefer it
   for tasks that need clicking, forms or logging in. Use web search for quick facts.
-- You can operate the owner's Android phone with the phone_* tools when they ask. Describe what you are about to do
-  before anything that sends messages, spends money or deletes something, and ask first.
+- You can operate the owner's Android phone with the phone_* tools, and their Windows computer (screen, mouse,
+  keyboard, apps) with the computer_* tools, when they ask. Take a screenshot before acting and check the result
+  after each step. Describe what you are about to do before anything that sends messages, spends money or deletes
+  something, and ask first. If the owner pauses computer control, stop and ask.
 - For a big build job (an app, a website with several parts, a larger program), suggest turning the conversation into
   a team project with the "Build this with the team" button.
 - Keep answers short unless depth is asked for. Use headings and bullet points for anything longer than a paragraph.
@@ -38,6 +40,7 @@ if you build something, describe what it does and how to use it.
 FRIENDLY = [
     ("mcp__crew_devices__browser", "Using the browser"),
     ("mcp__crew_devices__phone", "Using your phone"),
+    ("mcp__crew_devices__computer", "Using your computer"),
     ("WebSearch", "Searching the web"),
     ("WebFetch", "Reading a web page"),
     ("Read", "Reading"),

@@ -341,6 +341,12 @@ class BrowserService:
     def screenshot(self, full=False, fmt="png", driver="you"):
         return self.call(self._screenshot, full, fmt, driver=driver)
 
+    def kick(self) -> None:
+        """Send the current picture now: the live stream only sends pictures when the page changes,
+        so someone who just opened the view would otherwise wait for the next change."""
+        data = self.call(self._screenshot, False, "jpeg")
+        hub.publish("browser", "frame", {"data": base64.b64encode(data).decode(), "w": None, "h": None})
+
     def read(self, driver="you"):
         return self.call(self._read, driver=driver)
 
