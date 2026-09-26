@@ -108,5 +108,20 @@
   "category": "process",
   "text": "Concerns that carry a reproduced problem and a suggested fix get adopted into the plan immediately; opinions without evidence do not. Test first, then raise it.",
   "evidence": "Crew real run: boole reproduced an argparse pitfall with negative scientific notation during planning; the lead assigned the fix inside the CLI task"
+ },
+ {
+  "category": "process",
+  "text": "Make the foundation task complete: the module contract, the dispatcher, one full reference module with its tests, and stubs in their final shape. Put exact names, formats and expected outputs into each task spec so members do not invent them. Parallel tasks then plug in without merge conflicts and pass review the first time.",
+  "evidence": "Crew real run (unit converter): after a complete foundation, 4 of 4 parallel tasks passed review first time with zero merge conflicts"
+ },
+ {
+  "category": "quality",
+  "text": "Before declaring a project done, have a fresh critic check the whole merged result against the brief and try hostile edge cases; per-task reviews miss problems that only appear across modules, and a second critic should review the fix itself.",
+  "evidence": "Crew real run: the lead's whole-project critique found cross-module issues (multi-word unit names, overflow on huge values) that five per-task reviews had passed"
+ },
+ {
+  "category": "tooling",
+  "text": "For Python projects, run checks in a virtual environment inside each worktree (e.g. uv venv -p 3.9 .venv/py3.9) on the oldest and newest supported Python; never install into the shared system Python, which repoints the package for every agent.",
+  "evidence": "Crew real run: two agents' editable installs overwrote each other's console script"
  }
 ]
