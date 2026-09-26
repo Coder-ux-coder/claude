@@ -169,6 +169,18 @@ public class SupervisorTests
     }
 
     [Fact]
+    public void ConfigExpandsEnvironmentVariables()
+    {
+        Environment.SetEnvironmentVariable("JARVIS_TEST_ROOT", "/opt/jarvis-test");
+        var c = LauncherConfig.Expand(new LauncherConfig { Components = [new ComponentSpec { Name = "exec", Command = "%JARVIS_TEST_ROOT%/jarvis-exec", Args = ["--pipe", "p-%JARVIS_TEST_ROOT%"], ReadyPipe = "x-%JARVIS_TEST_ROOT%" }] });
+        Assert.Equal("/opt/jarvis-test/jarvis-exec", c.Components[0].Command);
+        Assert.Equal("p-/opt/jarvis-test", c.Components[0].Args[1]);
+        Assert.Equal("x-/opt/jarvis-test", c.Components[0].ReadyPipe);
+        var example = LauncherConfig.Load(Path.Combine(AppContext.BaseDirectory, "../../../../Jarvis.Launcher/launcher.example.json"));
+        Assert.All(example.Components.Take(2), comp => Assert.NotNull(comp.ReadyPipe));
+    }
+
+    [Fact]
     public void BackoffIsExponentialAndCapped()
     {
         Assert.Equal(TimeSpan.FromSeconds(1), Supervisor.Backoff(1));

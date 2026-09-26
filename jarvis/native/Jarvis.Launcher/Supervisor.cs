@@ -19,7 +19,20 @@ public sealed class ComponentSpec
 public sealed class LauncherConfig
 {
     [JsonPropertyName("components")] public List<ComponentSpec> Components { get; set; } = new();
-    public static LauncherConfig Load(string path) => JsonSerializer.Deserialize<LauncherConfig>(File.ReadAllText(path)) ?? new LauncherConfig();
+    /// <summary>Loads the config and expands %VARIABLES% (e.g. %LOCALAPPDATA%, %USERNAME%) in commands, args and pipe names.</summary>
+    public static LauncherConfig Load(string path) => Expand(JsonSerializer.Deserialize<LauncherConfig>(File.ReadAllText(path)) ?? new LauncherConfig());
+
+    public static LauncherConfig Expand(LauncherConfig c, Func<string, string>? expand = null)
+    {
+        expand ??= Environment.ExpandEnvironmentVariables;
+        foreach (var comp in c.Components)
+        {
+            comp.Command = expand(comp.Command);
+            comp.Args = comp.Args.Select(expand).ToList();
+            if (comp.ReadyPipe != null) comp.ReadyPipe = expand(comp.ReadyPipe);
+        }
+        return c;
+    }
 }
 
 /// <summary>A started child, abstracted so the supervision logic is testable.</summary>
