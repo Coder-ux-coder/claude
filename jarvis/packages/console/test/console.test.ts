@@ -209,10 +209,58 @@ test("Console in Chromium: chat, API key into the vault, emergency stop, a decis
     await page.getByText("HYPOTHETICAL: write a note").click();
     await page.getByTestId("task-detail").getByText("completed", { exact: true }).waitFor();
 
+    // Memory: edit as text → preview → apply
+    const rem = s.core.memory.remember({ type: "preference", text: "HYPOTHETICAL: I prefer aisle seats.", content: { domain: "travel.seat", value: "aisle", kind: "taste", strength: "mild" }, scope: { level: "global" }, message_id: "msg_ui" });
+    assert.ok("record" in rem);
+    await page.getByTestId("tab-memory").click();
+    await page.getByText("HYPOTHETICAL: I prefer aisle seats.").waitFor();
+    await page.getByTestId("edit-prefs").click();
+    const md = page.getByTestId("memory-md");
+    await md.fill((await md.inputValue()).replace("aisle seats", "window seats"));
+    await page.getByTestId("memory-preview").click();
+    await page.getByTestId("memory-diff").getByText("HYPOTHETICAL: I prefer window seats.", { exact: false }).waitFor();
+    await page.getByTestId("memory-apply").click();
+    await page.getByTestId("memory-editor").waitFor({ state: "detached" });
+    await page.getByTestId("memory-list").getByText("HYPOTHETICAL: I prefer window seats.").waitFor();
+    assert.equal(await page.getByText("HYPOTHETICAL: I prefer aisle seats.").count(), 0);
+    await page.getByTestId("memory-export").click();
+    await page.getByTestId("exported").waitFor();
+
     // Usage
     await page.getByTestId("tab-usage").click();
     assert.ok(Number(await page.getByTestId("usage-calls").textContent()) >= 3);
 
     assert.deepEqual(consoleErrors, [], "no page errors");
   } finally { await browser?.close(); await s.done(); }
+});
+
+test("Coordinator link: reconnects after the Coordinator restarts and resumes events from the last seq, without duplicates", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "jv-link-"));
+  const fake = new FakeAdapter("fake:boss", [], () => ({ structured: { intents: [{ kind: "reply", text: "ok" }] } }));
+  const core = new JarvisCore({ dataDir: dir, clock: new SimClock("2026-09-26T12:00:00Z"), adapters: [{ adapter: fake, provider: "anthropic", model: "claude-opus-5-5", billing: "api" }] });
+  core.start();
+  const secret = randomBytes(24).toString("hex");
+  const path = pipePath(`jarvis-ltest-${process.pid}-${randomBytes(3).toString("hex")}`);
+  let server = new CoordinatorServer(core, { path, secret });
+  await server.listen();
+  const link = new CoordinatorLink(path, secret, { retryMs: 20 });
+  const seqs: number[] = []; const states: string[] = [];
+  link.onEvent(e => seqs.push(e.event.seq));
+  link.onConnection(s => states.push(s));
+  await link.start();
+  try {
+    await link.call("conversation.send", { content: "one" });
+    await server.close();                                  // Coordinator goes away
+    for (let i = 0; i < 100 && !states.includes("reconnecting"); i++) await new Promise(r => setTimeout(r, 10));
+    assert.ok(states.includes("reconnecting"));
+    core.ctx.events.append({ type: "conversation.test_gap", summary: "while disconnected", data: {} });
+    server = new CoordinatorServer(core, { path, secret });
+    await server.listen();                                 // …and comes back
+    await link.call("conversation.send", { content: "two" });
+    for (let i = 0; i < 100 && states.at(-1) !== "connected"; i++) await new Promise(r => setTimeout(r, 10));
+    const all = core.ctx.events.list({ limit: 10_000 }).filter(e => e.seq > seqs[0]! - 1).map(e => e.seq);
+    assert.equal(new Set(seqs).size, seqs.length, "no duplicates");
+    assert.deepEqual(seqs, [...seqs].sort((a, b) => a - b), "in order");
+    assert.ok(all.every(sq => seqs.includes(sq)), "the event raised while disconnected was replayed");
+  } finally { link.stop(); await server.close(); await core.shutdown(); rmSync(dir, { recursive: true, force: true }); }
 });

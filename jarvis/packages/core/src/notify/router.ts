@@ -132,6 +132,16 @@ export class NotificationRouter {
       .run(rec.id, rec.kind, rec.status, rec.dedupe_key ?? null, rec.created_at, rec.delivered_at ?? null, JSON.stringify(rec));
   }
 
+  /**
+   * Delivers straight to the channels without touching the database (an alarm sounding
+   * while the database is unavailable, F22). Returns the channels that took it.
+   */
+  async deliverWithoutStore(input: NotificationInput): Promise<Channel[]> {
+    const rec: NotificationRecord = { ...input, id: `ntf_cache_${Date.now().toString(36)}`, status: "delivered", delivered_channels: [], created_at: new Date().toISOString() };
+    for (const ch of input.channels ?? ["sound", "toast", "console", "speech"]) await this.deliver(rec, ch);
+    return rec.delivered_channels;
+  }
+
   /** Items waiting on you, plus anything held during quiet hours. */
   needsYou(): NotificationRecord[] {
     return (this.ctx.db.prepare("select record from notifications where status in ('needs_you', 'held_quiet_hours') order by created_at").all() as { record: string }[]).map(r => JSON.parse(r.record));

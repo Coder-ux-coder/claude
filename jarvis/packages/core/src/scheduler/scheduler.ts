@@ -49,7 +49,12 @@ const ON_TIME_MS = 60_000;
  */
 export class Scheduler {
   private timer: NodeJS.Timeout | null = null;
-  private alarmCache: { schedule_id: string; at: number; message: string }[] = [];
+  private alarmCache: { schedule_id: string; at: number; message: string; local: string; revision: number }[] = [];
+  /** Alarms sounded from the cache while the database was unavailable; recorded as fired once it is back. */
+  private firedFromCache: { schedule_id: string; local: string; utc: number; revision: number }[] = [];
+  private lastCacheCheck = 0;
+  /** Delivers an alarm without the database (F22). Set by the runtime. */
+  onCachedAlarm: ((a: { schedule_id: string; at: number; message: string }) => void) | null = null;
   private leaseId: string | null = null;
   /** Called after each tick's fires have committed (run created tasks, deliver notifications). */
   afterTick: ((fires: FireOutcome[]) => void) | null = null;
@@ -213,7 +218,12 @@ export class Scheduler {
   /** Single active scheduler (F34): a lease with a fencing token; a second instance does not fire. */
   holdsLease(): boolean {
     if (this.leaseId) {
-      try { this.leases.heartbeat(this.leaseId, 120_000); return true; } catch { this.leaseId = null; }
+      try { this.leases.heartbeat(this.leaseId, 120_000); return true; }
+      catch (e) {
+        // Only a lost lease clears it; a database error is rethrown and we stay the (cache-)active instance.
+        if (!(e instanceof JarvisError && e.code === "conflict")) throw e;
+        this.leaseId = null;
+      }
     }
     const r = this.leases.acquire("scheduler:singleton", "exclusive", { task_id: this.instance }, 120_000);
     if (r.granted) { this.leaseId = r.lease.lease_id; return true; }
@@ -226,6 +236,7 @@ export class Scheduler {
    */
   tick(): FireOutcome[] {
     if (!this.holdsLease()) return [];
+    this.recordCacheFires();
     const now = this.ctx.clock.now();
     const out: FireOutcome[] = [];
     const due = this.ctx.db.prepare("select job from schedules where status = 'active' and next_fire_utc is not null and next_fire_utc <= ?").all(new Date(now).toISOString()) as { job: string }[];
@@ -336,9 +347,58 @@ export class Scheduler {
     if (!this.running) return;
     const r = this.ctx.db.prepare("select min(next_fire_utc) t from schedules where status = 'active'").get() as { t: string | null };
     const wait = r.t ? Math.max(0, Math.min(60_000, Date.parse(r.t) - this.ctx.clock.now())) : 60_000;
-    this.timer = setTimeout(() => { try { this.tick(); } catch (e) { this.ctx.events.append({ type: "scheduler.error", summary: String((e as Error).message).slice(0, 200), data: {} }); this.arm(); } }, wait);
+    this.timer = setTimeout(() => {
+      try { this.tick(); }
+      catch (e) {
+        this.fireFromCache();
+        try { this.ctx.events.append({ type: "scheduler.error", summary: String((e as Error).message).slice(0, 200), data: {} }); } catch { /* database down */ }
+        this.armFallback();
+      }
+    }, wait);
     this.timer.unref?.();
   }
+  /** While the database is down: check the cache every 15 s, and retry the normal tick. */
+  private armFallback(): void {
+    if (this.timer) clearTimeout(this.timer);
+    if (!this.running) return;
+    this.timer = setTimeout(() => {
+      try { this.tick(); }
+      catch { this.fireFromCache(); this.armFallback(); }
+    }, 15_000);
+    this.timer.unref?.();
+  }
+
+  /**
+   * F22: alarms due since the last check, from memory only. Each one is delivered once;
+   * when the database is back, tick() records them as fired so they don't ring again.
+   */
+  fireFromCache(nowMs = this.ctx.clock.now()): { schedule_id: string; at: number; message: string }[] {
+    if (!this.leaseId) return [];              // only the instance that was active sounds alarms (never two)
+    const since = this.lastCacheCheck || nowMs - 60_000;
+    this.lastCacheCheck = nowMs;
+    const due = this.alarmCache.filter(a => a.at > since && a.at <= nowMs && !this.firedFromCache.some(f => f.schedule_id === a.schedule_id && f.utc === a.at));
+    for (const a of due) {
+      this.firedFromCache.push({ schedule_id: a.schedule_id, local: a.local, utc: a.at, revision: a.revision });
+      try { this.onCachedAlarm?.({ schedule_id: a.schedule_id, at: a.at, message: a.message }); } catch { /* keep going */ }
+    }
+    return due;
+  }
+
+  private recordCacheFires(): void {
+    if (!this.firedFromCache.length) return;
+    const now = new Date(this.ctx.clock.now()).toISOString();
+    this.ctx.tx(() => {
+      for (const f of this.firedFromCache) {
+        this.ctx.db.prepare("insert or ignore into schedule_fires(fire_id, schedule_id, scheduled_local, scheduled_utc, fired_at, outcome, missed) values (?,?,?,?,?,?,0)")
+          .run(Scheduler.fireId(f.schedule_id, f.local, f.revision), f.schedule_id, f.local, new Date(f.utc).toISOString(), now, "fired_from_cache");
+        const j = this.get(f.schedule_id);
+        if (j && j.next_fire_utc && Date.parse(j.next_fire_utc) <= f.utc) this.advance(j, f.utc);
+      }
+      this.ctx.events.append({ type: "scheduler.cache_fires_recorded", summary: `${this.firedFromCache.length} alarm(s) sounded while the database was unavailable`, data: { count: this.firedFromCache.length } });
+    });
+    this.firedFromCache = [];
+  }
+
   private running = false;
   start(): void { this.running = true; this.recomputeAll(); this.tick(); }
   /** Stops the timer and hands the singleton lease back so a standby instance can take over at once. */
@@ -352,7 +412,8 @@ export class Scheduler {
   refreshAlarmCache(): void {
     const now = this.ctx.clock.now();
     this.alarmCache = this.list(["active"]).filter(j => j.kind === "alarm").flatMap(j => this.occurrencesBetween(j, now - 1, now + 86_400_000, 50)
-      .map(o => ({ schedule_id: j.schedule_id, at: o.utc, message: j.target.message ?? j.interpretation })));
+      .map(o => ({ schedule_id: j.schedule_id, at: o.utc, message: j.target.message ?? j.interpretation, local: o.local, revision: j.revision })));
+    this.lastCacheCheck = now;
   }
   cachedAlarmsDue(nowMs: number, sinceMs: number): { schedule_id: string; at: number; message: string }[] {
     return this.alarmCache.filter(a => a.at > sinceMs && a.at <= nowMs);

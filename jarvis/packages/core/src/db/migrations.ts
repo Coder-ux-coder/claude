@@ -256,4 +256,12 @@ create table notifications (id text primary key, kind text not null, status text
 create index notifications_status on notifications(status, created_at);
 `,
   },
+  {
+    version: 6, name: "ipc_idempotency",
+    sql: `
+-- 12 §17.6: a retried mutating command with the same idempotency key returns the first result.
+create table ipc_idempotency (idempotency_key text primary key, method text not null, params_hash text not null, result text not null, at text not null);
+create index ipc_idempotency_at on ipc_idempotency(at);
+`,
+  },
 ];

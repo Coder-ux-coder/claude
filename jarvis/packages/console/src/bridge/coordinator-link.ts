@@ -1,5 +1,6 @@
 import { NdjsonRpc } from "@jarvis/core/rpc";
 import { JarvisError } from "@jarvis/shared";
+import { randomUUID } from "node:crypto";
 import type { JarvisEventEnvelope } from "../shared/api.js";
 
 /**
@@ -23,10 +24,19 @@ export class CoordinatorLink {
   async start(): Promise<void> { await this.ensure(); }
   stop(): void { this.stopped = true; this.rpc?.close(); this.rpc = null; }
 
+  /**
+   * Every call carries an idempotency key; if the pipe drops mid-call it is retried once after
+   * reconnecting with the same key, so the Coordinator runs a command at most once (12 §17.6).
+   */
   async call<T>(method: string, params: unknown): Promise<T> {
     if (method === "hello" || method.startsWith("events.")) throw new JarvisError("missing_permission", `${method} is managed by the link`);
-    const rpc = await this.ensure();
-    return rpc.call<T>(method, params ?? {}, method === "conversation.send" || method === "task.steer" ? 10 * 60_000 : 60_000);
+    const p = { ...((params && typeof params === "object") ? params as Record<string, unknown> : {}), idempotency_key: `idk_${randomUUID()}` };
+    const timeout = method === "conversation.send" || method === "task.steer" ? 10 * 60_000 : 60_000;
+    try { return await (await this.ensure()).call<T>(method, p, timeout); }
+    catch (e) {
+      if (!(e instanceof JarvisError) || e.code !== "unavailable_device") throw e;
+      return (await this.ensure()).call<T>(method, p, timeout);
+    }
   }
 
   private ensure(): Promise<NdjsonRpc> {

@@ -5,7 +5,7 @@ import { Recorder, Speaker } from "./voice.js";
 type View = "conversation" | "tasks" | "needs" | "schedules" | "memory" | "rules" | "usage" | "settings";
 interface Msg { id: string; author: "owner" | "jarvis" | "system"; text: string | null; modality: string }
 interface TaskRow { task_id: string; objective: string; mode: string; status: string; wait_reason: string | null; status_detail: string | null; origin: string }
-interface Status { safe_mode: boolean; halted: boolean; anthropic_key: boolean; needs_you: number; open_decisions: number; policy_revision: number; boss_route: string[] }
+interface Status { database?: "ok" | "unavailable"; safe_mode: boolean; halted: boolean; anthropic_key: boolean; needs_you: number; open_decisions: number; policy_revision: number; boss_route: string[] }
 interface Decision { decision_request_id: string; task_id: string; why: { text: string }; proposal: { summary: string; target: string; expected_effect: string; reversibility: string; important_terms: string[] }; options: { id: string; label: string }[]; proposal_fingerprint: string; expires_at: string }
 interface Note { id: string; kind: string; title: string; body: string; schedule_id?: string; created_at: string }
 interface Schedule { schedule_id: string; kind: string; interpretation: string; status: string; next_fire_utc: string | null }
@@ -61,6 +61,7 @@ export function App({ api }: { api: JarvisApi }) {
         </nav>
         <div className="state">
           {conn !== "connected" && <span className="pill warn" data-testid="conn">Reconnecting…</span>}
+          {status?.database === "unavailable" && <span className="pill danger" data-testid="db-down">Database unavailable — alarms still sound; nothing else runs</span>}
           {status?.safe_mode && <span className="pill warn">Safe mode</span>}
           {status?.halted
             ? <button className="pill danger" data-testid="resume" onClick={() => api.call("emergency.resume").then(refreshStatus).catch(e => setError(errText(e)))}>Stopped — resume</button>
@@ -290,8 +291,35 @@ function MemoryView({ api, tick, onError }: ViewProps) {
   const latest = useLatest();
   const load = useCallback(() => { const only = latest(); return (q.trim() ? api.call<Memory[]>("memory.search", { query: q }) : api.call<Memory[]>("memory.list", { limit: 200 })).then(only(setRows)).catch(e => onError(errText(e))); }, [api, q, onError, latest]);
   useEffect(() => { void load(); }, [tick, load]);
+  const [editing, setEditing] = useState<{ markdown: string; exported_ids: string[]; type: string } | null>(null);
+  const [diff, setDiff] = useState<{ edits: { record_id: string; old_text: string; new_text: string }[]; added: { text: string }[]; deletions: { record_id: string; text: string }[]; conflicts: { record_id: string; new_text: string }[] } | null>(null);
+  const [exported, setExported] = useState<string | null>(null);
+  const edit = (type: string) => api.call<{ markdown: string; exported_ids: string[] }>("memory.markdown", { type }).then(v => { setEditing({ ...v, type }); setDiff(null); }).catch(e => onError(errText(e)));
+  const preview = () => editing && api.call<typeof diff>("memory.markdown_preview", { markdown: editing.markdown, exported_ids: editing.exported_ids }).then(setDiff).catch(e => onError(errText(e)));
+  const apply = () => editing && api.call("memory.markdown_apply", { markdown: editing.markdown, exported_ids: editing.exported_ids }).then(() => { setEditing(null); setDiff(null); void load(); }).catch(e => onError(errText(e)));
+  if (editing) return (
+    <section data-testid="memory-editor">
+      <p className="muted">Edit the text after each marker, delete a line to forget it, or add new "- " lines. Nothing changes until you apply.</p>
+      <textarea className="md" value={editing.markdown} onChange={e => { setEditing({ ...editing, markdown: e.target.value }); setDiff(null); }} rows={18} data-testid="memory-md" />
+      <div className="row"><button onClick={() => void preview()} data-testid="memory-preview">Preview changes</button>
+        <button onClick={() => { setEditing(null); setDiff(null); }}>Cancel</button></div>
+      {diff && (<div className="card" data-testid="memory-diff">
+        {diff.edits.map(e => <p key={e.record_id}>Change: <s>{e.old_text}</s> → {e.new_text}</p>)}
+        {diff.added.map((a, i) => <p key={i}>Add: {a.text}</p>)}
+        {diff.deletions.map(d => <p key={d.record_id}>Forget: {d.text}</p>)}
+        {diff.conflicts.map(c => <p key={c.record_id} className="danger">Changed elsewhere since you opened this, so not applied: {c.new_text}. Reopen the editor to see the latest.</p>)}
+        {diff.edits.length + diff.added.length + diff.deletions.length === 0 ? <p className="muted">No changes.</p> : <button className="primary" onClick={() => void apply()} data-testid="memory-apply">Apply</button>}
+      </div>)}
+    </section>
+  );
   return (
     <section>
+      <div className="row">
+        <button onClick={() => void edit("preference")} data-testid="edit-prefs">Edit preferences as text</button>
+        <button onClick={() => void edit("fact")}>Edit facts as text</button>
+        <button onClick={() => api.call<{ path: string }>("memory.export").then(r => setExported(r.path)).catch(e => onError(errText(e)))} data-testid="memory-export">Export everything</button>
+      </div>
+      {exported && <p className="ok" data-testid="exported">Exported to {exported}</p>}
       <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search what JARVIS remembers" data-testid="memory-search" />
       <ul className="list" data-testid="memory-list">
         {rows.length === 0 && <li className="muted">Nothing here.</li>}

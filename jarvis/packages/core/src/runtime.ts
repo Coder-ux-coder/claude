@@ -129,6 +129,7 @@ export class JarvisCore {
       runTask: t => this.track(this.conversation.planAndRun(t)), track: p => this.track(p) },
       this.leases);
     this.scheduler = this.schedules.scheduler;
+    this.scheduler.onCachedAlarm = a => this.track(this.notifications.deliverWithoutStore({ kind: "alarm", title: "Alarm", body: a.message, urgency: "high", schedule_id: a.schedule_id, channels: ["sound", "toast", "console", "speech"] }));
     this.conversation = new ConversationManager({ ctx, episodic: this.episodic, memory: this.memory, builder: this.builder, tasks: this.tasks, policy: this.policy, broker: this.broker,
       gateway: this.gateway, planner: this.planner, steps: this.steps, defaultTaskBudgetUsd: opts.defaultTaskBudgetUsd ?? 2,
       schedule: (intent, conv, m) => this.schedules.fromIntent(intent, conv, m), inboxDir: join(root, "artifacts", "inbox") });

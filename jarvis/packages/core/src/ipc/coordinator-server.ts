@@ -1,6 +1,8 @@
 import { createServer, type Server, type Socket } from "node:net";
 import { existsSync, unlinkSync } from "node:fs";
-import { JarvisError, safeEqualHex, sha256, type JarvisEvent } from "@jarvis/shared";
+import { JarvisError, canonicalJson, newId, safeEqualHex, sha256, type JarvisEvent } from "@jarvis/shared";
+import { join } from "node:path";
+import { existsSync as exists, mkdirSync } from "node:fs";
 import { NdjsonRpc } from "../nep/rpc.js";
 import type { JarvisCore } from "../runtime.js";
 import type { SessionBridge } from "../nep/session-bridge.js";
@@ -18,6 +20,11 @@ export interface CoordinatorServerOptions {
 }
 
 type Component = "console" | "session" | "phone";
+
+/** Commands that change state: they honour idempotency keys (12 §17.6). Credential calls are excluded so no secret is ever hashed to disk; they are idempotent by design (store rotates in place). */
+export const MUTATING = new Set(["conversation.send", "task.control", "task.steer", "decision.respond", "memory.delete", "memory.accept", "memory.correct", "memory.markdown_apply",
+  "memory.export", "memory.import", "rules.propose", "rules.confirm", "rules.revoke", "accounts.revoke", "schedules.control", "notifications.dismiss", "settings.set", "profile.set",
+  "emergency.stop", "emergency.resume"]);
 interface Client { rpc: NdjsonRpc; component: Component | null; subs: Map<string, () => void>; id: number }
 
 const P = <T>(p: unknown): T => (p ?? {}) as T;
@@ -94,12 +101,43 @@ export class CoordinatorServer {
     if (method === "hello") return this.hello(c, P(params));
     if (!c.component) throw new JarvisError("auth_required", "say hello first");
     if (method === "ping") return { ok: true, at: this.core.ctx.clock.iso() };
+    const meta = (params && typeof params === "object" ? params : {}) as { deadline?: unknown; idempotency_key?: unknown };
+    if (typeof meta.deadline === "string" && Date.parse(meta.deadline) <= this.core.ctx.clock.now()) throw new JarvisError("timeout", `${method}: the deadline passed before the call started`);
     if (c.component === "session") {
       // The Session Agent reports events; its requests are limited to these.
       if (method.startsWith("session.") || method.startsWith("power.") || method.startsWith("hotkey.")) { this.opts.sessionBridge?.handle(method, params); return { ok: true }; }
       throw new JarvisError("missing_permission", `the session agent may not call ${method}`);
     }
-    return this.consoleMethod(c, method, params);
+    const key = meta.idempotency_key;
+    if (key === undefined || !MUTATING.has(method)) return this.consoleMethod(c, method, params);
+    if (typeof key !== "string" || !/^[A-Za-z0-9_.:-]{8,128}$/.test(key)) throw new JarvisError("invalid_input", "idempotency_key must be 8–128 characters [A-Za-z0-9_.:-]");
+    return this.idempotent(key, method, params, () => this.consoleMethod(c, method, params));
+  }
+
+  private inflight = new Map<string, Promise<unknown>>();
+  /** Same key + same method and params → the first result; same key with different content → conflict. Kept 24 hours. */
+  private async idempotent(key: string, method: string, params: unknown, run: () => Promise<unknown>): Promise<unknown> {
+    const db = this.core.ctx.db;
+    const { idempotency_key: _k, deadline: _d, ...rest } = params as Record<string, unknown>;
+    const hash = sha256(canonicalJson(rest));
+    const prev = db.prepare("select method, params_hash, result from ipc_idempotency where idempotency_key = ?").get(key) as { method: string; params_hash: string; result: string } | undefined;
+    if (prev) {
+      if (prev.method !== method || prev.params_hash !== hash) throw new JarvisError("conflict", "that idempotency key was already used for a different command");
+      return JSON.parse(prev.result);
+    }
+    const running = this.inflight.get(key);
+    if (running) return running;
+    const p = run().then(result => {
+      const json = JSON.stringify(result ?? null);
+      if (json.length <= 1_000_000) {
+        const now = this.core.ctx.clock.now();
+        db.prepare("delete from ipc_idempotency where at < ?").run(new Date(now - 86_400_000).toISOString());
+        db.prepare("insert or ignore into ipc_idempotency(idempotency_key, method, params_hash, result, at) values (?,?,?,?,?)").run(key, method, hash, json, new Date(now).toISOString());
+      }
+      return result;
+    }).finally(() => this.inflight.delete(key));
+    this.inflight.set(key, p);
+    return p;
   }
 
   private async consoleMethod(c: Client, method: string, params: unknown): Promise<unknown> {
@@ -176,10 +214,51 @@ export class CoordinatorServer {
         return j.memory.delete(p.ids.map(String), p.reason ?? "deleted in the Console");
       }
       case "memory.accept": return j.memory.accept(str(P<{ id: string }>(params).id, "id"), { by: "owner" });
-      case "memory.markdown": return j.portability.markdownView((P<{ type?: "fact" | "preference" }>(params).type ?? "preference") as never);
+      case "memory.markdown": {
+        // The view plus the ids it contains; send both back to preview/apply an edit (03 §9.18).
+        const type = this.memType(P<{ type?: string }>(params).type);
+        const markdown = j.portability.markdownView(type);
+        return { markdown, exported_ids: [...markdown.matchAll(/<!-- (\S+)@r\d+ -->/g)].map(m => m[1]!) };
+      }
+      case "memory.markdown_preview": case "memory.markdown_apply": {
+        const p = P<{ markdown: string; exported_ids: string[]; accept?: { edits?: string[]; added?: number[]; deletions?: string[] } }>(params);
+        const md = str(p.markdown, "markdown");
+        if (md.length > 2_000_000) throw new JarvisError("invalid_input", "markdown too large");
+        if (!Array.isArray(p.exported_ids) || p.exported_ids.some(id => typeof id !== "string" || !j.memory.get(id))) throw new JarvisError("invalid_input", "exported_ids must be the ids from memory.markdown");
+        const diff = j.portability.diffImport(md, p.exported_ids);        // always recomputed here; a client-sent diff is never trusted
+        if (method === "memory.markdown_preview") return diff;
+        const { payload_id } = j.ctx.payloads.put(md, "personal");
+        return j.portability.applyImport(diff, p.accept ?? { edits: diff.edits.map(e => e.record_id), added: diff.added.map((_, i) => i), deletions: diff.deletions.map(d => d.record_id) }, payload_id);
+      }
+      case "memory.correct": {
+        const p = P<{ target_ids: string[]; kind: "should_not_remember" | "outdated" | "wrong_scope" | "wrong_entity"; generalization_limit?: string; note?: string }>(params);
+        if (!Array.isArray(p.target_ids) || !p.target_ids.length) throw new JarvisError("invalid_input", "target_ids are required");
+        if (!["should_not_remember", "outdated", "wrong_scope", "wrong_entity"].includes(p.kind)) throw new JarvisError("invalid_input", "to change wording use memory.markdown_apply; kind must be should_not_remember, outdated, wrong_scope or wrong_entity");
+        const { payload_id } = j.ctx.payloads.put(p.note ?? `Console correction: ${p.kind}`, "personal");
+        return j.memory.correct({ kind: p.kind, target_ids: p.target_ids.map(String), owner_statement_ref: payload_id, generalization_limit: p.generalization_limit ?? "Only these records; nothing else is implied." });
+      }
+      case "memory.export": {
+        if (!j.opts.dataDir) throw new JarvisError("unsupported_operation", "no data directory");
+        const dir = join(j.opts.dataDir, "exports"); mkdirSync(dir, { recursive: true });
+        const path = join(dir, `memory-${j.ctx.clock.iso().slice(0, 10)}-${newId("exp", j.ctx.clock.now()).slice(-6)}.jarvis-archive`);
+        return { path, ...j.portability.exportArchive(path) };
+      }
+      case "memory.import": {
+        const path = str(P<{ path: string }>(params).path, "path");
+        if (!path.endsWith(".jarvis-archive") || !exists(path)) throw new JarvisError("invalid_input", "choose an existing .jarvis-archive file");
+        return j.portability.importArchive(path);
+      }
       // ----- rules -----
       case "rules.list": return j.policy.listRules();
       case "rules.get": return j.policy.getRule(str(P<{ rule_id: string }>(params).rule_id, "rule_id")) ?? null;
+      case "rules.propose": {
+        // A rule typed in the Console's rule editor: compiled and stored as a draft; it applies only after rules.confirm.
+        const p = P<{ draft: Record<string, unknown> }>(params);
+        if (!p.draft || typeof p.draft !== "object") throw new JarvisError("invalid_input", "draft is required");
+        const { rule_id: _id, status: _st, ...draft } = p.draft;
+        try { return j.policy.propose({ ...draft, source: { type: "owner_edit", channel_verified: ownerVerified } } as never); }
+        catch (e) { if (e instanceof JarvisError) throw e; throw new JarvisError("invalid_input", `rule draft: ${(e as Error).message.slice(0, 300)}`); }
+      }
       case "rules.confirm": {
         const p = P<{ rule_id: string; typed_confirmation?: string }>(params);
         return j.policy.confirm(str(p.rule_id, "rule_id"), { channel: "console", owner_verified: ownerVerified, ...(p.typed_confirmation ? { typed_confirmation: p.typed_confirmation } : {}) });
@@ -255,11 +334,16 @@ export class CoordinatorServer {
       // ----- settings, status, safety -----
       case "settings.get": return j.getSettings();
       case "settings.set": { const p = P<{ key: string; value: unknown }>(params); j.setSetting(str(p.key, "key"), p.value); return { ok: true }; }
-      case "status.get": return {
-        safe_mode: j.broker.safeMode, halted: j.broker.isHalted(), policy_revision: j.policy.currentRevision(),
-        anthropic_key: !!j.vault.findByProvider("anthropic"), boss_route: j.gateway.route("boss.reasoning").chain, recovery: j.recovery ?? null,
-        needs_you: j.notifications.needsYou().length, open_decisions: j.policy.openDecisionRequests().length,
-      };
+      case "status.get": {
+        // The UI must be able to show a broken state (F22), so every part is read defensively.
+        const safe = <T,>(f: () => T, fallback: T): T => { try { return f(); } catch { return fallback; } };
+        const dbOk = safe(() => { j.ctx.db.prepare("select 1").get(); return true; }, false);
+        return {
+          database: dbOk ? "ok" : "unavailable", safe_mode: j.broker.safeMode || !dbOk, halted: j.broker.isHalted(), policy_revision: safe(() => j.policy.currentRevision(), -1),
+          anthropic_key: safe(() => !!j.vault.findByProvider("anthropic"), false), boss_route: safe(() => j.gateway.route("boss.reasoning").chain, []), recovery: j.recovery ?? null,
+          needs_you: safe(() => j.notifications.needsYou().length, 0), open_decisions: safe(() => j.policy.openDecisionRequests().length, 0),
+        };
+      }
       case "emergency.stop": return j.emergencyStop("emergency stop from the Console");
       case "emergency.resume": j.broker.resumeAfterHalt(ownerVerified); return { ok: true };
       // ----- streams -----
@@ -280,6 +364,12 @@ export class CoordinatorServer {
       }
       default: throw new JarvisError("unsupported_operation", `unknown method ${method}`);
     }
+  }
+
+  private memType(t: unknown): "fact" | "preference" | "lesson" {
+    if (t === undefined) return "preference";
+    if (t === "fact" || t === "preference" || t === "lesson") return t;
+    throw new JarvisError("invalid_input", "type must be fact, preference or lesson");
   }
 
   private memoryView(id: string) {

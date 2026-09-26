@@ -211,3 +211,71 @@ test("IPC: onboarding profile, timezone change moves floating schedules, usage s
     assert.ok(u.calls >= 1); assert.ok(u.by_model["fake:boss"]!.calls >= 1);
   } finally { await h.done(); }
 });
+
+test("review 2: idempotency keys make retried commands safe; expired deadlines are refused", async () => {
+  const h = await setup();
+  try {
+    const c = await h.connect("console");
+    const a = await c.call<{ message_id: string; conversation_id: string }>("conversation.send", { content: "Only once please", idempotency_key: "idk_test_000001" });
+    const b = await c.call<{ message_id: string }>("conversation.send", { content: "Only once please", idempotency_key: "idk_test_000001" });
+    assert.equal(b.message_id, a.message_id, "the retry returns the first result");
+    const msgs = await c.call<{ author: string }[]>("conversation.messages", { conversation_id: a.conversation_id });
+    assert.equal(msgs.filter(m => m.author === "owner").length, 1, "the message was stored once");
+    await rejects(c.call("conversation.send", { content: "different", idempotency_key: "idk_test_000001" }), "conflict");
+    await rejects(c.call("settings.set", { key: "ui.x", value: 1, idempotency_key: "bad key!" }), "invalid_input");
+    // Concurrent duplicates join the same run.
+    const [x, y] = await Promise.all([c.call<{ message_id: string }>("conversation.send", { content: "twin", idempotency_key: "idk_test_000002" }), c.call<{ message_id: string }>("conversation.send", { content: "twin", idempotency_key: "idk_test_000002" })]);
+    assert.equal(x.message_id, y.message_id);
+    await rejects(c.call("task.list", { deadline: "2026-09-26T11:59:00Z" }), "timeout");
+    assert.deepEqual(await c.call("task.list", { deadline: "2026-09-26T12:05:00Z" }), []);
+  } finally { await h.done(); }
+});
+
+test("review 2: memory edit via Markdown (preview then apply, diff recomputed server-side), correct, export and import; rules.propose → confirm", async () => {
+  const h = await setup();
+  try {
+    const c = await h.connect("console");
+    const m1 = h.core.memory.remember({ type: "preference", text: "HYPOTHETICAL: I prefer aisle seats.", content: { domain: "travel.seat", value: "aisle", kind: "taste", strength: "mild" }, scope: { level: "global" }, message_id: "msg_x" });
+    const id = "record" in m1 ? m1.record.id : assert.fail("not stored");
+    const view = await c.call<{ markdown: string; exported_ids: string[] }>("memory.markdown", { type: "preference" });
+    assert.deepEqual(view.exported_ids, [id]);
+    const edited = view.markdown.replace("I prefer aisle seats.", "I prefer window seats.");
+    const diff = await c.call<{ edits: { record_id: string; new_text: string }[] }>("memory.markdown_preview", { markdown: edited, exported_ids: view.exported_ids });
+    assert.equal(diff.edits.length, 1); assert.match(diff.edits[0]!.new_text, /window seats/);
+    await rejects(c.call("memory.markdown_apply", { markdown: edited, exported_ids: ["mem_FORGED"] }), "invalid_input");
+    const applied = await c.call<{ corrected: string[] }>("memory.markdown_apply", { markdown: edited, exported_ids: view.exported_ids });
+    assert.deepEqual(applied.corrected, [id]);
+    const now = await c.call<{ id: string; text: string }[]>("memory.search", { query: "window seats" });
+    assert.equal(now.length, 1); assert.notEqual(now[0]!.id, id, "a new revision record; the old one is superseded");
+    const corr = await c.call<{ kind: string }>("memory.correct", { target_ids: [now[0]!.id], kind: "should_not_remember" });
+    assert.equal(corr.kind, "should_not_remember");
+    assert.deepEqual(await c.call("memory.search", { query: "window seats" }), []);
+    await rejects(c.call("memory.correct", { target_ids: [id], kind: "wrong_value" }), "invalid_input");
+    const exp = await c.call<{ path: string; files: number }>("memory.export", {});
+    assert.ok(existsSync(exp.path) && exp.path.endsWith(".jarvis-archive"));
+    const imp = await c.call<{ imported: Record<string, number> }>("memory.import", { path: exp.path });
+    assert.ok(imp.imported);
+    await rejects(c.call("memory.import", { path: "/etc/passwd" }), "invalid_input");
+    // A rule from the Console editor is a draft until confirmed.
+    const prop = await c.call<{ rule: { rule_id: string; status: string }; errors: string[]; needs_confirmation: boolean }>("rules.propose", { draft: {
+      kind: "constraint", text: "HYPOTHETICAL: never delete anything in the Archive folder", applies_to: { effects: ["delete.local"], resources: [{ path_prefix: join(h.dir, "Archive") }] },
+      decision: "deny", enforcement: "broker", protection: "normal", conflict: "deny_wins", compile: { status: "compiled", interpretation: "Deny deletes under Archive" } } });
+    assert.deepEqual(prop.errors, []); assert.equal(prop.rule.status, "draft"); assert.equal(prop.needs_confirmation, true);
+    const conf = await c.call<{ status: string }>("rules.confirm", { rule_id: prop.rule.rule_id });
+    assert.equal(conf.status, "active");
+    await rejects(c.call("rules.propose", { draft: { kind: "constraint" } }), "invalid_input");
+  } finally { await h.done(); }
+});
+
+test("F22: status.get shows the unavailable database instead of failing", async () => {
+  const h = await setup();
+  try {
+    const c = await h.connect("console");
+    const realPrepare = h.core.ctx.db.prepare.bind(h.core.ctx.db);
+    (h.core.ctx.db as { prepare: unknown }).prepare = () => { throw new Error("SQLITE_CORRUPT: database disk image is malformed"); };
+    const st = await c.call<{ database: string; safe_mode: boolean }>("status.get", {});
+    (h.core.ctx.db as { prepare: unknown }).prepare = realPrepare;
+    assert.equal(st.database, "unavailable"); assert.equal(st.safe_mode, true);
+    assert.equal((await c.call<{ database: string }>("status.get", {})).database, "ok");
+  } finally { await h.done(); }
+});

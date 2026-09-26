@@ -350,3 +350,32 @@ test("review fix: a notification with nobody to show it to stays pending and is 
   assert.equal(out[0]!.status, "delivered"); assert.deepEqual(got, [n.id]);
   assert.equal((await r.flush()).length, 0, "delivered once");
 });
+
+test("F22: with the database unavailable, alarms sound from the in-memory cache once, and are not repeated when it returns", () => {
+  const h = harness("2026-09-26T06:50:00Z");
+  const sounded: string[] = [];
+  h.s.onCachedAlarm = a => sounded.push(a.message);
+  const j = h.s.create({ kind: "alarm", owner_text: "a", tz: "UTC", start_local: "2026-09-26T07:00", rrule: "FREQ=DAILY", policy_revision: 0, message: "Wake up" });
+  assert.equal(h.s.holdsLease(), true);
+  h.s.refreshAlarmCache();
+  const standby = new Scheduler(h.ctx, h.leases, () => "x", "sch_b");
+  standby.refreshAlarmCache(); standby.onCachedAlarm = () => assert.fail("a standby must not sound alarms");
+  // The database becomes unavailable.
+  const realPrepare = h.ctx.db.prepare.bind(h.ctx.db);
+  (h.ctx.db as { prepare: unknown }).prepare = () => { throw new Error("SQLITE_IOERR: disk I/O error"); };
+  h.clock.set(Date.parse("2026-09-26T07:00:20Z"));
+  assert.throws(() => h.s.tick(), /SQLITE_IOERR/);
+  assert.deepEqual(h.s.fireFromCache().map(a => a.schedule_id), [j.schedule_id]);
+  assert.deepEqual(standby.fireFromCache(), []);
+  h.clock.advance(30_000);
+  assert.deepEqual(h.s.fireFromCache(), [], "once");
+  assert.deepEqual(sounded, ["Wake up"]);
+  // The database is back: the occurrence is recorded as fired, not rung again.
+  (h.ctx.db as { prepare: unknown }).prepare = realPrepare;
+  h.clock.set(Date.parse("2026-09-26T07:02:00Z"));
+  assert.equal(h.s.tick().length, 0);
+  assert.equal(h.fires.length, 0);
+  const rec = h.ctx.db.prepare("select outcome from schedule_fires where schedule_id = ?").all(j.schedule_id) as { outcome: string }[];
+  assert.deepEqual(rec.map(r => r.outcome), ["fired_from_cache"]);
+  assert.equal(h.s.get(j.schedule_id)!.next_fire_utc, "2026-09-27T07:00:00.000Z");
+});
