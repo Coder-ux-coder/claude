@@ -1256,10 +1256,16 @@ class Orchestrator:
             f"The finished work is in {where}.",
             "",
             "## How it went",
-            f"- Time: {elapsed}, with {len(self.seats)} agents working in parallel.",
-            f"- {len(merged)} pieces of work built, each checked by a reviewer who had not written it "
-            f"({first_pass} approved at the first review).",
         ]
+        if self.store.get("mode") == "solo":
+            lines.append(f"- Time: {elapsed}. One builder did the work; a reviewer with fresh eyes and the CEO model "
+                         "checked it.")
+        else:
+            active = sum(1 for rt in self.seats.values() if not rt.benched)
+            lines.append(f"- Time: {elapsed}, with {active} agents working in parallel.")
+        pieces = len(merged)
+        lines.append(f"- {pieces} {'piece' if pieces == 1 else 'pieces'} of work built, each checked by a reviewer "
+                     f"who had not written it ({first_pass} approved at the first review).")
         if failovers:
             lines.append(f"- Usage limits were handled {len(failovers)} time(s) by moving work to another subscription.")
         lines += ["", "## Subscriptions used"]
