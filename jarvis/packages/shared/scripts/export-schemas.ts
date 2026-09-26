@@ -23,6 +23,7 @@ const entries: Record<string, z.ZodType> = {
   "memory/MemoryProposal": S.MemoryProposal,
   "policy/OwnerRule": S.OwnerRule, "policy/AuthorizationDecision": S.AuthorizationDecision, "policy/DecisionRequest": S.DecisionRequest,
   "capability/ServicePolicy": S.ServicePolicy, "capability/ProcessRequest": S.ProcessRequest,
+  "budget/Budget": S.Budget, "budget/UsageLedgerEntry": S.UsageLedgerEntry,
   "nep/NepInvoke": S.NepInvoke, "nep/NepEvent": S.NepEvent, "nep/NepCancel": S.NepCancel,
   ...((S as unknown as { EXTRA_SCHEMAS?: Record<string, z.ZodType> }).EXTRA_SCHEMAS ?? {}),
 };

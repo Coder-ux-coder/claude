@@ -60,7 +60,12 @@ export type NeutralContent =
   | { type: "tool_call"; call_id: string; tool: string; input: unknown }
   | { type: "tool_result"; call_id: string; output: unknown; is_error?: boolean };
 
-export interface NeutralMessage { role: "user" | "assistant"; content: NeutralContent[] }
+/**
+ * Provider-neutral transcript turn. `native` is a disposable provider cache (e.g. the
+ * exact assistant content blocks, including thinking blocks bound to the conversation);
+ * an adapter uses it only when it produced it, so a model switch simply ignores it.
+ */
+export interface NeutralMessage { role: "user" | "assistant"; content: NeutralContent[]; native?: { adapter: string; content: unknown } }
 export interface SystemBlock { kind: "persona" | "policy" | "instructions" | "context"; text: string; cacheable?: boolean }
 export interface ToolSpec { name: string; description: string; input_schema: Record<string, unknown> }
 
@@ -80,7 +85,9 @@ export type ReasoningEvent =
   | { type: "tool_call"; call_id: string; tool: string; input: unknown }
   | { type: "structured_output"; value: unknown }
   | { type: "usage"; usage: UsageReport }
-  | { type: "stop"; reason: "end" | "tool_use" | "max_tokens" | "refusal" | "error"; error?: StructuredError };
+  | { type: "stop"; reason: "end" | "tool_use" | "max_tokens" | "refusal" | "error"; error?: StructuredError }
+  // Extension to 02 §7.2: the provider's exact assistant content, stored as NeutralMessage.native (a disposable cache).
+  | { type: "native"; native: { adapter: string; content: unknown } };
 
 export interface ReasoningAdapter {
   id: string;

@@ -1,0 +1,196 @@
+{
+  "$id": "https://jarvis.local/schemas/budget/Budget.json",
+  "title": "Budget",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "budget_id": {
+      "type": "string"
+    },
+    "scope": {
+      "type": "object",
+      "properties": {
+        "level": {
+          "type": "string",
+          "enum": [
+            "owner",
+            "provider",
+            "task",
+            "work_order",
+            "dev_project",
+            "monitor",
+            "category"
+          ]
+        },
+        "ref": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "level"
+      ],
+      "additionalProperties": false
+    },
+    "period": {
+      "type": "string",
+      "enum": [
+        "day",
+        "month",
+        "task"
+      ]
+    },
+    "limit": {
+      "type": "object",
+      "properties": {
+        "amount": {
+          "type": "number"
+        },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        }
+      },
+      "required": [
+        "amount",
+        "currency"
+      ],
+      "additionalProperties": false
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "hard",
+        "soft"
+      ]
+    },
+    "alert_at": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      }
+    },
+    "fallback": {
+      "type": "object",
+      "properties": {
+        "chain": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "adapter": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "adapter"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "worker": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "worker"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "wait_for_reset": {
+                    "type": "object",
+                    "properties": {
+                      "max_wait": {
+                        "type": "string"
+                      },
+                      "show_reset_time_if_reported": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "max_wait",
+                      "show_reset_time_if_reported"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "wait_for_reset"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "ask_owner": {
+                    "type": "object",
+                    "properties": {
+                      "offer": {
+                        "type": "string"
+                      },
+                      "cap": {
+                        "type": "object",
+                        "properties": {
+                          "amount": {
+                            "type": "number"
+                          },
+                          "currency": {
+                            "type": "string",
+                            "pattern": "^[A-Z]{3}$"
+                          }
+                        },
+                        "required": [
+                          "amount",
+                          "currency"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "offer"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "ask_owner"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "never": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "unbounded_paid_retry",
+              "silent_subscription_to_api_switch"
+            ]
+          }
+        }
+      },
+      "required": [
+        "chain",
+        "never"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "budget_id",
+    "scope",
+    "limit",
+    "kind",
+    "alert_at",
+    "fallback"
+  ],
+  "additionalProperties": false
+}

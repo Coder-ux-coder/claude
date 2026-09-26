@@ -110,6 +110,17 @@ export class Broker {
     return this.result(newId("inv", this.ctx.clock.now()), req, { status: "error", effect_state: err.effect_state, error: err }, started, action_id);
   }
 
+  /** What a call would be: resolved capability, effects, real targets, derived fields. No side effects (used by the Plan Validator). */
+  describeCall(capability: string, params: Record<string, unknown>): { cap: CapabilityDescriptor; effects: EffectClass[]; targets: ResourceSelector[]; fields: Record<string, unknown> } {
+    const cap = this.registry.require(capability);
+    const exec = this.executors.get(cap.id);
+    let targets: ResourceSelector[] = [], fields: Record<string, unknown> = {};
+    try { targets = exec?.targets?.(cap.id, params) ?? []; fields = exec?.fields?.(cap.id, params) ?? {}; } catch { /* params may be incomplete at planning time */ }
+    return { cap, effects: [...new Set([...this.registry.effectsFor(cap, params), ...(exec?.classify?.(cap.id, params) ?? [])])], targets, fields };
+  }
+
+  hasExecutor(capabilityId: string): boolean { return this.executors.has(capabilityId); }
+
   /** Entry point for boss, skill, and worker (via the MCP Gateway) tool calls. */
   async execute(req: BrokerRequest): Promise<BrokerOutcome> {
     const started = this.ctx.clock.iso();

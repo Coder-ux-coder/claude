@@ -1,0 +1,135 @@
+import { join } from "node:path";
+import type { Clock } from "@jarvis/shared";
+import { createContext, type CoreContext } from "./context.js";
+import type { MasterKeyWrapper } from "./crypto/keys.js";
+import { TaskEngine } from "./tasks/task-engine.js";
+import { ActionService } from "./tasks/actions.js";
+import { LeaseManager } from "./tasks/leases.js";
+import { runRecoveryScan, type RecoverySummary } from "./tasks/recovery.js";
+import { MemoryService } from "./memory/memory-service.js";
+import { EpisodicStore } from "./memory/episodic.js";
+import { Portability } from "./memory/portability.js";
+import { ContextBuilder } from "./context/context-builder.js";
+import { PolicyEngine } from "./policy/policy-engine.js";
+import { CapabilityRegistry } from "./registry/registry.js";
+import { CredentialVault } from "./vault/vault.js";
+import { AccountStore } from "./vault/accounts.js";
+import { EvidenceStore, Verifier } from "./verifier/verifier.js";
+import { Broker } from "./broker/broker.js";
+import { FilesExecutor } from "./executors/files.js";
+import { ShellExecutor } from "./executors/shell.js";
+import { WebFetchExecutor } from "./executors/web.js";
+import { BUILTIN_CAPABILITIES } from "./executors/builtins.js";
+import { ModelGateway, type AdapterRegistration } from "./models/gateway.js";
+import { AnthropicAdapter } from "./models/anthropic-adapter.js";
+import { Planner } from "./boss/planner.js";
+import { StepController, type StepHandlers } from "./boss/step-controller.js";
+import { AgentLoop } from "./boss/agent-loop.js";
+import { ConversationManager } from "./boss/conversation.js";
+import type { Intent } from "./boss/intents.js";
+
+export interface JarvisOptions {
+  dataDir: string | null;                  // %LOCALAPPDATA%\Jarvis on Windows; null = in-memory
+  clock?: Clock;
+  keyWrapper?: MasterKeyWrapper;           // DPAPI through the Exec Host on Windows
+  bossModel?: string;                      // default claude-opus-5-5 (owner decision)
+  bossEffort?: "low" | "medium" | "high" | "xhigh" | "max";
+  adapters?: AdapterRegistration[];        // replaces the default Anthropic adapter (tests, offline)
+  defaultTaskBudgetUsd?: number;
+  schedule?(intent: Intent, conversationId: string): Promise<string>;
+  stepHandlers?: StepHandlers;
+  fetchImpl?: typeof fetch;
+}
+
+/**
+ * The Coordinator process's core (01 §3): every module wired with explicit
+ * dependencies, the recovery scan at start, and safe mode when rules can't load.
+ */
+export class JarvisCore {
+  readonly ctx: CoreContext;
+  readonly tasks: TaskEngine; readonly actions: ActionService; readonly leases: LeaseManager;
+  readonly memory: MemoryService; readonly episodic: EpisodicStore; readonly portability: Portability;
+  readonly policy: PolicyEngine; readonly registry: CapabilityRegistry; readonly vault: CredentialVault; readonly accounts: AccountStore;
+  readonly evidence: EvidenceStore; readonly verifier: Verifier; readonly broker: Broker;
+  readonly gateway: ModelGateway; readonly builder: ContextBuilder; readonly planner: Planner; readonly agent: AgentLoop;
+  readonly steps: StepController; readonly conversation: ConversationManager;
+  recovery!: RecoverySummary;
+
+  constructor(readonly opts: JarvisOptions) {
+    this.ctx = createContext({ dataDir: opts.dataDir, ...(opts.clock ? { clock: opts.clock } : {}), ...(opts.keyWrapper ? { keyWrapper: opts.keyWrapper } : {}) });
+    const ctx = this.ctx;
+    this.tasks = new TaskEngine(ctx); this.actions = new ActionService(ctx); this.leases = new LeaseManager(ctx);
+    this.tasks.actions = this.actions; this.tasks.leases = this.leases;
+    this.memory = new MemoryService(ctx); this.episodic = new EpisodicStore(ctx);
+    this.vault = new CredentialVault(opts.dataDir ? join(opts.dataDir, "vault", "vault.bin") : null, ctx.keys, ctx.clock);
+    ctx.events.setRedactor(s => this.vault.redactor.redact(s));
+    this.accounts = new AccountStore(ctx, this.vault);
+    const root = opts.dataDir ?? join(process.cwd(), ".jarvis-dev");
+    this.policy = new PolicyEngine(ctx, {
+      artifactsRoot: join(root, "artifacts"),
+      messageTrust: id => this.episodic.getMessage(id)?.trust,
+      memoryRecordTrusted: id => {
+        if (id.startsWith("ent_")) { const e = this.memory.entities.get(id); return !!e && e.status === "active" && e.provenance.source_trust === "owner_verified" && e.identifiers.some(i => i.verified); }
+        const r = this.memory.get(id); return !!r && r.status === "active" && r.provenance.source_trust === "owner_verified";
+      },
+    });
+    this.portability = new Portability(ctx, this.memory, () => ({ "policy/rules.jsonl": this.policy.listRules() }));
+    this.registry = new CapabilityRegistry(ctx, ctx.nodeId);
+    this.evidence = new EvidenceStore(ctx); this.verifier = new Verifier(ctx, this.evidence);
+    this.broker = new Broker(ctx, this.tasks, this.actions, this.leases, this.policy, this.registry, this.memory, this.vault, this.evidence, this.verifier);
+    this.accounts.onRevoked(id => this.broker.onAccountRevoked(id));
+    this.broker.registerExecutor(new FilesExecutor(join(root, "recovery-bin"), join(root, "trash")));
+    this.broker.registerExecutor(new ShellExecutor());
+    this.broker.registerExecutor(new WebFetchExecutor(opts.fetchImpl));
+    for (const d of BUILTIN_CAPABILITIES) this.registry.register(d, { via: "builtin" });
+    this.gateway = new ModelGateway(ctx);
+    const adapters = opts.adapters ?? [{
+      adapter: new AnthropicAdapter({ model: opts.bossModel ?? "claude-opus-5-5", effort: opts.bossEffort ?? "medium", ...(opts.fetchImpl ? { fetch: opts.fetchImpl } : {}),
+        // The API key lives only in the local vault; it is released inside this call and never stored elsewhere.
+        withKey: async fn => {
+          const cred = this.vault.findByProvider("anthropic");
+          if (!cred) throw new (await import("@jarvis/shared")).JarvisError("missing_credential", "no Anthropic API key in the vault");
+          return this.vault.use(cred.credential_ref, "model call", fn);
+        } }),
+      provider: "anthropic", model: opts.bossModel ?? "claude-opus-5-5", billing: "api" as const }];
+    for (const a of adapters) this.gateway.register(a);
+    if (opts.adapters?.length) for (const role of ["boss.reasoning", "boss.fast", "agent.worker", "vision.interpret", "vision.act"] as const)
+      if (!this.gateway.route(role).chain.every(id => this.gateway.adapterIds().includes(id))) this.gateway.setRoute(role, [opts.adapters[0]!.adapter.id], "default");
+    this.builder = new ContextBuilder(ctx, this.memory, this.episodic, this.policy);
+    this.planner = new Planner(this.gateway, this.registry, this.policy, this.broker, this.tasks);
+    this.agent = new AgentLoop(this.gateway, this.registry, this.broker, this.memory, this.evidence);
+    this.steps = new StepController(ctx, this.tasks, this.actions, this.leases, this.broker, this.verifier, this.evidence, this.episodic, {
+      reason: async (task, step) => {
+        const pkg = this.builder.build({ kind: "task", task, text: `${task.objective} ${step.description}` });
+        const r = await this.agent.run({ task, step_id: step.step_id, goal: step.description, context: pkg });
+        if (r.text && task.origin.conversation_id) this.episodic.addMessage({ conversation_id: task.origin.conversation_id, author: "jarvis", channel: "console", trust: "system", modality: "text", text: r.text });
+        return { evidence_ids: r.evidence_ids, text: r.text };
+      },
+      ...(opts.stepHandlers ?? {}),
+    });
+    this.conversation = new ConversationManager({ ctx, episodic: this.episodic, memory: this.memory, builder: this.builder, tasks: this.tasks, policy: this.policy, broker: this.broker,
+      gateway: this.gateway, planner: this.planner, steps: this.steps, defaultTaskBudgetUsd: opts.defaultTaskBudgetUsd ?? 2, ...(opts.schedule ? { schedule: opts.schedule } : {}) });
+  }
+
+  /** Startup (01 §4.5): integrity, policy load, deterministic recovery scan, safe mode if needed. */
+  start(): RecoverySummary {
+    let policyOk = true;
+    try { this.policy.activeRules(); } catch { policyOk = false; }
+    this.recovery = runRecoveryScan(this.ctx, this.tasks, this.actions, this.leases, {
+      policyLoaded: () => policyOk,
+      enqueueReconciliation: id => this.broker.enqueueReconciliation(id),
+      revalidateGrant: id => {
+        const a = this.actions.get(id);
+        const row = a.grant_id ? this.ctx.db.prepare("select decision from grants where decision_id = ?").get(a.grant_id) as { decision: string } | undefined : undefined;
+        if (!row) return false;
+        return this.policy.verifyGrant(JSON.parse(row.decision), { task_revision: this.tasks.require(a.task_id).revision, fingerprint: a.fingerprint ?? "" }).ok;
+      },
+      processAlive: () => false,
+    });
+    this.broker.safeMode = this.recovery.safe_mode;
+    this.memory.expireSweep();
+    return this.recovery;
+  }
+
+  close(): void { this.builder.close(); this.ctx.db.close(); }
+}

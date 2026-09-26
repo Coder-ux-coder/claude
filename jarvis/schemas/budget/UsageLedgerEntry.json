@@ -1,0 +1,92 @@
+{
+  "$id": "https://jarvis.local/schemas/budget/UsageLedgerEntry.json",
+  "title": "UsageLedgerEntry",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "use_id": {
+      "type": "string"
+    },
+    "provider": {
+      "type": "string"
+    },
+    "account": {
+      "type": "string"
+    },
+    "adapter": {
+      "type": "string"
+    },
+    "role": {
+      "type": "string"
+    },
+    "task_id": {
+      "type": "string"
+    },
+    "work_order_id": {
+      "type": "string"
+    },
+    "tokens": {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "number"
+        },
+        "output": {
+          "type": "number"
+        },
+        "cache_read": {
+          "type": "number"
+        },
+        "cache_write": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "input",
+        "output"
+      ],
+      "additionalProperties": false
+    },
+    "amount": {
+      "type": "object",
+      "properties": {
+        "amount": {
+          "type": "number"
+        },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        }
+      },
+      "required": [
+        "amount",
+        "currency"
+      ],
+      "additionalProperties": false
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "actual",
+        "estimated",
+        "unknown"
+      ]
+    },
+    "basis": {
+      "type": "string"
+    },
+    "at": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "use_id",
+    "provider",
+    "adapter",
+    "role",
+    "kind",
+    "basis",
+    "at"
+  ],
+  "additionalProperties": false
+}

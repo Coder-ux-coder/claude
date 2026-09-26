@@ -47,6 +47,8 @@ export interface PolicyDeps {
   messageTrust(messageId: string): "owner_verified" | "owner_unverified" | "system" | undefined;
   memoryRecordTrusted(recordId: string): boolean;       // active and owner-stated/confirmed
   presenceVerifier?(): boolean;                          // M6: Windows Hello via the Guard
+  /** Where plan/research/monitor tasks may write their artifact (02 §8.3: "the plan artifact", "notes", "records"). */
+  artifactsRoot?: string;
   grantTtlMs?: number;
 }
 
@@ -335,7 +337,7 @@ export class PolicyEngine implements PolicyReader {
   }
 
   /** Evaluates one prepared action and returns a signed decision (a grant when allow). */
-  evaluate(a: ActionRequest): Evaluation {
+  evaluate(a: ActionRequest, opts: { dryRun?: boolean } = {}): Evaluation {
     let rules: OwnerRule[];
     try { rules = this.activeRules(); } catch (e) { throw new JarvisError("policy_unavailable", `policy cannot be read: ${(e as Error).message}`); }
     const matched: AuthorizationDecision["matched_rules"] = [];
@@ -358,6 +360,12 @@ export class PolicyEngine implements PolicyReader {
     const ceiling = effectCeiling(a.task.mode, a.task.intended_effects);
     const outside = a.effects.filter(e => !ceiling.has(e));
     if (outside.length) { denied = true; reasons.push(`this ${a.task.mode} task may not ${outside.join(", ")}`); }
+    // 2b. Plan, research and monitor tasks write only their own artifact, never your files.
+    if (["plan", "research", "monitor"].includes(a.task.mode) && a.effects.includes("write.local")) {
+      const root = this.deps.artifactsRoot;
+      const paths = a.targets.filter(t => "path_prefix" in t);
+      if (!root || !paths.length || !paths.every(p => resourceMatches({ path_prefix: root }, p))) { denied = true; reasons.push(`a ${a.task.mode} task only writes its own ${a.task.mode === "plan" ? "plan" : a.task.mode === "research" ? "notes" : "records"}, not your files`); }
+    }
     // 3. Normal constraints (rank 3): deny wins; an owner override for this task skips the rule.
     for (const r of rules.filter(r => r.kind === "constraint" && r.protection === "normal")) {
       if (overriddenRules.has(r.rule_id) || !this.ruleMatches(r, a, true)) continue;
@@ -415,13 +423,13 @@ export class PolicyEngine implements PolicyReader {
         if (!grounded) {
           const untrusted = sources.some(s => s.kind === "untrusted" || s.kind === "worker_output");
           want({ kind: "scope_expansion", refs: sources.map(s => s.ref), text: `The ${param} ${untrusted ? "comes only from untrusted content" : "can't be traced to anything you said"}.` });
-          if (untrusted) this.ctx.events.append({ type: "policy.injection_suspected", correlation: { task_id: a.task.task_id, action_id: a.action_id }, summary: `${param} traced only to untrusted content`, data: { param, sources } });
+          if (untrusted && !opts.dryRun) this.ctx.events.append({ type: "policy.injection_suspected", correlation: { task_id: a.task.task_id, action_id: a.action_id }, summary: `${param} traced only to untrusted content`, data: { param, sources } });
         }
       }
     }
     // 6. Guidance (rank 5): advisory only.
     for (const r of rules.filter(r => r.kind === "guidance")) if (this.ruleMatches(r, a, false)) matched.push({ rule_id: r.rule_id, revision: r.revision, effect: "advisory" });
-    if (outside.length && a.value_sources && Object.values(a.value_sources).some(s => s.some(x => x.kind === "untrusted")))
+    if (!opts.dryRun && outside.length && a.value_sources && Object.values(a.value_sources).some(s => s.some(x => x.kind === "untrusted")))
       this.ctx.events.append({ type: "policy.injection_suspected", correlation: { task_id: a.task.task_id, action_id: a.action_id }, summary: "out-of-ceiling call with parameters from untrusted content", data: { effects: outside } });
 
     const decision: AuthorizationDecision["decision"] = denied ? "deny" : presence ? "require_presence" : needDecision ? "require_decision" : "allow";
@@ -436,6 +444,7 @@ export class PolicyEngine implements PolicyReader {
       reason_for_owner: reason, issuer: { component: "policy_engine", version: POLICY_ENGINE_VERSION },
     };
     const signed = AuthorizationDecision.parse({ ...unsigned, signature: this.sign(unsigned) });
+    if (opts.dryRun) return { decision: { ...signed, signature: "dry-run" }, ...(decision === "require_decision" && needDecision ? { decision_request: { why: needDecision } } : {}) };
     this.ctx.tx(() => {
       this.ctx.db.prepare("insert into grants(decision_id, action_id, task_id, decision) values (?,?,?,?)").run(signed.decision_id, a.action_id, a.task.task_id, JSON.stringify(signed));
       this.ctx.events.append({ type: "policy.decision", correlation: { task_id: a.task.task_id, action_id: a.action_id }, summary: `${decision}: ${a.capability}`,

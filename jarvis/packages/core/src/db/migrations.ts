@@ -233,4 +233,15 @@ create table reconciliation_queue (action_id text primary key, next_at text not 
 create table broker_pending (action_id text primary key, request_ref text not null, created_at text not null);
 `,
   },
+  {
+    version: 4, name: "models_budgets",
+    sql: `
+create table budgets (budget_id text primary key, level text not null, ref text, budget text not null);
+create table usage_ledger (use_id text primary key, provider text not null, adapter text not null, role text not null, task_id text, work_order_id text,
+  amount real, currency text, kind text not null, at text not null, entry text not null);
+create index usage_ledger_at on usage_ledger(at);
+create index usage_ledger_task on usage_ledger(task_id);
+create table budget_alerts (budget_id text not null, period_key text not null, threshold real not null, at text not null, primary key (budget_id, period_key, threshold));
+`,
+  },
 ];
