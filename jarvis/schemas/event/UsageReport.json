@@ -1,0 +1,92 @@
+{
+  "$id": "https://jarvis.local/schemas/event/UsageReport.json",
+  "title": "UsageReport",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "tokens": {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "number"
+        },
+        "output": {
+          "type": "number"
+        },
+        "cache_read": {
+          "type": "number"
+        },
+        "cache_write": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "input",
+        "output"
+      ],
+      "additionalProperties": false
+    },
+    "cost": {
+      "type": "object",
+      "properties": {
+        "amount": {
+          "type": "object",
+          "properties": {
+            "amount": {
+              "type": "number"
+            },
+            "currency": {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            }
+          },
+          "required": [
+            "amount",
+            "currency"
+          ],
+          "additionalProperties": false
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "actual",
+            "estimated",
+            "unknown"
+          ]
+        },
+        "basis": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "amount",
+        "kind",
+        "basis"
+      ],
+      "additionalProperties": false
+    },
+    "subscription": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "type": "string"
+        },
+        "plan_usage": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "plan_usage"
+      ],
+      "additionalProperties": false
+    },
+    "duration_ms": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "duration_ms"
+  ],
+  "additionalProperties": false
+}

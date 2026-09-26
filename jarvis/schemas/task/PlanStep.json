@@ -1,0 +1,114 @@
+{
+  "$id": "https://jarvis.local/schemas/task/PlanStep.json",
+  "title": "PlanStep",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "step_id": {
+      "type": "string"
+    },
+    "task_id": {
+      "type": "string"
+    },
+    "task_revision": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "tool",
+        "skill",
+        "worker",
+        "ask_owner",
+        "reason",
+        "verify",
+        "wait"
+      ]
+    },
+    "description": {
+      "type": "string"
+    },
+    "capability": {
+      "type": "string"
+    },
+    "params": {},
+    "depends_on": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "effects": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "read.local",
+          "read.account",
+          "write.local",
+          "delete.local",
+          "write.account",
+          "delete.account",
+          "communicate",
+          "publish",
+          "spend",
+          "commit",
+          "access_control",
+          "execute_code",
+          "install",
+          "admin",
+          "notify_owner"
+        ]
+      }
+    },
+    "resources": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "ready",
+        "running",
+        "waiting",
+        "done",
+        "failed",
+        "skipped",
+        "invalidated"
+      ]
+    },
+    "attempts": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "outputs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "checkpoint_ref": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "step_id",
+    "task_id",
+    "task_revision",
+    "kind",
+    "description",
+    "depends_on",
+    "effects",
+    "resources",
+    "status",
+    "attempts",
+    "outputs"
+  ],
+  "additionalProperties": false
+}

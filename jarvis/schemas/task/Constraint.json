@@ -1,0 +1,60 @@
+{
+  "$id": "https://jarvis.local/schemas/task/Constraint.json",
+  "title": "Constraint",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "field": {
+      "type": "string"
+    },
+    "op": {
+      "type": "string",
+      "enum": [
+        "<=",
+        ">=",
+        "==",
+        "in",
+        "not_in",
+        "between",
+        "matches"
+      ]
+    },
+    "value": {},
+    "source": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "owner_message",
+            "rule",
+            "memory"
+          ]
+        },
+        "ref": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "ref"
+      ],
+      "additionalProperties": false
+    },
+    "hard": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id",
+    "field",
+    "op",
+    "value",
+    "source",
+    "hard"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,100 @@
+{
+  "$id": "https://jarvis.local/schemas/event/ToolInvocation.json",
+  "title": "ToolInvocation",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "invocation_id": {
+      "type": "string"
+    },
+    "capability": {
+      "type": "string"
+    },
+    "params_ref": {
+      "type": "string"
+    },
+    "requested_by": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "boss",
+            "skill",
+            "worker"
+          ]
+        },
+        "ref": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "ref"
+      ],
+      "additionalProperties": false
+    },
+    "action_id": {
+      "type": "string"
+    },
+    "decision_id": {
+      "type": "string"
+    },
+    "lease_id": {
+      "type": "string"
+    },
+    "correlation": {
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string"
+        },
+        "step_id": {
+          "type": "string"
+        },
+        "action_id": {
+          "type": "string"
+        },
+        "work_order_id": {
+          "type": "string"
+        },
+        "conversation_id": {
+          "type": "string"
+        },
+        "causation_event_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "requested",
+        "denied",
+        "dispatched",
+        "completed",
+        "failed",
+        "cancelled"
+      ]
+    },
+    "result_ref": {
+      "type": "string"
+    },
+    "started_at": {
+      "type": "string"
+    },
+    "ended_at": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "invocation_id",
+    "capability",
+    "params_ref",
+    "requested_by",
+    "correlation",
+    "status"
+  ],
+  "additionalProperties": false
+}

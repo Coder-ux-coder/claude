@@ -1,0 +1,6 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.jarvis-dev/
+native/**/bin/
+native/**/obj/

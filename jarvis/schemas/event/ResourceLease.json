@@ -1,0 +1,89 @@
+{
+  "$id": "https://jarvis.local/schemas/event/ResourceLease.json",
+  "title": "ResourceLease",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "lease_id": {
+      "type": "string"
+    },
+    "resource": {
+      "type": "string"
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "exclusive",
+        "shared_read"
+      ]
+    },
+    "holder": {
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string"
+        },
+        "work_order_id": {
+          "type": "string"
+        },
+        "process_instance": {
+          "type": "string"
+        },
+        "node_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "process_instance",
+        "node_id"
+      ],
+      "additionalProperties": false
+    },
+    "fencing_token": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "acquired_at": {
+      "type": "string"
+    },
+    "expires_at": {
+      "type": "string"
+    },
+    "heartbeat_at": {
+      "type": "string"
+    },
+    "state": {
+      "type": "string",
+      "enum": [
+        "active",
+        "released",
+        "expired",
+        "revoked"
+      ]
+    },
+    "revoked_reason": {
+      "type": "string",
+      "enum": [
+        "owner_takeover",
+        "emergency_stop",
+        "expired",
+        "task_cancelled",
+        "lock"
+      ]
+    }
+  },
+  "required": [
+    "lease_id",
+    "resource",
+    "mode",
+    "holder",
+    "fencing_token",
+    "acquired_at",
+    "expires_at",
+    "heartbeat_at",
+    "state"
+  ],
+  "additionalProperties": false
+}

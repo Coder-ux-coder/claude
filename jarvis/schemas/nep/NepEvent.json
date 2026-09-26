@@ -1,0 +1,32 @@
+{
+  "$id": "https://jarvis.local/schemas/nep/NepEvent.json",
+  "title": "NepEvent",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "invocation_id": {
+      "type": "string"
+    },
+    "seq": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "progress",
+        "observation",
+        "log"
+      ]
+    },
+    "data": {}
+  },
+  "required": [
+    "invocation_id",
+    "seq",
+    "kind",
+    "data"
+  ],
+  "additionalProperties": false
+}

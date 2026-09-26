@@ -1,0 +1,345 @@
+{
+  "$id": "https://jarvis.local/schemas/capability/ToolResult.json",
+  "title": "ToolResult",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "invocation_id": {
+      "type": "string"
+    },
+    "action_id": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ok",
+        "error",
+        "partial"
+      ]
+    },
+    "effect_state": {
+      "type": "string",
+      "enum": [
+        "none",
+        "unknown",
+        "partial",
+        "complete"
+      ]
+    },
+    "output": {},
+    "error": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "invalid_input",
+            "missing_permission",
+            "missing_credential",
+            "auth_required",
+            "unavailable_device",
+            "unsupported_operation",
+            "transient_service_error",
+            "rate_limited",
+            "uncertain_external_effect",
+            "verification_failed",
+            "precondition_changed",
+            "conflict",
+            "timeout",
+            "budget_exhausted",
+            "policy_unavailable",
+            "expired",
+            "external_refusal",
+            "cancelled",
+            "internal_error"
+          ]
+        },
+        "message": {
+          "type": "string"
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "retry_after_s": {
+          "type": "number"
+        },
+        "effect_state": {
+          "type": "string",
+          "enum": [
+            "none",
+            "unknown",
+            "partial",
+            "complete"
+          ]
+        },
+        "details": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "cause_ref": {
+          "type": "string"
+        },
+        "source": {
+          "type": "object",
+          "properties": {
+            "capability_id": {
+              "type": "string"
+            },
+            "executor": {
+              "type": "string"
+            },
+            "node_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "capability_id",
+            "executor",
+            "node_id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "retryable",
+        "effect_state",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "evidence_id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "service_readback",
+              "service_confirmation",
+              "postcondition_observation",
+              "file_check",
+              "test_result",
+              "process_exit",
+              "screenshot",
+              "model_judgement",
+              "owner_confirmation"
+            ]
+          },
+          "strength": {
+            "type": "string",
+            "enum": [
+              "strong",
+              "moderate",
+              "weak"
+            ]
+          }
+        },
+        "required": [
+          "evidence_id",
+          "type",
+          "strength"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "observations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "page",
+              "uia",
+              "screenshot",
+              "file",
+              "api"
+            ]
+          },
+          "ref": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "ref",
+          "at"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "timing": {
+      "type": "object",
+      "properties": {
+        "started_at": {
+          "type": "string"
+        },
+        "ended_at": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "started_at",
+        "ended_at"
+      ],
+      "additionalProperties": false
+    },
+    "usage": {
+      "type": "object",
+      "properties": {
+        "tokens": {
+          "type": "object",
+          "properties": {
+            "input": {
+              "type": "number"
+            },
+            "output": {
+              "type": "number"
+            },
+            "cache_read": {
+              "type": "number"
+            },
+            "cache_write": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "input",
+            "output"
+          ],
+          "additionalProperties": false
+        },
+        "cost": {
+          "type": "object",
+          "properties": {
+            "amount": {
+              "type": "object",
+              "properties": {
+                "amount": {
+                  "type": "number"
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                }
+              },
+              "required": [
+                "amount",
+                "currency"
+              ],
+              "additionalProperties": false
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "actual",
+                "estimated",
+                "unknown"
+              ]
+            },
+            "basis": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "amount",
+            "kind",
+            "basis"
+          ],
+          "additionalProperties": false
+        },
+        "subscription": {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "type": "string"
+            },
+            "plan_usage": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "provider",
+            "plan_usage"
+          ],
+          "additionalProperties": false
+        },
+        "duration_ms": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "duration_ms"
+      ],
+      "additionalProperties": false
+    },
+    "executor": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "node_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "version",
+        "node_id"
+      ],
+      "additionalProperties": false
+    },
+    "correlation": {
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string"
+        },
+        "step_id": {
+          "type": "string"
+        },
+        "action_id": {
+          "type": "string"
+        },
+        "work_order_id": {
+          "type": "string"
+        },
+        "conversation_id": {
+          "type": "string"
+        },
+        "causation_event_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "invocation_id",
+    "status",
+    "effect_state",
+    "evidence",
+    "timing",
+    "executor",
+    "correlation"
+  ],
+  "additionalProperties": false
+}

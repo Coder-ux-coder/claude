@@ -1,0 +1,88 @@
+{
+  "$id": "https://jarvis.local/schemas/capability/StructuredError.json",
+  "title": "StructuredError",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "code": {
+      "type": "string",
+      "enum": [
+        "invalid_input",
+        "missing_permission",
+        "missing_credential",
+        "auth_required",
+        "unavailable_device",
+        "unsupported_operation",
+        "transient_service_error",
+        "rate_limited",
+        "uncertain_external_effect",
+        "verification_failed",
+        "precondition_changed",
+        "conflict",
+        "timeout",
+        "budget_exhausted",
+        "policy_unavailable",
+        "expired",
+        "external_refusal",
+        "cancelled",
+        "internal_error"
+      ]
+    },
+    "message": {
+      "type": "string"
+    },
+    "retryable": {
+      "type": "boolean"
+    },
+    "retry_after_s": {
+      "type": "number"
+    },
+    "effect_state": {
+      "type": "string",
+      "enum": [
+        "none",
+        "unknown",
+        "partial",
+        "complete"
+      ]
+    },
+    "details": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
+    },
+    "cause_ref": {
+      "type": "string"
+    },
+    "source": {
+      "type": "object",
+      "properties": {
+        "capability_id": {
+          "type": "string"
+        },
+        "executor": {
+          "type": "string"
+        },
+        "node_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "capability_id",
+        "executor",
+        "node_id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "code",
+    "message",
+    "retryable",
+    "effect_state",
+    "source"
+  ],
+  "additionalProperties": false
+}

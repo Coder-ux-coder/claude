@@ -1,0 +1,72 @@
+{
+  "$id": "https://jarvis.local/schemas/task/SuccessCriterion.json",
+  "title": "SuccessCriterion",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "check": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "file_exists",
+            "file_content",
+            "service_readback",
+            "confirmation_captured",
+            "tests_pass",
+            "postcondition",
+            "model_judgement",
+            "owner_confirmation"
+          ]
+        },
+        "spec": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": [
+        "kind",
+        "spec"
+      ],
+      "additionalProperties": false
+    },
+    "acceptable_evidence": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "service_readback",
+          "service_confirmation",
+          "postcondition_observation",
+          "file_check",
+          "test_result",
+          "process_exit",
+          "screenshot",
+          "model_judgement",
+          "owner_confirmation"
+        ]
+      }
+    },
+    "required": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id",
+    "description",
+    "check",
+    "acceptable_evidence",
+    "required"
+  ],
+  "additionalProperties": false
+}

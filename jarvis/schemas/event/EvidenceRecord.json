@@ -1,0 +1,126 @@
+{
+  "$id": "https://jarvis.local/schemas/event/EvidenceRecord.json",
+  "title": "EvidenceRecord",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "evidence_id": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "service_readback",
+        "service_confirmation",
+        "postcondition_observation",
+        "file_check",
+        "test_result",
+        "process_exit",
+        "screenshot",
+        "model_judgement",
+        "owner_confirmation"
+      ]
+    },
+    "strength": {
+      "type": "string",
+      "enum": [
+        "strong",
+        "moderate",
+        "weak"
+      ]
+    },
+    "claim": {
+      "type": "string"
+    },
+    "criterion_id": {
+      "type": "string"
+    },
+    "action_id": {
+      "type": "string"
+    },
+    "task_id": {
+      "type": "string"
+    },
+    "observed_at": {
+      "type": "string"
+    },
+    "source": {
+      "type": "object",
+      "properties": {
+        "capability_id": {
+          "type": "string"
+        },
+        "executor": {
+          "type": "string"
+        },
+        "account_id": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "capability_id",
+        "executor"
+      ],
+      "additionalProperties": false
+    },
+    "data": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
+    },
+    "artifact_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "limitations": {
+      "type": "string"
+    },
+    "retention": {
+      "type": "object",
+      "properties": {
+        "policy": {
+          "type": "string",
+          "enum": [
+            "keep",
+            "until",
+            "task_end",
+            "days"
+          ]
+        },
+        "value": {
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "review_at": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "policy"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "evidence_id",
+    "type",
+    "strength",
+    "claim",
+    "task_id",
+    "observed_at",
+    "source",
+    "data",
+    "artifact_refs",
+    "retention"
+  ],
+  "additionalProperties": false
+}

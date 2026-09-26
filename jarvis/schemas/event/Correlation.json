@@ -1,0 +1,27 @@
+{
+  "$id": "https://jarvis.local/schemas/event/Correlation.json",
+  "title": "Correlation",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "task_id": {
+      "type": "string"
+    },
+    "step_id": {
+      "type": "string"
+    },
+    "action_id": {
+      "type": "string"
+    },
+    "work_order_id": {
+      "type": "string"
+    },
+    "conversation_id": {
+      "type": "string"
+    },
+    "causation_event_id": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}

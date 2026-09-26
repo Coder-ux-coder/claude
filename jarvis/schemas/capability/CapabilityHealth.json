@@ -1,0 +1,76 @@
+{
+  "$id": "https://jarvis.local/schemas/capability/CapabilityHealth.json",
+  "title": "CapabilityHealth",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "capability_id": {
+      "type": "string"
+    },
+    "node_id": {
+      "type": "string"
+    },
+    "account_id": {
+      "type": "string"
+    },
+    "state": {
+      "type": "string",
+      "enum": [
+        "installed",
+        "available",
+        "needs_auth",
+        "degraded",
+        "outdated",
+        "disabled",
+        "unsupported_on_node",
+        "unavailable_now"
+      ]
+    },
+    "reason": {
+      "type": "string"
+    },
+    "checked_at": {
+      "type": "string"
+    },
+    "probe": {
+      "type": "string",
+      "enum": [
+        "active",
+        "passive"
+      ]
+    },
+    "recent": {
+      "type": "object",
+      "properties": {
+        "successes": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "failures": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "window": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "successes",
+        "failures",
+        "window"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "capability_id",
+    "node_id",
+    "state",
+    "checked_at",
+    "probe",
+    "recent"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,23 @@
+{
+  "$id": "https://jarvis.local/schemas/nep/NepCancel.json",
+  "title": "NepCancel",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "invocation_id": {
+      "type": "string"
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "cooperative",
+        "kill"
+      ]
+    }
+  },
+  "required": [
+    "invocation_id",
+    "mode"
+  ],
+  "additionalProperties": false
+}
