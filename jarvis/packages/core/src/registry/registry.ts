@@ -49,7 +49,9 @@ export class CapabilityRegistry {
    * suggestions so the model replans; nothing executes (F38).
    */
   require(ref: string, opts: { allowUnvalidated?: boolean } = {}): CapabilityDescriptor {
-    const d = this.resolve(ref, { includeAll: true });
+    // The newest usable version first; other lifecycles only to explain why nothing can run
+    // (after a rollback the newest version is quarantined, the previous one active).
+    const d = this.resolve(ref) ?? this.resolve(ref, { includeAll: true });
     if (!d) {
       const suggestions = this.search(ref.split("@")[0]!.replace(/^(tool|skill|worker|model_function):/, "").replace(/[._-]/g, " "), {}).slice(0, 3).map(c => c.id);
       throw new JarvisError("invalid_input", `no capability "${ref}"${suggestions.length ? `; did you mean ${suggestions.join(", ")}?` : ""}`, { details: { suggestions } });

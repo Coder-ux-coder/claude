@@ -11,9 +11,11 @@ const docs = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "docs", "
 const text = readdirSync(docs).filter(f => f.endsWith(".md")).map(f => readFileSync(join(docs, f), "utf8")).join("\n");
 
 function specFields(name: string): string[] | null {
-  const re = new RegExp(`interface ${name}\\s*(?:extends [^{]+)?\\{`, "g");
+  const re = new RegExp(`interface ${name}\\s*(?:extends ([^{]+))?\\{`, "g");
   const m = re.exec(text);
   if (!m) return null;
+  // Inherited fields count too: "interface DevWorkOrder extends WorkOrder { dev }" has WorkOrder's fields plus dev.
+  const inherited = (m[1] ?? "").split(",").map(x => x.trim()).filter(Boolean).flatMap(parent => specFields(parent) ?? []);
   let i = m.index + m[0].length, depth = 1, body = "";
   while (i < text.length && depth > 0) { const c = text[i]!; if (c === "{") depth++; if (c === "}") depth--; if (depth > 0) body += c; i++; }
   // Only top-level keys: drop nested braces/brackets/parens content.
@@ -21,7 +23,7 @@ function specFields(name: string): string[] | null {
   for (const c of body) { if ("{[(".includes(c)) d++; if (d === 0) top += c; if ("}])".includes(c)) d--; }
   top = top.replace(/\/\/[^\n]*/g, "");
   const keys = [...top.matchAll(/(?:^|[;\n,])\s*([a-z_][a-z0-9_]*)\??\s*:/gi)].map(x => x[1]!);
-  return [...new Set(keys)];
+  return [...new Set([...inherited, ...keys])];
 }
 
 const pairs: Record<string, z.ZodType> = (globalThis as any).__PAIRS ?? {
@@ -37,6 +39,8 @@ const pairs: Record<string, z.ZodType> = (globalThis as any).__PAIRS ?? {
   DerivedSummary: S.DerivedSummary, MemoryProposal: S.MemoryProposal,
   OwnerRule: S.OwnerRule, AuthorizationDecision: S.AuthorizationDecision, DecisionRequest: S.DecisionRequest, ServicePolicy: S.ServicePolicy, ProcessRequest: S.ProcessRequest,
   Budget: S.Budget, UsageLedgerEntry: S.UsageLedgerEntry, ScheduledJob: S.ScheduledJob,
+  DevWorkOrder: S.DevWorkOrder, DevResult: S.DevResult, PromotionEvidence: S.PromotionEvidence, ReleaseRecord: S.ReleaseRecord, ImprovementProposal: S.ImprovementProposal,
+  GapReport: S.GapReport, ResolverOption: S.ResolverOption,
   Money: S.Money, Retention: S.Retention, Provenance: S.Provenance, SourceRef: S.SourceRef, RecordTimes: S.RecordTimes,
   ...((S as any).SPEC_PAIRS ?? {}),
 };

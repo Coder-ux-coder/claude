@@ -1,0 +1,149 @@
+{
+  "$id": "https://jarvis.local/schemas/workshop/PromotionEvidence.json",
+  "title": "PromotionEvidence",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "release_candidate": {
+      "type": "string"
+    },
+    "capability_id": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    },
+    "tested": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "level": {
+            "type": "string"
+          },
+          "suite": {
+            "type": "string"
+          },
+          "result": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "level",
+          "suite",
+          "result",
+          "environment"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "untested": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "holdout": {
+      "type": "object",
+      "properties": {
+        "set": {
+          "type": "string"
+        },
+        "result": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "set",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "review": {
+      "type": "object",
+      "properties": {
+        "reviewer": {
+          "type": "string"
+        },
+        "findings": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "unresolved": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "reviewer",
+        "findings",
+        "unresolved"
+      ],
+      "additionalProperties": false
+    },
+    "live_checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string"
+          },
+          "result": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "scope",
+          "result",
+          "at"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "confidence_limits": {
+      "type": "string"
+    },
+    "permission_delta": {
+      "type": "object",
+      "properties": {
+        "added": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "removed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "added",
+        "removed"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "release_candidate",
+    "capability_id",
+    "version",
+    "tested",
+    "untested",
+    "holdout",
+    "confidence_limits",
+    "permission_delta"
+  ],
+  "additionalProperties": false
+}

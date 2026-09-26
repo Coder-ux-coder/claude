@@ -1,0 +1,171 @@
+{
+  "$id": "https://jarvis.local/schemas/workshop/ImprovementProposal.json",
+  "title": "ImprovementProposal",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "proposal_id": {
+      "type": "string"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "skill",
+        "tool",
+        "connector",
+        "routing",
+        "learning_config",
+        "ui",
+        "core",
+        "memory_generalization"
+      ]
+    },
+    "title": {
+      "type": "string"
+    },
+    "rationale": {
+      "type": "string"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "target": {
+      "type": "object",
+      "properties": {
+        "capability_id": {
+          "type": "string"
+        },
+        "current_version": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "expected_effect": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "metric": {
+            "type": "string"
+          },
+          "baseline": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "metric",
+          "baseline",
+          "target"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "risk": {
+      "type": "object",
+      "properties": {
+        "class": {
+          "type": "string",
+          "enum": [
+            "R0",
+            "R1",
+            "R2",
+            "R3"
+          ]
+        },
+        "permission_delta": {
+          "type": "object",
+          "properties": {
+            "added": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "removed": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "added",
+            "removed"
+          ],
+          "additionalProperties": false
+        },
+        "protected_paths_touched": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "class",
+        "permission_delta",
+        "protected_paths_touched"
+      ],
+      "additionalProperties": false
+    },
+    "budget_estimate": {
+      "type": "object",
+      "properties": {
+        "amount": {
+          "type": "number"
+        },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        }
+      },
+      "required": [
+        "amount",
+        "currency"
+      ],
+      "additionalProperties": false
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "proposed",
+        "approved",
+        "in_development",
+        "validated",
+        "rejected",
+        "released",
+        "abandoned"
+      ]
+    },
+    "decided_by": {
+      "type": "string",
+      "enum": [
+        "policy",
+        "owner"
+      ]
+    },
+    "created_at": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "proposal_id",
+    "kind",
+    "title",
+    "rationale",
+    "evidence_refs",
+    "target",
+    "expected_effect",
+    "risk",
+    "status",
+    "created_at"
+  ],
+  "additionalProperties": false
+}

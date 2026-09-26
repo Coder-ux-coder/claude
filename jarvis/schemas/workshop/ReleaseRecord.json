@@ -1,0 +1,283 @@
+{
+  "$id": "https://jarvis.local/schemas/workshop/ReleaseRecord.json",
+  "title": "ReleaseRecord",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "release_id": {
+      "type": "string"
+    },
+    "capability_id": {
+      "type": "string"
+    },
+    "from_version": {
+      "type": "string"
+    },
+    "to_version": {
+      "type": "string"
+    },
+    "package_hash": {
+      "type": "string"
+    },
+    "class": {
+      "type": "string",
+      "enum": [
+        "configuration",
+        "skill",
+        "connector",
+        "routing",
+        "ui",
+        "learning_config",
+        "core"
+      ]
+    },
+    "validation_report_ref": {
+      "type": "string"
+    },
+    "promotion_evidence": {
+      "type": "object",
+      "properties": {
+        "release_candidate": {
+          "type": "string"
+        },
+        "capability_id": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "tested": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "level": {
+                "type": "string"
+              },
+              "suite": {
+                "type": "string"
+              },
+              "result": {
+                "type": "string"
+              },
+              "environment": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "level",
+              "suite",
+              "result",
+              "environment"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "untested": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "holdout": {
+          "type": "object",
+          "properties": {
+            "set": {
+              "type": "string"
+            },
+            "result": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "set",
+            "result"
+          ],
+          "additionalProperties": false
+        },
+        "review": {
+          "type": "object",
+          "properties": {
+            "reviewer": {
+              "type": "string"
+            },
+            "findings": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "unresolved": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "reviewer",
+            "findings",
+            "unresolved"
+          ],
+          "additionalProperties": false
+        },
+        "live_checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string"
+              },
+              "result": {
+                "type": "string"
+              },
+              "at": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "scope",
+              "result",
+              "at"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "confidence_limits": {
+          "type": "string"
+        },
+        "permission_delta": {
+          "type": "object",
+          "properties": {
+            "added": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "removed": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "added",
+            "removed"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "release_candidate",
+        "capability_id",
+        "version",
+        "tested",
+        "untested",
+        "holdout",
+        "confidence_limits",
+        "permission_delta"
+      ],
+      "additionalProperties": false
+    },
+    "approvals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "by": {
+            "type": "string",
+            "enum": [
+              "policy",
+              "owner"
+            ]
+          },
+          "at": {
+            "type": "string"
+          },
+          "signature": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "by",
+          "at"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "migrations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "reversible": {
+            "type": "boolean"
+          },
+          "backup_ref": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "reversible",
+          "backup_ref"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "activated_at": {
+      "type": "string"
+    },
+    "canary": {
+      "type": "object",
+      "properties": {
+        "runs": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "failures": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "running",
+            "passed",
+            "failed"
+          ]
+        }
+      },
+      "required": [
+        "runs",
+        "failures",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "rolled_back_at": {
+      "type": "string"
+    },
+    "rollback_reason": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "release_id",
+    "capability_id",
+    "to_version",
+    "package_hash",
+    "class",
+    "validation_report_ref",
+    "promotion_evidence",
+    "approvals",
+    "canary"
+  ],
+  "additionalProperties": false
+}

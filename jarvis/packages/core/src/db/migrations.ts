@@ -264,4 +264,22 @@ create table ipc_idempotency (idempotency_key text primary key, method text not 
 create index ipc_idempotency_at on ipc_idempotency(at);
 `,
   },
+  {
+    version: 7, name: "workshop_release_gaps_backups",
+    sql: `
+-- 08 §13: development work orders, candidates, releases and the active-version pointer.
+create table dev_orders (work_order_id text primary key, task_id text not null, status text not null, worker text not null, order_json text not null,
+  result_json text, validation_json text, created_at text not null, updated_at text not null);
+create table releases (release_id text primary key, capability_id text not null, version text not null, record text not null, created_at text not null);
+create index releases_cap on releases(capability_id, created_at);
+create table capability_pointers (capability_id text primary key, active_version text not null, previous_version text, package_dir text not null,
+  package_hash text not null, release_id text not null, risk_class text not null, updated_at text not null);
+-- 07 §12.15: gap reports (signature finds prior work).
+create table gap_reports (gap_id text primary key, task_id text not null, signature text not null, status text not null, report text not null, created_at text not null);
+create index gap_reports_sig on gap_reports(signature);
+-- Backups v1: nightly encrypted, weekly restore test.
+create table backups (backup_id text primary key, at text not null, path text not null, sha256 text not null, bytes integer not null, kind text not null,
+  verified_at text, verify_result text);
+`,
+  },
 ];
