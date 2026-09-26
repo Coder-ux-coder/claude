@@ -139,12 +139,20 @@ export class GapResolver {
    * The step controller's gap hook. Returns "waiting_subtask" while a build runs; "blocked"
    * when it needs you or can't be solved here. Never throws into the task loop.
    */
-  async onStepGap(task: TaskContract, step: PlanStep, message: string): Promise<"blocked" | "waiting_subtask" | "resolved"> {
+  async onStepGap(task: TaskContract, step: PlanStep, message: string, observed?: StructuredError): Promise<"blocked" | "waiting_subtask" | "resolved"> {
     const missing = this.d.episodic.getWorkingState(task.task_id, `gap:${step.step_id}`) as MissingCapability | undefined;
-    const failure = new JarvisError("unsupported_operation", message.slice(0, 500)).structured;
+    // The executor's structured error keeps details such as missing_prerequisite (F17).
+    const failure = observed ?? new JarvisError("unsupported_operation", message.slice(0, 500)).structured;
     const g = this.open(task, step, failure, missing);
     try {
       if (NEVER_BUILD.has(g.classification)) { this.decide(g, "o1", "authorization and restrictions are never engineered around"); g.status = "blocked"; this.save(g); return "blocked"; }
+      if (g.classification === "environment") {
+        // Installing needs your authority (never done around you): report the exact prerequisite.
+        this.decide(g, "o2", `missing prerequisite: ${String(failure.details?.missing_prerequisite)}`);
+        g.status = "blocked"; this.save(g);
+        this.notifyBlocked(task, g, `this needs ${String(failure.details?.missing_prerequisite)}, which isn't installed. I can install it only with your approval`);
+        return "blocked";
+      }
       if (g.classification !== "tool" && g.classification !== "integration") { this.decide(g, g.options[g.options.length - 1]!.id, "not a tool gap"); g.status = "blocked"; this.save(g); return "blocked"; }
       // Search before building (07 §12.15): the planner already saw the capability list and found
       // nothing, so what counts here is prior work on this exact gap — a tool built for it that is

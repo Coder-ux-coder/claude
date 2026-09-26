@@ -63,7 +63,7 @@ test("classification is deterministic and never routes authorization to engineer
   assert.deepEqual(parseWslList(Buffer.from("Ubuntu\r\njarvis-workshop\r\n", "utf16le")), ["Ubuntu", "jarvis-workshop"]);
 });
 
-test("M1 headline: a missing capability is built by the Workshop (holdouts hidden from the builder), released, and the original task resumes and completes", async () => {
+test("F04 (M1 headline): a missing capability is built by the Workshop (holdouts hidden from the builder), released, and the original task resumes and completes", async () => {
   const { fake, calls } = boss(GAP_PLAN);
   const worker = new ScriptedWorker([out => writePackage(out, { id: "tool:gen.word_count", effects: [] })]);
   const c = core(fake, worker);

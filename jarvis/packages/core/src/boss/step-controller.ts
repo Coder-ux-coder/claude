@@ -1,4 +1,4 @@
-import { JarvisError, RETRY_POLICY, backoffMs, TERMINAL_TASK_STATUSES, type PlanStep, type TaskContract, type ToolResult } from "@jarvis/shared";
+import { type StructuredError, JarvisError, RETRY_POLICY, backoffMs, TERMINAL_TASK_STATUSES, type PlanStep, type TaskContract, type ToolResult } from "@jarvis/shared";
 import type { CoreContext } from "../context.js";
 import type { TaskEngine, CriterionVerdict } from "../tasks/task-engine.js";
 import type { ActionService } from "../tasks/actions.js";
@@ -12,7 +12,7 @@ export interface StepHandlers {
   reason?(task: TaskContract, step: PlanStep): Promise<{ evidence_ids: string[]; text: string }>;
   /** Gap Resolver hook for unsupported_operation (wired in Phase 8). */
   /** "waiting_subtask": a build (or other resolution) is under way; the task waits for it (07 §12.15). */
-  onGap?(task: TaskContract, step: PlanStep, error: string): Promise<"blocked" | "resolved" | "waiting_subtask">;
+  onGap?(task: TaskContract, step: PlanStep, error: string, failure?: StructuredError): Promise<"blocked" | "resolved" | "waiting_subtask">;
   /** worker / skill steps (wired in Phases 8 and 10). */
   runWorker?(task: TaskContract, step: PlanStep): Promise<{ ok: boolean; evidence_ids: string[]; error?: string }>;
   sleep?(ms: number): Promise<void>;
@@ -69,7 +69,7 @@ export class StepController {
           this.tasks.updateStep(step.step_id, { status: "done", outputs: r.evidence_ids });
         } catch (e) {
           const code = e instanceof JarvisError ? e.code : "internal_error";
-          return this.waitOrFail(task, step, code, (e as Error).message);
+          return this.waitOrFail(task, step, code, (e as Error).message, e instanceof JarvisError ? e.structured : undefined);
         }
         return true;
       }
@@ -146,17 +146,17 @@ export class StepController {
       return true;
     }
     const detail = code === "rate_limited" && r.error?.retry_after_s ? `${r.error.message} (resets in about ${Math.ceil(r.error.retry_after_s / 60)} min)` : r.error?.message ?? code;
-    return this.waitOrFail(task, step, code, detail);
+    return this.waitOrFail(task, step, code, detail, r.error);
   }
 
-  private async waitOrFail(task: TaskContract, step: PlanStep, code: string, message: string): Promise<boolean> {
+  private async waitOrFail(task: TaskContract, step: PlanStep, code: string, message: string, failure?: StructuredError): Promise<boolean> {
     const wait = code === "auth_required" || code === "missing_credential" ? "auth" : code === "unavailable_device" ? "device" : code === "rate_limited" ? "quota" : null;
     if (wait) {
       this.tasks.updateStep(step.step_id, { status: "ready" });
       this.tasks.transition(task.task_id, "waiting", { wait_reason: wait, initiator: "step_controller", detail: message });
       return false;
     }
-    if (code === "unsupported_operation") return this.gap(task, step, message);
+    if (code === "unsupported_operation") return this.gap(task, step, message, failure);
     if (code === "precondition_changed") {
       // Out of bounds at the pre-commit re-read (04 §10.6): stop and ask, never proceed or silently fail.
       this.tasks.updateStep(step.step_id, { status: "ready" });
@@ -178,8 +178,8 @@ export class StepController {
     return true;
   }
 
-  private async gap(task: TaskContract, step: PlanStep, message: string): Promise<boolean> {
-    const r = this.h.onGap ? await this.h.onGap(task, step, message) : "blocked";
+  private async gap(task: TaskContract, step: PlanStep, message: string, failure?: StructuredError): Promise<boolean> {
+    const r = this.h.onGap ? await this.h.onGap(task, step, message, failure) : "blocked";
     if (r === "resolved") { this.tasks.updateStep(step.step_id, { status: "ready" }); return true; }
     if (r === "waiting_subtask") {
       this.tasks.updateStep(step.step_id, { status: "ready" });

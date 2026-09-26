@@ -147,7 +147,7 @@ export class JarvisCore {
         if (r.text && task.origin.conversation_id) this.episodic.addMessage({ conversation_id: task.origin.conversation_id, author: "jarvis", channel: "console", trust: "system", modality: "text", text: r.text });
         return { evidence_ids: r.evidence_ids, text: r.text };
       },
-      onGap: (task, step, message) => this.gaps.onStepGap(task, step, message),
+      onGap: (task, step, message, failure) => this.gaps.onStepGap(task, step, message, failure),
       ...(opts.stepHandlers ?? {}),
     });
     this.notifications = new NotificationRouter(ctx, () => { const p = this.episodic.getProfile(); return { hours: p?.quiet_hours ?? null, tz: p?.timezone ?? "UTC" }; });
