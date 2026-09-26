@@ -1,0 +1,8 @@
+{
+  "components": [
+    { "name": "exec", "command": "%LOCALAPPDATA%\\Jarvis\\app\\current\\jarvis-exec.exe", "args": [] },
+    { "name": "core", "command": "%LOCALAPPDATA%\\Jarvis\\app\\current\\node\\node.exe", "args": ["%LOCALAPPDATA%\\Jarvis\\app\\current\\core\\main.js"], "safe_mode_arg": "--safe-mode", "ready_pipe": "jarvis-core-%USERNAME%" },
+    { "name": "session", "command": "%LOCALAPPDATA%\\Jarvis\\app\\current\\jarvis-session.exe", "args": [] },
+    { "name": "console", "command": "%LOCALAPPDATA%\\Jarvis\\app\\current\\console\\JARVIS.exe", "args": ["--tray"], "critical": false }
+  ]
+}

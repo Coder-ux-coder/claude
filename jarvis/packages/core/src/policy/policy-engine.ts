@@ -393,9 +393,12 @@ export class PolicyEngine implements PolicyReader {
       if (effect === "write.local" && this.inScope(a)) continue;
       if ((effect === "execute_code" || effect === "install") && a.tier === "T2" && a.task.mode === "build") continue;
       if (ownerDecision) { basis = { kind: "owner_decision", refs: [a.approved_decision_id!] }; continue; }
-      if (env && envOk.ok && env.effects.includes(effect) && env.bounds.every(b => this.checkConstraint(b, a.fields))) {
+      // Bounds apply to the actions they describe: those whose field this action has. An effect that
+      // must be bounded needs at least one applicable bound, so a missing field never widens authority.
+      const applicable = env ? env.bounds.filter(b => getField(a.fields, b.field).found) : [];
+      if (env && envOk.ok && env.effects.includes(effect) && applicable.every(b => this.checkConstraint(b, a.fields)) && (applicable.length > 0 || !BOUND_REQUIRED.has(effect))) {
         basis = { kind: a.task.origin.channel === "schedule" ? "schedule_owner_intent" : "explicit_instruction", refs: a.task.origin.message_ids };
-        bounds.push(...env.bounds.filter(b => !bounds.some(x => x.id === b.id)));
+        bounds.push(...applicable.filter(b => !bounds.some(x => x.id === b.id)));
         continue;
       }
       const standing = rules.map(r => ({ r, c: this.standingCovers(r, a, effect) })).find(x => x.c.ok);

@@ -42,3 +42,6 @@ export * from "./boss/step-controller.js";
 export * from "./boss/agent-loop.js";
 export * from "./boss/conversation.js";
 export * from "./runtime.js";
+export * from "./nep/rpc.js";
+export * from "./nep/exec-host.js";
+export * from "./nep/session-bridge.js";

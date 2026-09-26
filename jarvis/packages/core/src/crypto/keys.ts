@@ -11,7 +11,7 @@ import { JarvisError } from "@jarvis/shared";
  */
 export interface KeyProvider {
   readonly kind: string;
-  dataKey(purpose: "payloads" | "vault" | "backups" | "artifacts" | "grants" | "memory_sensitive"): Buffer;
+  dataKey(purpose: "payloads" | "vault" | "backups" | "artifacts" | "grants" | "memory_sensitive" | "nep_grants"): Buffer;
 }
 
 export interface MasterKeyWrapper {
@@ -43,6 +43,15 @@ export class MasterKeyProvider implements KeyProvider {
     const key = randomBytes(32);
     writeFileSync(path, wrapper.wrap(key), { mode: 0o600 });
     try { chmodSync(path, 0o600); } catch { /* not supported on some filesystems */ }
+    return new MasterKeyProvider(key, wrapper.kind);
+  }
+
+  /** First run creates the key; later runs unwrap it. The wrapper may be asynchronous (DPAPI through the Exec Host). */
+  static async fromFileAsync(path: string, wrapper: { kind: string; wrap(k: Buffer): Promise<Buffer>; unwrap(b: Buffer): Promise<Buffer> }): Promise<MasterKeyProvider> {
+    if (existsSync(path)) return new MasterKeyProvider(await wrapper.unwrap(readFileSync(path)), wrapper.kind);
+    mkdirSync(dirname(path), { recursive: true });
+    const key = randomBytes(32);
+    writeFileSync(path, await wrapper.wrap(key), { mode: 0o600 });
     return new MasterKeyProvider(key, wrapper.kind);
   }
 

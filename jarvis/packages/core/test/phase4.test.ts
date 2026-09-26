@@ -482,3 +482,21 @@ test("review fixes: your approval answers an 'ask me' rule; a pending decision s
   b.ctx.db.close();
   rmSync(dir, { recursive: true, force: true });
 });
+
+test("review fix: envelope bounds apply to the actions they describe; a bounded effect never passes on a missing field", () => {
+  const h = coreHarness();
+  const { task, message_id } = h.task("execute", ["communicate", "execute_code"], {}, "Run the report script and email it to sam@example.com (HYPOTHETICAL)");
+  const env: AuthorizationEnvelope = { effects: ["communicate", "execute_code"], substitution: "exact_target",
+    bounds: [{ id: "b1", field: "program", op: "in", value: ["/bin/sh"], source: { kind: "owner_message", ref: message_id }, hard: true },
+      { id: "b2", field: "recipients", op: "in", value: ["sam@example.com"], source: { kind: "owner_message", ref: message_id }, hard: true }],
+    grounding: [{ constraint_id: "b1", source: { kind: "owner_message", ref: message_id } }, { constraint_id: "b2", source: { kind: "owner_message", ref: message_id } }],
+    derived_by: { adapter: "t", at: h.clock.iso() }, validated_at: h.clock.iso() };
+  const t = { ...task, authorization: { ...task.authorization, envelope: env } };
+  const ev = (effects: ("communicate" | "execute_code")[], fields: Record<string, unknown>) => h.policy.evaluate({ task: t, action_id: "a", capability: "tool:x@1.0.0", effects, tier: "T1", fingerprint: "f", targets: [], fields,
+    value_sources: effects.includes("communicate") ? { recipient: [{ kind: "owner_message", ref: message_id }] } : {} }).decision.decision;
+  assert.equal(ev(["execute_code"], { program: "/bin/sh" }), "allow");
+  assert.equal(ev(["communicate"], { recipients: ["sam@example.com"] }), "allow");
+  assert.equal(ev(["communicate"], { recipients: ["eve@example.com"] }), "require_decision");
+  assert.equal(ev(["communicate"], {}), "require_decision", "no recipients field: nothing bounds this send");
+  assert.equal(ev(["execute_code"], { program: "/usr/bin/python3" }), "require_decision");
+});
