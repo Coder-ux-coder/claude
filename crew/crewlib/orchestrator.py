@@ -397,8 +397,7 @@ class Orchestrator:
         row = self.store.seat(rt.name) or {}
         task = self.store.task(row["current_task"]) if row.get("current_task") else None
         if task and task["owner"] == rt.name and task["status"] == "in_progress" and self.phase() == "build":
-            unread = self.store.unread(rt.name)
-            if rt.idle_nudges < 3 and not unread:
+            if rt.idle_nudges < 3:  # the nudge is delivered together with any unread chat
                 rt.idle_nudges += 1
                 rt.pending.append(
                     f"Task #{task['id']} is still in progress. Continue until it is done and verified, then submit "
@@ -528,9 +527,8 @@ class Orchestrator:
             accs = {a["name"]: a for a in self.store.accounts()}
             target = min(same_vendor, key=lambda a: scheduler._burn(accs.get(a.name, {})))
             t0 = now()
-            copied = True
-            if rt.spec.vendor == "claude" and session:
-                copied = copy_claude_session(session, rt.account, target)
+            # Claude conversations move between accounts intact; Codex ones restart from the handover notes.
+            copied = bool(rt.spec.vendor == "claude" and session and copy_claude_session(session, rt.account, target))
             old = rt.account
             if rt.runner:
                 rt.stopping = True
@@ -540,12 +538,20 @@ class Orchestrator:
             self.store.update_seat(rt.name, account=target.name)
             row = self.store.seat(rt.name) or {}
             task = self.store.task(row["current_task"]) if row.get("current_task") else None
-            msg = (f"You were moved from {old.name} to {target.name} because of: {reason}. Your conversation is intact. "
-                   + (f"Continue task #{task['id']}." if task and task["status"] == "in_progress" else "Carry on."))
+            doing = task and task["status"] == "in_progress"
+            if copied:
+                msg = (f"You were moved from {old.name} to {target.name} because of: {reason}. Your conversation is "
+                       "intact. " + (f"Continue task #{task['id']}." if doing else "Carry on."))
+            else:
+                msg = (f"You were moved from {old.name} to {target.name} because of: {reason}. This is a fresh "
+                       "conversation, so first read "
+                       + (f"task #{task['id']} (team_task_detail), its handover notes, and the work already on your "
+                          f"branch (git log / git diff {self.integration}...HEAD), then continue it."
+                          if doing else "the team chat, then wait for your next assignment."))
             self.start_seat(rt, msg, resume_session=session if copied else None)
             self.store.event("failover", seat=rt.name, frm=old.name, to=target.name, seconds=now() - t0,
-                             kept_context=bool(copied and session))
-            self.say(f"{rt.name} now runs on {target.name} (conversation kept: {'yes' if copied and session else 'no'}).")
+                             kept_context=copied)
+            self.say(f"{rt.name} now runs on {target.name} (conversation kept: {'yes' if copied else 'no — continuing from its notes'}).")
             return
         # No same-vendor capacity: hand the task to a seat of the other vendor via its notes, branch and diff.
         row = self.store.seat(rt.name) or {}
@@ -582,10 +588,12 @@ class Orchestrator:
                 self.last_progress = max(self.last_progress, m["ts"])
 
     def _wants_wake(self, rt: SeatRT, unread: list[dict]) -> bool:
+        """Wake an idle agent only when a message needs it: tokens are spent on work, not on reading chatter."""
+        is_lead = rt.name == self.lead_name
         for m in unread:
-            if m["urgent"] or _mentions(m["text"], rt.name) or m["sender"] == "you":
+            if _mentions(m["text"], rt.name):
                 return True
-            if rt.spec.role == "lead" and m["kind"] in ("question", "blocker", "concern"):
+            if is_lead and (m["sender"] == "you" or m["kind"] in ("question", "blocker", "concern")):
                 return True
         return False
 
@@ -628,6 +636,15 @@ class Orchestrator:
 
     def watchdog(self) -> None:
         stall = self.cfg.team.stall_minutes * 60
+        for rt in self.seats.values():
+            # An idle agent must never sit on an unfinished task (whatever path led there).
+            if (not rt.down and not rt.busy and rt.runner is not None and not rt.pending
+                    and now() - rt.last_event > max(60.0, min(stall, 180.0)) and self.phase() == "build"):
+                row = self.store.seat(rt.name) or {}
+                task = self.store.task(row["current_task"]) if row.get("current_task") else None
+                if task and task["owner"] == rt.name and task["status"] == "in_progress":
+                    rt.last_event = now()
+                    self.after_turn(rt)
         for rt in self.seats.values():
             if rt.down or not rt.busy or rt.runner is None:
                 continue

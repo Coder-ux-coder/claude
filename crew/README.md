@@ -79,6 +79,10 @@ The design and the research behind it are in `ARCHITECTURE.md`.
 
 ## Good to know
 
+- **Where the speed comes from:** parts that do not depend on each other are
+  built at the same time. A small job with one or two such parts gains little,
+  because planning and independent reviews take their own time. A larger
+  project with several independent parts gains the most.
 - Anthropic states that Pro/Max plan limits assume ordinary, individual use.
   Spreading one project across several of your own subscriptions is your call;
   never share logins with other people.

@@ -181,3 +181,35 @@ crew/
   crewlib/                    the engine (Python 3.11+, standard library only)
   tests/                      unit, fault-injection and end-to-end tests
 ```
+
+---
+
+## 9. How it is tested
+
+**Unit tests** (`tests/test_units.py`): file-lease overlap rules, task dependencies
+and atomic claiming, chat budgets and one-concern-per-plan, role authority (only the
+lead plans, only the owner submits, only the assigned reviewer reviews), the MCP
+protocol over real stdio, usage modes from real rate-limit events, settings and
+the model ban list, lesson reinforcement, secret redaction, worktree merges,
+conflict detection, automatic revert, and carrying early work onto a task branch.
+
+**Fault-injection runs** (`tests/test_e2e.py`): the real orchestrator drives
+protocol-faithful fake agents (`tests/fakes/`) that speak Claude Code's
+stream-json and Codex's exec JSONL, launch the team tools like the real CLIs,
+and keep resumable session files. Scenarios: a three-vendor team (Claude +
+Codex) with cross-vendor reviews; rejected reviews, planning concerns and a
+CEO-required plan revision; a usage-limit hit mid-task with failover to another
+account that keeps the conversation; a frozen agent and a crashed agent; merge
+conflicts; and stop-then-resume.
+
+**Real runs** with Claude Code (Opus 5.5 workers, Fable 5.1 CEO) on a small
+project confirmed the integration end to end and surfaced issues the fakes could
+not: check commands written for bash, a lead starting work before its formal
+assignment, and parallel agents sharing one system Python. Each became a fix and
+a lesson.
+
+Bugs these tests caught before release: build artifacts from check runs
+blocking merges (an endless bounce loop); a stale "exited" event from a replaced
+process cascading into restarts; a resumed run idling because the stopped phase
+and in-flight reviews were not restored; transient Codex reconnect notices being
+treated as failures; git refusing branch names nested under another branch.
