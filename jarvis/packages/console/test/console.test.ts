@@ -112,6 +112,15 @@ test("Console in Chromium: chat, API key into the vault, emergency stop, a decis
   try {
     browser = await chromium.launch({ executablePath: CHROMIUM, args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] });
     const ctx = await browser.newContext();
+    // Record speech output instead of playing it.
+    await ctx.addInitScript(() => {
+      const w = window as unknown as { __spoken: string[]; __cancels: number };
+      w.__spoken = []; w.__cancels = 0;
+      if ("speechSynthesis" in window) {
+        window.speechSynthesis.speak = (u: SpeechSynthesisUtterance) => { w.__spoken.push(u.text); };
+        window.speechSynthesis.cancel = () => { w.__cancels++; };
+      }
+    });
     const page = await ctx.newPage();
     const consoleErrors: string[] = [];
     page.on("pageerror", e => consoleErrors.push(e.message));
@@ -154,6 +163,9 @@ test("Console in Chromium: chat, API key into the vault, emergency stop, a decis
     await page.mouse.up();
     await page.getByText("Got it (voice).").waitFor({ timeout: 10_000 });
     assert.ok(await page.getByText("You (voice)").count() >= 1);
+    const speech = await page.evaluate(() => { const w = window as unknown as { __spoken: string[]; __cancels: number }; return { spoken: [...w.__spoken], cancels: w.__cancels }; });
+    assert.deepEqual(speech.spoken, ["Got it (voice)."], "a reply to voice input is spoken; earlier text replies were not");
+    assert.ok(speech.cancels >= 1, "pressing push-to-talk silenced speech first (barge-in)");
 
     // API key → vault; never shown again
     const KEY = "sk-ant-HYPOTHETICAL-" + randomBytes(12).toString("hex");

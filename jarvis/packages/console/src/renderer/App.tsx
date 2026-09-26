@@ -99,9 +99,13 @@ function Conversation({ api, speaker, tick, onError }: ViewProps & { speaker: Sp
   const fileInput = useRef<HTMLInputElement>(null);
   const recorder = useMemo(() => new Recorder(), []);
   const lastSpoken = useRef<string | null>(null);
+  const reopening = useRef(false);
   const endRef = useRef<HTMLDivElement>(null);
 
+  const lastInputVoice = useRef(false);
   useEffect(() => { speaker.onChange = setSpeaking; return () => { speaker.onChange = null; }; }, [speaker]);
+  // Reopen the most recent conversation (after a restart or reload).
+  useEffect(() => { api.call<{ id: string }[]>("conversation.list").then(l => { if (l[0]) setConv(c => { if (c) return c; reopening.current = true; return l[0]!.id; }); }).catch(() => {}); }, [api]);
   useEffect(() => { api.call<Record<string, unknown>>("settings.get").then(s => setSpeakReplies(s["voice.speak_replies"] === true)).catch(() => {}); }, [api]);
   const latest = useLatest();
   const load = useCallback(async (id: string) => {
@@ -111,13 +115,16 @@ function Conversation({ api, speaker, tick, onError }: ViewProps & { speaker: Sp
     only<Msg[]>(v => { setMsgs(v); applied = true; })(m);
     if (!applied) return;
     const last = m[m.length - 1];
-    if (last && last.author === "jarvis" && last.text && last.id !== lastSpoken.current && speakReplies) { lastSpoken.current = last.id; speaker.speak(last.text); }
+    // Spoken output only when you asked for it: the setting, or a reply to something you said aloud (09 §14.3).
+    if (reopening.current) { reopening.current = false; lastSpoken.current = last?.id ?? null; return; }     // never read old messages on open
+    if (last && last.author === "jarvis" && last.text && last.id !== lastSpoken.current && (speakReplies || lastInputVoice.current)) { lastSpoken.current = last.id; speaker.speak(last.text); }
   }, [api, speaker, speakReplies, latest]);
   useEffect(() => { if (conv) void load(conv).catch(e => onError(errText(e))); }, [conv, tick, load, onError]);
   useEffect(() => { endRef.current?.scrollIntoView?.({ block: "end" }); }, [msgs]);
 
   const send = async (content: string, modality: "text" | "voice" = "text", confidence?: "high" | "medium" | "low") => {
     if (!content.trim() && !files.length) return;
+    lastInputVoice.current = modality === "voice";
     setBusy(true);
     try {
       const attachments = files.map(({ size: _s, ...f }) => f);

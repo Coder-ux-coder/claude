@@ -44,6 +44,7 @@ export class CoordinatorServer {
     // Toasts go to the Session Agent's tray; Console notifications arrive through the event stream.
     this.core.notifications.registerSink("toast", n => this.toast(n));
     this.core.notifications.registerSink("console", () => this.clientsOf("console").length > 0);
+    this.core.track(this.core.notifications.flush());           // anything that fired before we were listening
   }
 
   async close(): Promise<void> {
@@ -85,6 +86,7 @@ export class CoordinatorServer {
     if (p.component !== "console" && p.component !== "session") throw new JarvisError("invalid_input", `unknown component ${p.component}`);
     c.component = p.component;
     this.core.ctx.events.append({ type: "ipc.connected", summary: p.component, data: { component: p.component, client: c.id } });
+    setImmediate(() => this.core.track(this.core.notifications.flush()));   // a new client can show what was waiting
     return { protocol_version: COORDINATOR_PROTOCOL, server: "jarvis-core", safe_mode: this.core.broker.safeMode, halted: this.core.broker.isHalted() };
   }
 
@@ -148,6 +150,7 @@ export class CoordinatorServer {
         const p = P<{ task_id: string; text: string }>(params);
         const t = j.tasks.require(str(p.task_id, "task_id"));
         if (!t.origin.conversation_id) throw new JarvisError("invalid_input", "this task has no conversation to steer it in");
+        j.conversation.setFocus(t.origin.conversation_id, t.task_id);      // "change it" refers to this task
         return j.conversation.handle({ conversation_id: t.origin.conversation_id, text: str(p.text, "text"), channel: "console_text", owner_verified: ownerVerified }, { background: true });
       }
       // ----- decisions -----

@@ -57,7 +57,11 @@ export function localToUtc(l: LocalParts, tz: string, policy: { nonexistent: "sh
 export function parseLocal(s: string): LocalParts {
   const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(s);
   if (!m) throw new JarvisError("invalid_input", `bad local time ${s}`);
-  return { y: +m[1]!, mo: +m[2]!, d: +m[3]!, h: +m[4]!, mi: +m[5]! };
+  const l = { y: +m[1]!, mo: +m[2]!, d: +m[3]!, h: +m[4]!, mi: +m[5]! };
+  // No silent roll-over: 30 Feb or 25:00 is an error, not 2 March or tomorrow.
+  const t = new Date(Date.UTC(l.y, l.mo - 1, l.d, l.h, l.mi));
+  if (l.h > 23 || l.mi > 59 || t.getUTCFullYear() !== l.y || t.getUTCMonth() !== l.mo - 1 || t.getUTCDate() !== l.d) throw new JarvisError("invalid_input", `no such date or time: ${s}`);
+  return l;
 }
 export function formatLocal(l: LocalParts): string {
   const p = (n: number, w = 2) => String(n).padStart(w, "0");

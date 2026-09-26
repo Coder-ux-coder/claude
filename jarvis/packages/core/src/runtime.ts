@@ -60,6 +60,7 @@ export class JarvisCore {
   readonly notifications: NotificationRouter; readonly schedules: ScheduleService; readonly scheduler: Scheduler;
   recovery!: RecoverySummary;
   private background = new Set<Promise<unknown>>();
+  private attentionTimer: NodeJS.Timeout | null = null;
 
   /** Fire-and-forget work that must still finish (or fail visibly) before close. */
   track<T>(p: Promise<T>): void {
@@ -152,7 +153,12 @@ export class JarvisCore {
     this.memory.expireSweep();
     // Missed runs (10 §15.3): recompute from the last fire, then apply each kind's policy once.
     this.scheduler.recomputeAll();
-    if (this.opts.runScheduler) this.scheduler.start(); else this.scheduler.tick();
+    if (this.opts.runScheduler) {
+      this.scheduler.start();
+      // Quiet hours end, clients connect: held and undelivered notifications go out.
+      this.attentionTimer = setInterval(() => this.track(this.notifications.releaseHeld().then(() => this.notifications.flush())), 60_000);
+      this.attentionTimer.unref?.();
+    } else this.scheduler.tick();
     this.track(this.notifications.resumeAfterRestart());
     return this.recovery;
   }
@@ -216,7 +222,7 @@ export class JarvisCore {
     });
   }
 
-  close(): void { this.scheduler.stop(); this.notifications.close(); this.builder.close(); this.ctx.db.close(); }
+  close(): void { if (this.attentionTimer) clearInterval(this.attentionTimer); this.scheduler.stop(); this.notifications.close(); this.builder.close(); this.ctx.db.close(); }
   /** Stops timers, waits for background work, then closes. */
-  async shutdown(): Promise<void> { this.scheduler.stop(); await this.idle(); this.close(); }
+  async shutdown(): Promise<void> { if (this.attentionTimer) clearInterval(this.attentionTimer); this.scheduler.stop(); await this.idle(); this.close(); }
 }

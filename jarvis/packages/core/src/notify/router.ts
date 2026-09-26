@@ -17,7 +17,7 @@ export interface NotificationInput {
 
 export interface NotificationRecord extends NotificationInput {
   id: string; status: "pending" | "delivering" | "delivered" | "held_quiet_hours" | "needs_you" | "deduplicated" | "dismissed";
-  delivered_channels: Channel[]; created_at: string; delivered_at?: string;
+  delivered_channels: Channel[]; created_at: string; delivered_at?: string; attempts?: number;
 }
 
 export type ChannelSink = (n: NotificationRecord) => Promise<boolean> | boolean;
@@ -106,6 +106,13 @@ export class NotificationRouter {
     } else {
       for (const ch of channels) await this.deliver(rec, ch);
       if (this.closed || !this.ctx.db.open) return rec;       // closed mid-delivery: re-delivered at next start
+      if (!rec.delivered_channels.length && !NEEDS_YOU.has(rec.kind)) {
+        // Nobody to show it to yet (no Console or tray connected): keep it pending; the next
+        // flush — when a client connects — delivers it. Never marked delivered to no one.
+        rec.status = "pending"; rec.attempts = (rec.attempts ?? 0) + 1;
+        this.save(rec);
+        return rec;
+      }
       rec.status = NEEDS_YOU.has(rec.kind) ? "needs_you" : "delivered";
       rec.delivered_at = this.ctx.clock.iso();
     }

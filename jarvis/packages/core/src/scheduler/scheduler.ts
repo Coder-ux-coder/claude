@@ -77,13 +77,14 @@ export class Scheduler {
 
   /** The exact interpretation shown to you, e.g. "Weekdays at 08:30 Europe/London, starting Mon 28 Sep 2026". */
   static interpret(i: Pick<ScheduleInput, "rrule" | "start_local" | "at_instant" | "tz" | "kind">, firstLocal?: string): string {
-    const when = firstLocal ?? i.start_local ?? i.at_instant ?? "";
+    // A fixed instant is shown in your zone (its occurrences are computed in UTC).
+    const when = i.at_instant ? formatLocal(toLocal(Date.parse(i.at_instant), i.tz)) : firstLocal ?? i.start_local ?? "";
     const d = when ? new Date(`${when.slice(0, 16)}:00Z`) : null;
     // Formatted by hand: ICU date text differs between Node builds ("Sep" vs "Sept", commas).
     const dateStr = d && !Number.isNaN(d.getTime()) ? `${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getUTCDay()]} ${d.getUTCDate()} ${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][d.getUTCMonth()]} ${d.getUTCFullYear()}` : "";
     const time = when.slice(11, 16);
     if (!i.rrule) return `${i.kind === "alarm" ? "Alarm" : i.kind === "reminder" ? "Reminder" : "Once"} at ${time} ${i.tz} on ${dateStr}`;
-    const r = parseRRule(i.rrule);
+    const r = parseRRule(i.rrule, i.tz);
     const days = r.byday?.map(b => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][b.wd]).join(", ");
     const hm = r.byhour ? `${String(r.byhour[0]).padStart(2, "0")}:${String(r.byminute?.[0] ?? 0).padStart(2, "0")}` : time;
     const freq = r.freq === "DAILY" ? (r.interval > 1 ? `Every ${r.interval} days` : "Every day")
@@ -93,7 +94,7 @@ export class Scheduler {
 
   create(i: ScheduleInput): ScheduledJob {
     if (!isValidZone(i.tz)) throw new JarvisError("invalid_input", `unknown timezone ${i.tz}`);
-    if (i.rrule) parseRRule(i.rrule);                // reject unsupported rules now
+    if (i.rrule) parseRRule(i.rrule, i.tz);          // reject unsupported rules now
     const semantics = i.semantics ?? (i.at_instant ? "fixed_instant" : "floating_local");
     if (semantics === "floating_local" && !i.start_local) throw new JarvisError("invalid_input", "a floating schedule needs a local start time");
     if (semantics === "fixed_instant" && !i.at_instant) throw new JarvisError("invalid_input", "a fixed schedule needs an instant");
@@ -127,14 +128,23 @@ export class Scheduler {
     return this.ctx.tx(() => {
       const j = this.require(id);
       if (patch.tz && !isValidZone(patch.tz)) throw new JarvisError("invalid_input", `unknown timezone ${patch.tz}`);
-      if (patch.rrule) parseRRule(patch.rrule);
+      if (patch.start_local) parseLocal(patch.start_local);
+      if (j.time.semantics === "fixed_instant" && patch.start_local) {
+        // "Make that 8 instead" on a fixed instant: the new wall time in the schedule's zone becomes the new instant.
+        const r = localToUtc(parseLocal(patch.start_local), patch.tz ?? j.time.tz, j.dst_policy);
+        if (r.utc === null) throw new JarvisError("invalid_input", `${patch.start_local} does not exist in ${patch.tz ?? j.time.tz}`);
+        j.time = { ...j.time, at_instant: new Date(r.utc).toISOString() };
+        delete patch.start_local;
+      }
+      if (patch.rrule) parseRRule(patch.rrule, patch.tz ?? j.time.tz);
       const next: ScheduledJob = { ...j, revision: j.revision + 1, time: { ...j.time, ...(patch.start_local ? { start_local: patch.start_local.slice(0, 16) } : {}), ...(patch.tz ? { tz: patch.tz } : {}) },
         target: { ...j.target, ...(patch.message ? { message: patch.message } : {}) } };
       if (patch.rrule === null) delete next.time.rrule; else if (patch.rrule) next.time.rrule = patch.rrule;
       const n = this.computeNext(next, this.ctx.clock.now() - 1);
       next.next_fire_utc = n ? new Date(n.utc).toISOString() : undefined;
       if (!n) next.status = "completed";
-      next.interpretation = Scheduler.interpret({ kind: next.kind, tz: next.time.tz, ...(next.time.rrule ? { rrule: next.time.rrule } : {}), ...(next.time.start_local ? { start_local: next.time.start_local } : {}) }, n?.local);
+      next.interpretation = Scheduler.interpret({ kind: next.kind, tz: next.time.tz, ...(next.time.rrule ? { rrule: next.time.rrule } : {}), ...(next.time.start_local ? { start_local: next.time.start_local } : {}),
+        ...(next.time.semantics === "fixed_instant" && next.time.at_instant ? { at_instant: next.time.at_instant } : {}) }, n?.local);
       this.save(next, true);
       this.ctx.events.append({ type: "schedule.revised", summary: next.interpretation, data: { schedule_id: id, revision: next.revision } });
       this.arm();
@@ -176,7 +186,7 @@ export class Scheduler {
       if (r.utc !== null && r.utc > fromUtc && r.utc <= toUtc) out.push({ local: startLocal, utc: r.utc });
       return out;
     }
-    const rule = parseRRule(j.time.rrule);
+    const rule = parseRRule(j.time.rrule, tz);
     // Start a day before the window in local terms, then filter by resolved UTC.
     const fromLocal = fromUtc < 0 ? null : formatLocal(toLocal(Math.max(0, fromUtc - 86_400_000 * 2), tz));
     let cursor = fromLocal;
@@ -331,7 +341,12 @@ export class Scheduler {
   }
   private running = false;
   start(): void { this.running = true; this.recomputeAll(); this.tick(); }
-  stop(): void { this.running = false; if (this.timer) clearTimeout(this.timer); }
+  /** Stops the timer and hands the singleton lease back so a standby instance can take over at once. */
+  stop(): void {
+    this.running = false;
+    if (this.timer) clearTimeout(this.timer);
+    if (this.leaseId) { try { this.leases.release(this.leaseId); } catch { /* database already closed */ } this.leaseId = null; }
+  }
 
   /** The next 24 hours of alarms, kept in memory so alarms still sound if the database is unavailable (03 §9.9, F22). */
   refreshAlarmCache(): void {

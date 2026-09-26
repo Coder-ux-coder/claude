@@ -307,3 +307,46 @@ test("JarvisCore: a scheduled task fires as a new task (origin: schedule, author
   assert.throws(() => j.schedules.runNow("sch_nope"), /unknown schedule/);
   await j.shutdown(); rmSync(dir, { recursive: true, force: true });
 });
+
+test("review fixes: UNTIL in RFC 5545 forms, WKST=MO for INTERVAL weeks, rules keep firing after years, no date roll-over", async () => {
+  const { occurrences } = await import("../src/scheduler/rrule.js");
+  const start = parseLocal("2026-09-28T09:00");          // a Monday
+  // UNTIL as UTC date-time, as a date, and COUNT+UNTIL together (rejected)
+  assert.deepEqual(occurrences(parseRRule("FREQ=DAILY;UNTIL=20260930T075900Z", "Europe/London"), start, null, 10), ["2026-09-28T09:00", "2026-09-29T09:00"], "30 Sep 09:00 BST is after 07:59Z (08:59 BST)");
+  assert.equal(occurrences(parseRRule("FREQ=DAILY;UNTIL=20260930T080000Z", "Europe/London"), start, null, 10).length, 3, "UNTIL is inclusive");
+  assert.deepEqual(occurrences(parseRRule("FREQ=DAILY;UNTIL=20260930"), start, null, 10), ["2026-09-28T09:00", "2026-09-29T09:00", "2026-09-30T09:00"], "a date-only UNTIL includes that day");
+  assert.throws(() => parseRRule("FREQ=DAILY;COUNT=2;UNTIL=20261001"), /both/);
+  // Every 2 weeks on Mon and Sun: with Monday week start, Sun 4 Oct belongs to the first week.
+  assert.deepEqual(occurrences(parseRRule("FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,SU"), start, null, 4), ["2026-09-28T09:00", "2026-10-04T09:00", "2026-10-12T09:00", "2026-10-18T09:00"]);
+  // A daily rule started 6 years ago still produces occurrences now.
+  const old = occurrences(parseRRule("FREQ=DAILY"), parseLocal("2020-01-01T07:00"), "2026-09-26T12:00", 1);
+  assert.deepEqual(old, ["2026-09-27T07:00"]);
+  assert.throws(() => parseLocal("2026-02-30T08:00"), /no such date/);
+  assert.throws(() => parseLocal("2026-03-01T24:00"), /no such date/);
+});
+
+test("review fixes: fixed instants read in your zone and can be revised; stop() hands the lease over", () => {
+  const h = harness("2026-09-26T12:00:00Z");
+  const j = h.s.create({ kind: "reminder", owner_text: "call", tz: "Asia/Karachi", at_instant: "2026-09-28T05:00:00Z", policy_revision: 0 });
+  assert.match(j.interpretation, /^Reminder at 10:00 Asia\/Karachi on Mon 28 Sep 2026$/);
+  const r = h.s.revise(j.schedule_id, { start_local: "2026-09-28T11:30" });
+  assert.equal(r.next_fire_utc, "2026-09-28T06:30:00.000Z"); assert.match(r.interpretation, /11:30 Asia\/Karachi/);
+  assert.throws(() => h.s.revise(j.schedule_id, { start_local: "2026-09-31T11:30" }), /no such date/);
+  assert.equal(h.s.holdsLease(), true);
+  const b = new Scheduler(h.ctx, h.leases, () => "x", "sch_b");
+  assert.equal(b.holdsLease(), false);
+  h.s.stop();
+  assert.equal(b.holdsLease(), true, "standby takes over immediately after a clean stop");
+});
+
+test("review fix: a notification with nobody to show it to stays pending and is delivered when a client connects", async () => {
+  const ctx = createContext({ clock: new SimClock("2026-09-26T12:00:00Z") });
+  const r = new NotificationRouter(ctx, () => ({ hours: null, tz: "UTC" }));
+  const n = await r.notify({ kind: "alarm", title: "Alarm", body: "Wake up", urgency: "high", channels: ["sound", "console"] });
+  assert.equal(n.status, "pending", "no sinks yet → not 'delivered to no one'");
+  const got: string[] = [];
+  r.registerSink("console", x => { got.push(x.id); return true; });
+  const out = await r.flush();
+  assert.equal(out[0]!.status, "delivered"); assert.deepEqual(got, [n.id]);
+  assert.equal((await r.flush()).length, 0, "delivered once");
+});
