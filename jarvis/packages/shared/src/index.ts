@@ -9,3 +9,4 @@ export * from "./capability.js";
 export * from "./worker.js";
 export * from "./nep.js";
 export * from "./memory.js";
+export * from "./policy.js";

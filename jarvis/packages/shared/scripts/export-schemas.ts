@@ -21,6 +21,8 @@ const entries: Record<string, z.ZodType> = {
   "memory/Entity": S.Entity, "memory/Relationship": S.Relationship, "memory/Conversation": S.Conversation, "memory/Message": S.Message,
   "memory/ExperienceRecord": S.ExperienceRecord, "memory/MemoryCorrection": S.MemoryCorrection, "memory/DerivedSummary": S.DerivedSummary,
   "memory/MemoryProposal": S.MemoryProposal,
+  "policy/OwnerRule": S.OwnerRule, "policy/AuthorizationDecision": S.AuthorizationDecision, "policy/DecisionRequest": S.DecisionRequest,
+  "capability/ServicePolicy": S.ServicePolicy, "capability/ProcessRequest": S.ProcessRequest,
   "nep/NepInvoke": S.NepInvoke, "nep/NepEvent": S.NepEvent, "nep/NepCancel": S.NepCancel,
   ...((S as unknown as { EXTRA_SCHEMAS?: Record<string, z.ZodType> }).EXTRA_SCHEMAS ?? {}),
 };

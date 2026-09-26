@@ -206,4 +206,31 @@ create table memory_proposals (proposal_id text primary key, status text not nul
 create table task_working_state (task_id text not null, key text not null, value text not null, expires_at text, primary key (task_id, key));
 `,
   },
+  {
+    version: 3, name: "policy_registry_broker",
+    sql: `
+create table rules (rule_id text primary key, revision integer not null, status text not null, kind text not null, protection text not null, rule text not null);
+create table rule_history (rule_id text not null, revision integer not null, rule text not null, at text not null, primary key (rule_id, revision));
+create table policy_revisions (revision integer primary key, at text not null, source text not null, change text not null);
+create table rule_usage (rule_id text not null, action_id text not null, amount real, currency text, at text not null);
+create index rule_usage_rule on rule_usage(rule_id, at);
+
+create table decision_requests (id text primary key, task_id text not null, status text not null, option_id text, responded_at text, request text not null);
+create index decision_requests_task on decision_requests(task_id, status);
+create table grants (decision_id text primary key, action_id text not null, task_id text not null, used integer not null default 0, decision text not null);
+create index grants_action on grants(action_id);
+
+create table capabilities (id text not null, version text not null, lifecycle text not null, admin_state text not null, descriptor text not null, registered_at text not null, primary key (id, version));
+create virtual table capability_fts using fts5(title, purpose, goals, cap_key unindexed);
+create table capability_health (capability_id text not null, node_id text not null, account_id text not null default '', state text not null, health text not null, primary key (capability_id, node_id, account_id));
+create table capability_outcomes (capability_id text not null, account_id text not null default '', ok integer not null, error_code text, goal_class text, at text not null);
+create index capability_outcomes_cap on capability_outcomes(capability_id, at);
+create table service_policies (service text primary key, policy text not null);
+
+create table invocations (invocation_id text primary key, capability text not null, status text not null, task_id text, action_id text, record text not null);
+create table accounts (account_id text primary key, connector text not null, status text not null, record text not null);
+create table reconciliation_queue (action_id text primary key, next_at text not null, attempt integer not null, window_ends_at text not null, state text not null);
+create table broker_pending (action_id text primary key, request_ref text not null, created_at text not null);
+`,
+  },
 ];

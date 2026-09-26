@@ -1,0 +1,67 @@
+{
+  "$id": "https://jarvis.local/schemas/capability/ServicePolicy.json",
+  "title": "ServicePolicy",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "service": {
+      "type": "string"
+    },
+    "ui_automation": {
+      "type": "string",
+      "enum": [
+        "allowed",
+        "restricted",
+        "prohibited",
+        "unknown"
+      ]
+    },
+    "api": {
+      "type": "string",
+      "enum": [
+        "public",
+        "approval_required",
+        "none"
+      ]
+    },
+    "notes": {
+      "type": "string"
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "checked_at": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "V",
+              "V-S",
+              "U"
+            ]
+          }
+        },
+        "required": [
+          "url",
+          "checked_at",
+          "status"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "service",
+    "ui_automation",
+    "api",
+    "notes",
+    "sources"
+  ],
+  "additionalProperties": false
+}

@@ -33,6 +33,16 @@ const REDACTED = "[redacted]";
  */
 export class EventStore {
   private emitter = new EventEmitter();
+  private extraRedact: ((s: string) => string) | null = null;
+  /** Adds exact-match scrubbing of released secrets (04 §10.13 layer 1) to summaries and data strings. */
+  setRedactor(fn: (s: string) => string): void { this.extraRedact = fn; }
+  private scrub<T>(v: T): T {
+    const f = (s: string) => redactMessage(this.extraRedact ? this.extraRedact(s) : s);
+    if (typeof v === "string") return f(v) as T;
+    if (Array.isArray(v)) return v.map(x => this.scrub(x)) as T;
+    if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, this.scrub(x)])) as T;
+    return v;
+  }
   constructor(
     private db: Db, private payloads: PayloadStore, private clock: Clock,
     private node = { node_id: "node_local", version: "0.1.0", process_instance: `pi_${process.pid}` },
@@ -49,7 +59,7 @@ export class EventStore {
   /** Appends one event. Call inside the caller's transaction to commit it atomically with state changes. */
   append(input: AppendInput): JarvisEvent {
     const recorded_at = this.clock.iso();
-    const data = input.data ?? {};
+    const data = this.scrub(input.data ?? {});
     const last = this.db.prepare("select seq, hash from events order by seq desc limit 1").get() as { seq: number; hash: string } | undefined;
     const seq = (last?.seq ?? 0) + 1;
     let payload_ref: string | undefined, payload_hash: string | undefined;
@@ -66,7 +76,7 @@ export class EventStore {
       source: { component: input.component ?? "core", version: this.node.version, process_instance: this.node.process_instance },
       correlation: input.correlation ?? {},
       sensitivity: input.sensitivity ?? "normal",
-      summary: redactMessage(input.summary),
+      summary: this.scrub(input.summary),
       data,
       data_hash: hashObject(data),
       ...(payload_ref ? { payload_ref, payload_hash } : {}),

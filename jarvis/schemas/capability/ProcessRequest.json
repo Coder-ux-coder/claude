@@ -1,0 +1,96 @@
+{
+  "$id": "https://jarvis.local/schemas/capability/ProcessRequest.json",
+  "title": "ProcessRequest",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "program": {
+      "type": "string"
+    },
+    "args": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "cwd": {
+      "type": "string"
+    },
+    "env_allowlist": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "env_inject": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "secret_ref": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "secret_ref"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "stdin_ref": {
+      "type": "string"
+    },
+    "timeout_s": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "max_output_bytes": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    },
+    "tier": {
+      "type": "string",
+      "enum": [
+        "T1",
+        "T2",
+        "T3"
+      ]
+    },
+    "job_limits": {
+      "type": "object",
+      "properties": {
+        "memory_mb": {
+          "type": "number"
+        },
+        "cpu_percent": {
+          "type": "number"
+        },
+        "max_processes": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        }
+      },
+      "additionalProperties": false
+    },
+    "script_hash": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "program",
+    "args",
+    "cwd",
+    "env_allowlist",
+    "timeout_s",
+    "max_output_bytes",
+    "tier",
+    "job_limits"
+  ],
+  "additionalProperties": false
+}

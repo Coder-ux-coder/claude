@@ -1,0 +1,552 @@
+{
+  "$id": "https://jarvis.local/schemas/policy/OwnerRule.json",
+  "title": "OwnerRule",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "rule_id": {
+      "type": "string"
+    },
+    "schema": {
+      "type": "string",
+      "const": "jarvis.rule/1"
+    },
+    "revision": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "guidance",
+        "constraint",
+        "standing_permission",
+        "exception"
+      ]
+    },
+    "text": {
+      "type": "string"
+    },
+    "source": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "owner_statement",
+            "owner_edit",
+            "onboarding",
+            "migration"
+          ]
+        },
+        "message_id": {
+          "type": "string"
+        },
+        "channel_verified": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "type",
+        "channel_verified"
+      ],
+      "additionalProperties": false
+    },
+    "applies_to": {
+      "type": "object",
+      "properties": {
+        "effects": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "read.local",
+              "read.account",
+              "write.local",
+              "delete.local",
+              "write.account",
+              "delete.account",
+              "communicate",
+              "publish",
+              "spend",
+              "commit",
+              "access_control",
+              "execute_code",
+              "install",
+              "admin",
+              "notify_owner"
+            ]
+          }
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "resources": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "path_prefix": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path_prefix"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "account": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "account"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "site": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "site"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "entity": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "entity"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "app": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "app"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "recipient_set": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "recipient_set"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "accounts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "projects": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "entities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "effects"
+      ],
+      "additionalProperties": false
+    },
+    "conditions": {
+      "$ref": "#/$defs/__schema0"
+    },
+    "decision": {
+      "type": "string",
+      "enum": [
+        "allow",
+        "deny",
+        "require_decision",
+        "require_presence"
+      ]
+    },
+    "bounds": {
+      "type": "object",
+      "properties": {
+        "max_amount": {
+          "type": "object",
+          "properties": {
+            "amount": {
+              "type": "number"
+            },
+            "currency": {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            }
+          },
+          "required": [
+            "amount",
+            "currency"
+          ],
+          "additionalProperties": false
+        },
+        "per_period": {
+          "type": "object",
+          "properties": {
+            "period": {
+              "type": "string",
+              "enum": [
+                "day",
+                "week",
+                "month"
+              ]
+            },
+            "max_total": {
+              "type": "object",
+              "properties": {
+                "amount": {
+                  "type": "number"
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                }
+              },
+              "required": [
+                "amount",
+                "currency"
+              ],
+              "additionalProperties": false
+            },
+            "max_count": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "period"
+          ],
+          "additionalProperties": false
+        },
+        "recipients": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "destinations": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "path_prefix": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path_prefix"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "account": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "account"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "site": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "site"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "entity": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "entity"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "app": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "app"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "recipient_set": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "recipient_set"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "time_window": {
+          "type": "object",
+          "properties": {
+            "tz": {
+              "type": "string"
+            },
+            "from": {
+              "type": "string"
+            },
+            "to": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "from",
+            "to"
+          ],
+          "additionalProperties": false
+        },
+        "require_refundable": {
+          "type": "boolean"
+        },
+        "require_skill_lifecycle": {
+          "type": "string",
+          "const": "active"
+        },
+        "payment_method_ref": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "effective_from": {
+      "type": "string"
+    },
+    "effective_until": {
+      "type": "string"
+    },
+    "enforcement": {
+      "type": "string",
+      "enum": [
+        "advisory",
+        "broker",
+        "os",
+        "provider"
+      ]
+    },
+    "protection": {
+      "type": "string",
+      "enum": [
+        "normal",
+        "protected"
+      ]
+    },
+    "conflict": {
+      "type": "string",
+      "enum": [
+        "deny_wins",
+        "most_specific_wins",
+        "ask"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "active",
+        "suspended",
+        "expired",
+        "revoked",
+        "superseded"
+      ]
+    },
+    "compile": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "compiled",
+            "advisory_only",
+            "needs_clarification"
+          ]
+        },
+        "interpretation": {
+          "type": "string"
+        },
+        "confirmed_at": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "interpretation"
+      ],
+      "additionalProperties": false
+    },
+    "supersedes": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "created_in_policy_revision": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    }
+  },
+  "required": [
+    "rule_id",
+    "schema",
+    "revision",
+    "kind",
+    "text",
+    "source",
+    "applies_to",
+    "decision",
+    "enforcement",
+    "protection",
+    "conflict",
+    "status",
+    "compile",
+    "created_at",
+    "created_in_policy_revision"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "__schema0": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "all": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema0"
+              }
+            }
+          },
+          "required": [
+            "all"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "any": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema0"
+              }
+            }
+          },
+          "required": [
+            "any"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "not": {
+              "$ref": "#/$defs/__schema0"
+            }
+          },
+          "required": [
+            "not"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "field": {
+              "type": "string"
+            },
+            "op": {
+              "type": "string",
+              "enum": [
+                "==",
+                "!=",
+                "<",
+                "<=",
+                ">",
+                ">=",
+                "in",
+                "not_in",
+                "matches",
+                "within"
+              ]
+            },
+            "value": {}
+          },
+          "required": [
+            "field",
+            "op",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

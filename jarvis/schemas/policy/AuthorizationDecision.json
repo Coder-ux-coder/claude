@@ -1,0 +1,248 @@
+{
+  "$id": "https://jarvis.local/schemas/policy/AuthorizationDecision.json",
+  "title": "AuthorizationDecision",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "decision_id": {
+      "type": "string"
+    },
+    "schema": {
+      "type": "string",
+      "const": "jarvis.authorization_decision/1"
+    },
+    "task_id": {
+      "type": "string"
+    },
+    "task_revision": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "step_id": {
+      "type": "string"
+    },
+    "action_id": {
+      "type": "string"
+    },
+    "policy_revision": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "decision": {
+      "type": "string",
+      "enum": [
+        "allow",
+        "deny",
+        "require_decision",
+        "require_presence",
+        "require_clarification"
+      ]
+    },
+    "basis": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "explicit_instruction",
+            "standing_permission",
+            "owner_decision",
+            "schedule_owner_intent",
+            "default_allow"
+          ]
+        },
+        "refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "kind",
+        "refs"
+      ],
+      "additionalProperties": false
+    },
+    "matched_rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "rule_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "effect": {
+            "type": "string",
+            "enum": [
+              "allowed",
+              "denied",
+              "bounded",
+              "required_decision",
+              "advisory"
+            ]
+          }
+        },
+        "required": [
+          "rule_id",
+          "revision",
+          "effect"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "action_fingerprint": {
+      "type": "string"
+    },
+    "bounds": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "field": {
+            "type": "string"
+          },
+          "op": {
+            "type": "string",
+            "enum": [
+              "<=",
+              ">=",
+              "==",
+              "in",
+              "not_in",
+              "between",
+              "matches"
+            ]
+          },
+          "value": {},
+          "source": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "owner_message",
+                  "rule",
+                  "memory"
+                ]
+              },
+              "ref": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "ref"
+            ],
+            "additionalProperties": false
+          },
+          "hard": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "field",
+          "op",
+          "value",
+          "source",
+          "hard"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "resources": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "effects": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "read.local",
+          "read.account",
+          "write.local",
+          "delete.local",
+          "write.account",
+          "delete.account",
+          "communicate",
+          "publish",
+          "spend",
+          "commit",
+          "access_control",
+          "execute_code",
+          "install",
+          "admin",
+          "notify_owner"
+        ]
+      }
+    },
+    "issued_at": {
+      "type": "string"
+    },
+    "expires_at": {
+      "type": "string"
+    },
+    "single_use": {
+      "type": "boolean"
+    },
+    "reason_for_owner": {
+      "type": "string"
+    },
+    "issuer": {
+      "type": "object",
+      "properties": {
+        "component": {
+          "type": "string",
+          "const": "policy_engine"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "component",
+        "version"
+      ],
+      "additionalProperties": false
+    },
+    "signature": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "decision_id",
+    "schema",
+    "task_id",
+    "task_revision",
+    "action_id",
+    "policy_revision",
+    "decision",
+    "basis",
+    "matched_rules",
+    "action_fingerprint",
+    "bounds",
+    "resources",
+    "effects",
+    "issued_at",
+    "expires_at",
+    "single_use",
+    "reason_for_owner",
+    "issuer",
+    "signature"
+  ],
+  "additionalProperties": false
+}

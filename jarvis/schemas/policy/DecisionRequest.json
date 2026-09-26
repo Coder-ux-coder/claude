@@ -1,0 +1,151 @@
+{
+  "$id": "https://jarvis.local/schemas/policy/DecisionRequest.json",
+  "title": "DecisionRequest",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "decision_request_id": {
+      "type": "string"
+    },
+    "task_id": {
+      "type": "string"
+    },
+    "action_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "why": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "owner_rule",
+            "no_authority",
+            "ambiguity",
+            "scope_expansion",
+            "account_requirement",
+            "new_skill_first_use"
+          ]
+        },
+        "refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "refs",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "proposal": {
+      "type": "object",
+      "properties": {
+        "summary": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        },
+        "recipient": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "object",
+          "properties": {
+            "amount": {
+              "type": "number"
+            },
+            "currency": {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            }
+          },
+          "required": [
+            "amount",
+            "currency"
+          ],
+          "additionalProperties": false
+        },
+        "dates": {
+          "type": "string"
+        },
+        "important_terms": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "expected_effect": {
+          "type": "string"
+        },
+        "reversibility": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "summary",
+        "target",
+        "important_terms",
+        "expected_effect",
+        "reversibility"
+      ],
+      "additionalProperties": false
+    },
+    "options": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "creates": {
+            "type": "string",
+            "enum": [
+              "grant",
+              "revision",
+              "cancel",
+              "rule_draft"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "creates"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "proposal_fingerprint": {
+      "type": "string"
+    },
+    "expires_at": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "decision_request_id",
+    "task_id",
+    "action_ids",
+    "why",
+    "proposal",
+    "options",
+    "proposal_fingerprint",
+    "expires_at"
+  ],
+  "additionalProperties": false
+}
