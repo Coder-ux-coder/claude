@@ -244,4 +244,16 @@ create index usage_ledger_task on usage_ledger(task_id);
 create table budget_alerts (budget_id text not null, period_key text not null, threshold real not null, at text not null, primary key (budget_id, period_key, threshold));
 `,
   },
+  {
+    version: 5, name: "scheduler_notifications",
+    sql: `
+create table schedules (schedule_id text primary key, kind text not null, status text not null, next_fire_utc text, search_from_utc integer not null default 0, job text not null);
+create index schedules_next on schedules(status, next_fire_utc);
+create table schedule_fires (fire_id text primary key, schedule_id text not null, scheduled_local text not null, scheduled_utc text not null,
+  fired_at text not null, outcome text not null, missed integer not null default 0);
+create index schedule_fires_sched on schedule_fires(schedule_id, scheduled_utc);
+create table notifications (id text primary key, kind text not null, status text not null, dedupe_key text, created_at text not null, delivered_at text, record text not null);
+create index notifications_status on notifications(status, created_at);
+`,
+  },
 ];

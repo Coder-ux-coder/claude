@@ -18,6 +18,9 @@ import type { StepController } from "./step-controller.js";
 import { buildReport } from "./reporter.js";
 import type { Intent } from "./intents.js";
 
+
+/** The message a schedule came from; scheduled tasks inherit its verification (02 §8.1). */
+export interface ScheduleMessage { id: string; text: string; content_ref: string; channel: "console_text" | "console_voice"; owner_verified: boolean; transcript_confidence?: "high" | "medium" | "low" }
 export interface IncomingMessage {
   conversation_id?: string;
   text: string;
@@ -42,7 +45,7 @@ export interface ConversationDeps {
   ctx: CoreContext; episodic: EpisodicStore; memory: MemoryService; builder: ContextBuilder; tasks: TaskEngine; policy: PolicyEngine; broker: Broker; gateway: ModelGateway;
   planner: Planner; steps: StepController; interpreter?: IntentInterpreter;
   defaultTaskBudgetUsd: number;
-  schedule?(intent: Intent, conversationId: string): Promise<string>;
+  schedule?(intent: Intent, conversationId: string, message: ScheduleMessage): Promise<string>;
 }
 
 /**
@@ -178,7 +181,8 @@ export class ConversationManager {
         return;
       }
       case "schedule": {
-        reply(this.d.schedule ? await this.d.schedule(intent, c.conv) : "I can't schedule yet on this installation.");
+        reply(this.d.schedule ? await this.d.schedule(intent, c.conv, { id: c.msg.id, text: c.msg.text, content_ref: c.msg.content_ref, channel: c.m.channel, owner_verified: c.m.owner_verified,
+          ...(c.m.transcript_confidence ? { transcript_confidence: c.m.transcript_confidence } : {}) }) : "I can't schedule yet on this installation.");
         return;
       }
       case "steer_task": {

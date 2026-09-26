@@ -26,7 +26,9 @@ import { Planner } from "./boss/planner.js";
 import { StepController, type StepHandlers } from "./boss/step-controller.js";
 import { AgentLoop } from "./boss/agent-loop.js";
 import { ConversationManager } from "./boss/conversation.js";
-import type { Intent } from "./boss/intents.js";
+import { NotificationRouter } from "./notify/router.js";
+import { ScheduleService } from "./scheduler/schedule-service.js";
+import type { Scheduler } from "./scheduler/scheduler.js";
 
 export interface JarvisOptions {
   dataDir: string | null;                  // %LOCALAPPDATA%\Jarvis on Windows; null = in-memory
@@ -36,8 +38,9 @@ export interface JarvisOptions {
   bossEffort?: "low" | "medium" | "high" | "xhigh" | "max";
   adapters?: AdapterRegistration[];        // replaces the default Anthropic adapter (tests, offline)
   defaultTaskBudgetUsd?: number;
-  schedule?(intent: Intent, conversationId: string): Promise<string>;
   stepHandlers?: StepHandlers;
+  /** Start the scheduler's timer at start(); tests drive `scheduler.tick()` themselves. */
+  runScheduler?: boolean;
   fetchImpl?: typeof fetch;
 }
 
@@ -53,7 +56,18 @@ export class JarvisCore {
   readonly evidence: EvidenceStore; readonly verifier: Verifier; readonly broker: Broker;
   readonly gateway: ModelGateway; readonly builder: ContextBuilder; readonly planner: Planner; readonly agent: AgentLoop;
   readonly steps: StepController; readonly conversation: ConversationManager;
+  readonly notifications: NotificationRouter; readonly schedules: ScheduleService; readonly scheduler: Scheduler;
   recovery!: RecoverySummary;
+  private background = new Set<Promise<unknown>>();
+
+  /** Fire-and-forget work that must still finish (or fail visibly) before close. */
+  track<T>(p: Promise<T>): void {
+    const q = p.catch(e => { if (this.ctx.db.open) this.ctx.events.append({ type: "core.background_error", summary: String((e as Error).message).slice(0, 200), data: {} }); })
+      .finally(() => this.background.delete(q));
+    this.background.add(q);
+  }
+  /** Resolves when all tracked background work (task runs, notification delivery) has settled. */
+  async idle(): Promise<void> { while (this.background.size) await Promise.all([...this.background]); }
 
   constructor(readonly opts: JarvisOptions) {
     this.ctx = createContext({ dataDir: opts.dataDir, ...(opts.clock ? { clock: opts.clock } : {}), ...(opts.keyWrapper ? { keyWrapper: opts.keyWrapper } : {}) });
@@ -107,8 +121,15 @@ export class JarvisCore {
       },
       ...(opts.stepHandlers ?? {}),
     });
+    this.notifications = new NotificationRouter(ctx, () => { const p = this.episodic.getProfile(); return { hours: p?.quiet_hours ?? null, tz: p?.timezone ?? "UTC" }; });
+    this.schedules = new ScheduleService({ ctx, tasks: this.tasks, notifications: this.notifications, policy: this.policy, episodic: this.episodic,
+      adapterId: () => this.gateway.route("boss.reasoning").chain[0] ?? "unknown", defaultTaskBudgetUsd: opts.defaultTaskBudgetUsd ?? 2,
+      runTask: t => this.track(this.conversation.planAndRun(t)), track: p => this.track(p) },
+      this.leases);
+    this.scheduler = this.schedules.scheduler;
     this.conversation = new ConversationManager({ ctx, episodic: this.episodic, memory: this.memory, builder: this.builder, tasks: this.tasks, policy: this.policy, broker: this.broker,
-      gateway: this.gateway, planner: this.planner, steps: this.steps, defaultTaskBudgetUsd: opts.defaultTaskBudgetUsd ?? 2, ...(opts.schedule ? { schedule: opts.schedule } : {}) });
+      gateway: this.gateway, planner: this.planner, steps: this.steps, defaultTaskBudgetUsd: opts.defaultTaskBudgetUsd ?? 2,
+      schedule: (intent, conv, m) => this.schedules.fromIntent(intent, conv, m) });
   }
 
   /** Startup (01 §4.5): integrity, policy load, deterministic recovery scan, safe mode if needed. */
@@ -128,8 +149,14 @@ export class JarvisCore {
     });
     this.broker.safeMode = this.recovery.safe_mode;
     this.memory.expireSweep();
+    // Missed runs (10 §15.3): recompute from the last fire, then apply each kind's policy once.
+    this.scheduler.recomputeAll();
+    if (this.opts.runScheduler) this.scheduler.start(); else this.scheduler.tick();
+    this.track(this.notifications.resumeAfterRestart());
     return this.recovery;
   }
 
-  close(): void { this.builder.close(); this.ctx.db.close(); }
+  close(): void { this.scheduler.stop(); this.notifications.close(); this.builder.close(); this.ctx.db.close(); }
+  /** Stops timers, waits for background work, then closes. */
+  async shutdown(): Promise<void> { this.scheduler.stop(); await this.idle(); this.close(); }
 }
