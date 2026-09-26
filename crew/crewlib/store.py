@@ -1,0 +1,398 @@
+"""The team's shared state: one SQLite file per run.
+
+Every agent's tool server and the orchestrator open the same file. WAL mode
+lets them read concurrently; writes that check-then-set (claiming a task,
+taking a lease) run inside BEGIN IMMEDIATE so two agents can never both win.
+"""
+
+from __future__ import annotations
+
+import fnmatch
+import sqlite3
+import threading
+from contextlib import contextmanager
+from pathlib import Path
+
+from .util import dumps, loads, now
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
+CREATE TABLE IF NOT EXISTS messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts REAL NOT NULL,
+    sender TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    text TEXT NOT NULL,
+    task_id INTEGER,
+    urgent INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS seats (
+    name TEXT PRIMARY KEY,
+    vendor TEXT, role TEXT, account TEXT, model TEXT,
+    status TEXT DEFAULT 'starting',
+    session_id TEXT, worktree TEXT, current_task INTEGER,
+    chat_cursor INTEGER DEFAULT 0,
+    chat_used INTEGER DEFAULT 0,
+    last_event_at REAL, last_progress_at REAL,
+    turns INTEGER DEFAULT 0, tokens INTEGER DEFAULT 0, cost_usd REAL DEFAULT 0,
+    restarts INTEGER DEFAULT 0, note TEXT DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS accounts (
+    name TEXT PRIMARY KEY,
+    vendor TEXT, profile TEXT,
+    status TEXT DEFAULT 'unknown',
+    mode TEXT DEFAULT 'normal',
+    util_5h REAL, reset_5h INTEGER, util_7d REAL, reset_7d INTEGER,
+    parked_until INTEGER DEFAULT 0,
+    tokens INTEGER DEFAULT 0, cost_usd REAL DEFAULT 0,
+    updated_at REAL
+);
+CREATE TABLE IF NOT EXISTS tasks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    spec TEXT NOT NULL,
+    acceptance TEXT NOT NULL DEFAULT '',
+    scope TEXT NOT NULL DEFAULT '[]',
+    depends_on TEXT NOT NULL DEFAULT '[]',
+    size TEXT NOT NULL DEFAULT 'M',
+    kind TEXT NOT NULL DEFAULT 'build',
+    suggested_owner TEXT,
+    status TEXT NOT NULL DEFAULT 'todo',
+    owner TEXT, branch TEXT, created_by TEXT,
+    created_at REAL, started_at REAL, submitted_at REAL, finished_at REAL,
+    review_rounds INTEGER NOT NULL DEFAULT 0,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    notes TEXT NOT NULL DEFAULT '',
+    summary TEXT, evidence TEXT, review_notes TEXT, block_reason TEXT,
+    tokens INTEGER NOT NULL DEFAULT 0,
+    cost_usd REAL NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts REAL NOT NULL, kind TEXT NOT NULL, seat TEXT, task_id INTEGER, data TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+CREATE INDEX IF NOT EXISTS idx_events_kind ON events(kind);
+"""
+
+OPEN_STATES = ("todo", "in_progress", "review", "approved", "changes", "blocked")
+ACTIVE_STATES = ("in_progress", "review", "approved", "changes", "blocked")  # hold their file lease
+DONE_STATES = ("merged", "cancelled")
+SIZES = ("S", "M", "L")
+KINDS = ("foundation", "build", "fix", "test", "docs", "research", "verify")
+NO_WRITE_KINDS = ("research", "verify")
+
+
+class StoreError(ValueError):
+    pass
+
+
+class Store:
+    def __init__(self, path: Path | str):
+        self.path = str(path)
+        self._lock = threading.RLock()
+        self.db = sqlite3.connect(self.path, timeout=30, isolation_level=None, check_same_thread=False)
+        self.db.row_factory = sqlite3.Row
+        self.db.execute("PRAGMA journal_mode=WAL")
+        self.db.execute("PRAGMA synchronous=NORMAL")
+        self.db.execute("PRAGMA busy_timeout=30000")
+        with self._lock:
+            self.db.executescript(SCHEMA)
+
+    def close(self) -> None:
+        self.db.close()
+
+    @contextmanager
+    def tx(self):
+        """Serializable write transaction (other writers wait on busy_timeout)."""
+        with self._lock:
+            self.db.execute("BEGIN IMMEDIATE")
+            try:
+                yield self.db
+            except BaseException:
+                self.db.execute("ROLLBACK")
+                raise
+            else:
+                self.db.execute("COMMIT")
+
+    def _all(self, sql: str, args=()) -> list[dict]:
+        with self._lock:
+            return [dict(r) for r in self.db.execute(sql, args).fetchall()]
+
+    def _one(self, sql: str, args=()) -> dict | None:
+        with self._lock:
+            row = self.db.execute(sql, args).fetchone()
+        return dict(row) if row else None
+
+    # ------------------------------------------------------------------ meta
+
+    def get(self, key: str, default=None):
+        row = self._one("SELECT value FROM meta WHERE key=?", (key,))
+        return loads(row["value"], default) if row else default
+
+    def set(self, key: str, value) -> None:
+        with self.tx() as db:
+            db.execute("INSERT INTO meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                       (key, dumps(value)))
+
+    # ------------------------------------------------------------- messages
+
+    def post(self, sender: str, kind: str, text: str, task_id: int | None = None, urgent: bool = False) -> int:
+        with self.tx() as db:
+            cur = db.execute(
+                "INSERT INTO messages(ts,sender,kind,text,task_id,urgent) VALUES(?,?,?,?,?,?)",
+                (now(), sender, kind, text, task_id, 1 if urgent else 0),
+            )
+            return int(cur.lastrowid)
+
+    def messages_after(self, after_id: int = 0, limit: int = 500) -> list[dict]:
+        return self._all("SELECT * FROM messages WHERE id>? ORDER BY id LIMIT ?", (after_id, limit))
+
+    def recent_messages(self, limit: int = 50) -> list[dict]:
+        rows = self._all("SELECT * FROM messages ORDER BY id DESC LIMIT ?", (limit,))
+        return list(reversed(rows))
+
+    def unread(self, seat: str, limit: int = 200) -> list[dict]:
+        cursor = (self.seat(seat) or {}).get("chat_cursor") or 0
+        return self._all(
+            "SELECT * FROM messages WHERE id>? AND sender!=? ORDER BY id LIMIT ?", (cursor, seat, limit)
+        )
+
+    def mark_read(self, seat: str, up_to: int) -> None:
+        with self.tx() as db:
+            db.execute("UPDATE seats SET chat_cursor=MAX(COALESCE(chat_cursor,0),?) WHERE name=?", (up_to, seat))
+
+    def last_message_id(self) -> int:
+        row = self._one("SELECT MAX(id) AS m FROM messages")
+        return int(row["m"] or 0) if row else 0
+
+    # ----------------------------------------------------------------- seats
+
+    def upsert_seat(self, name: str, **fields) -> None:
+        with self.tx() as db:
+            db.execute("INSERT INTO seats(name) VALUES(?) ON CONFLICT(name) DO NOTHING", (name,))
+            if fields:
+                cols = ", ".join(f"{k}=?" for k in fields)
+                db.execute(f"UPDATE seats SET {cols} WHERE name=?", (*fields.values(), name))
+
+    update_seat = upsert_seat
+
+    def seat(self, name: str) -> dict | None:
+        return self._one("SELECT * FROM seats WHERE name=?", (name,))
+
+    def seats(self) -> list[dict]:
+        return self._all("SELECT * FROM seats ORDER BY rowid")
+
+    def add_seat_usage(self, name: str, tokens: int = 0, cost: float = 0.0, turns: int = 0) -> None:
+        with self.tx() as db:
+            db.execute("UPDATE seats SET tokens=tokens+?, cost_usd=cost_usd+?, turns=turns+? WHERE name=?",
+                       (tokens, cost, turns, name))
+
+    # -------------------------------------------------------------- accounts
+
+    def upsert_account(self, name: str, **fields) -> None:
+        with self.tx() as db:
+            db.execute("INSERT INTO accounts(name) VALUES(?) ON CONFLICT(name) DO NOTHING", (name,))
+            if fields:
+                fields = {**fields, "updated_at": now()}
+                cols = ", ".join(f"{k}=?" for k in fields)
+                db.execute(f"UPDATE accounts SET {cols} WHERE name=?", (*fields.values(), name))
+
+    def account(self, name: str) -> dict | None:
+        return self._one("SELECT * FROM accounts WHERE name=?", (name,))
+
+    def accounts(self) -> list[dict]:
+        return self._all("SELECT * FROM accounts ORDER BY rowid")
+
+    def add_account_usage(self, name: str, tokens: int = 0, cost: float = 0.0) -> None:
+        with self.tx() as db:
+            db.execute("UPDATE accounts SET tokens=tokens+?, cost_usd=cost_usd+? WHERE name=?", (tokens, cost, name))
+
+    # ----------------------------------------------------------------- tasks
+
+    def create_task(
+        self,
+        title: str,
+        spec: str,
+        acceptance: str,
+        scope: list[str],
+        depends_on: list[int],
+        size: str = "M",
+        kind: str = "build",
+        suggested_owner: str | None = None,
+        created_by: str = "lead",
+    ) -> int:
+        title, spec = (title or "").strip(), (spec or "").strip()
+        if not title or not spec:
+            raise StoreError("a task needs a title and a spec")
+        if size not in SIZES:
+            raise StoreError(f"size must be one of {SIZES}")
+        if kind not in KINDS:
+            raise StoreError(f"kind must be one of {KINDS}")
+        scope = [normalize_glob(p) for p in (scope or []) if str(p).strip()]
+        if not scope and kind not in NO_WRITE_KINDS:
+            raise StoreError("a task that changes files must declare its file scope (paths or globs it may edit)")
+        deps = sorted({int(d) for d in (depends_on or [])})
+        with self.tx() as db:
+            for dep in deps:
+                row = db.execute("SELECT status FROM tasks WHERE id=?", (dep,)).fetchone()
+                if row is None:
+                    raise StoreError(f"depends_on refers to unknown task #{dep}")
+                if row["status"] == "cancelled":
+                    raise StoreError(f"depends_on refers to cancelled task #{dep}")
+            cur = db.execute(
+                """INSERT INTO tasks(title,spec,acceptance,scope,depends_on,size,kind,suggested_owner,
+                   status,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,'todo',?,?)""",
+                (title, spec, acceptance or "", dumps(scope), dumps(deps), size, kind,
+                 suggested_owner, created_by, now()),
+            )
+            return int(cur.lastrowid)
+
+    def task(self, task_id: int) -> dict | None:
+        row = self._one("SELECT * FROM tasks WHERE id=?", (int(task_id),))
+        return _decode_task(row) if row else None
+
+    def tasks(self, statuses: tuple[str, ...] | None = None) -> list[dict]:
+        if statuses:
+            marks = ",".join("?" * len(statuses))
+            rows = self._all(f"SELECT * FROM tasks WHERE status IN ({marks}) ORDER BY id", statuses)
+        else:
+            rows = self._all("SELECT * FROM tasks ORDER BY id")
+        return [_decode_task(r) for r in rows]
+
+    def update_task(self, task_id: int, **fields) -> None:
+        if not fields:
+            return
+        for key in ("scope", "depends_on"):
+            if key in fields and not isinstance(fields[key], str):
+                fields[key] = dumps(fields[key])
+        cols = ", ".join(f"{k}=?" for k in fields)
+        with self.tx() as db:
+            db.execute(f"UPDATE tasks SET {cols} WHERE id=?", (*fields.values(), int(task_id)))
+
+    def append_note(self, task_id: int, who: str, note: str) -> None:
+        from .util import hhmm
+
+        line = f"[{hhmm(now())} {who}] {note.strip()}\n"
+        with self.tx() as db:
+            db.execute("UPDATE tasks SET notes=notes||? WHERE id=?", (line, int(task_id)))
+
+    def add_task_usage(self, task_id: int, tokens: int = 0, cost: float = 0.0) -> None:
+        with self.tx() as db:
+            db.execute("UPDATE tasks SET tokens=tokens+?, cost_usd=cost_usd+? WHERE id=?", (tokens, cost, int(task_id)))
+
+    def deps_done(self, task: dict) -> bool:
+        for dep in task["depends_on"]:
+            other = self.task(dep)
+            if not other or other["status"] != "merged":
+                return False
+        return True
+
+    def lease_conflicts(self, task: dict) -> list[dict]:
+        """Active tasks (other than this one) whose file scope overlaps this task's scope."""
+        if not task["scope"]:
+            return []
+        clashes = []
+        for other in self.tasks(ACTIVE_STATES):
+            if other["id"] == task["id"] or not other["scope"]:
+                continue
+            if scopes_overlap(task["scope"], other["scope"]):
+                clashes.append(other)
+        return clashes
+
+    def ready_tasks(self) -> list[dict]:
+        """To-do tasks whose dependencies are merged and whose files are free."""
+        return [t for t in self.tasks(("todo",)) if self.deps_done(t) and not self.lease_conflicts(t)]
+
+    def start_task(self, task_id: int, owner: str, branch: str) -> dict:
+        """Atomically give a to-do task to a seat. Raises if it is not claimable."""
+        with self.tx() as db:
+            row = db.execute("SELECT * FROM tasks WHERE id=?", (int(task_id),)).fetchone()
+            if row is None:
+                raise StoreError(f"no task #{task_id}")
+            task = _decode_task(dict(row))
+            if task["status"] not in ("todo", "changes"):
+                raise StoreError(f"task #{task_id} is {task['status']}, not claimable")
+            for dep in task["depends_on"]:
+                d = db.execute("SELECT status FROM tasks WHERE id=?", (dep,)).fetchone()
+                if d is None or d["status"] != "merged":
+                    raise StoreError(f"task #{task_id} waits on task #{dep}")
+            if task["scope"]:
+                marks = ",".join("?" * len(ACTIVE_STATES))
+                for other in db.execute(f"SELECT * FROM tasks WHERE status IN ({marks}) AND id!=?",
+                                        (*ACTIVE_STATES, task["id"])).fetchall():
+                    o = _decode_task(dict(other))
+                    if o["scope"] and scopes_overlap(task["scope"], o["scope"]):
+                        raise StoreError(f"task #{task_id} overlaps files held by task #{o['id']} ({o['owner']})")
+            db.execute(
+                "UPDATE tasks SET status='in_progress', owner=?, branch=?, started_at=COALESCE(started_at,?), "
+                "attempts=attempts+1 WHERE id=?",
+                (owner, branch, now(), task["id"]),
+            )
+        return self.task(task_id)
+
+    # ---------------------------------------------------------------- events
+
+    def event(self, kind: str, seat: str | None = None, task_id: int | None = None, **data) -> None:
+        with self.tx() as db:
+            db.execute("INSERT INTO events(ts,kind,seat,task_id,data) VALUES(?,?,?,?,?)",
+                       (now(), kind, seat, task_id, dumps(data)))
+
+    def events(self, kind: str | None = None, limit: int = 1000) -> list[dict]:
+        if kind:
+            rows = self._all("SELECT * FROM events WHERE kind=? ORDER BY id DESC LIMIT ?", (kind, limit))
+        else:
+            rows = self._all("SELECT * FROM events ORDER BY id DESC LIMIT ?", (limit,))
+        for r in rows:
+            r["data"] = loads(r["data"], {})
+        return list(reversed(rows))
+
+
+# ------------------------------------------------------------------ helpers
+
+
+def _decode_task(row: dict) -> dict:
+    row["scope"] = loads(row.get("scope"), []) or []
+    row["depends_on"] = loads(row.get("depends_on"), []) or []
+    return row
+
+
+def normalize_glob(pattern: str) -> str:
+    p = str(pattern).strip().replace("\\", "/")
+    while p.startswith("./"):
+        p = p[2:]
+    return p.lstrip("/") or "**"
+
+
+def _static_prefix(pattern: str) -> str:
+    """The literal part of a glob before the first wildcard ('src/api/**' -> 'src/api/')."""
+    for i, ch in enumerate(pattern):
+        if ch in "*?[":
+            return pattern[:i]
+    return pattern
+
+
+def _path_prefix(a: str, b: str) -> bool:
+    """True if path a is b or an ancestor directory of b (component-wise)."""
+    a = a.rstrip("/")
+    return a == "" or b == a or b.startswith(a + "/")
+
+
+def globs_overlap(a: str, b: str) -> bool:
+    """Conservative: may say 'overlap' when unsure (that only serializes work, never corrupts it)."""
+    if a == b:
+        return True
+    sa, sb = _static_prefix(a), _static_prefix(b)
+    wild_a, wild_b = sa != a, sb != b
+    if not wild_a and not wild_b:
+        return _path_prefix(a, b) or _path_prefix(b, a)
+    if wild_a and fnmatch.fnmatchcase(b if not wild_b else sb, a):
+        return True
+    if wild_b and fnmatch.fnmatchcase(a if not wild_a else sa, b):
+        return True
+    # Two wildcards (or a wildcard and a directory): overlap if one literal prefix contains the other.
+    return _path_prefix(sa, sb) or _path_prefix(sb, sa)
+
+
+def scopes_overlap(a: list[str], b: list[str]) -> bool:
+    return any(globs_overlap(x, y) for x in a for y in b)

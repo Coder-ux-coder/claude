@@ -1,0 +1,6 @@
+{
+  "name": "crew-skills",
+  "version": "0.1.0",
+  "description": "Built-in skills for Crew teams: visual checks with screenshots, verification before submitting, handover notes, thrifty usage, and creating new skills.",
+  "author": {"name": "Crew"}
+}

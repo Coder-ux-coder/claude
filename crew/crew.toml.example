@@ -1,0 +1,51 @@
+# Crew settings. Copy to ~/.crew/crew.toml (crew setup does this) and edit.
+# Every value has a sensible default; delete what you do not need.
+
+[team]
+max_hours = 3            # hard stop for one run
+stall_minutes = 8        # an agent silent this long is nudged, then restarted
+ledger_minutes = 12      # no task moving for this long -> the lead must replan
+chat_budget = 8          # chat messages per agent per task (blockers are always allowed)
+review = "cross"         # "cross" = reviewed by the other company's model when possible; "same"; "off"
+ceo_reviews = true       # the CEO model reviews the plan and the final result
+deliver = "merge"        # "merge" into your project, "branch" (leave it separate), or "push" to GitHub
+permission_mode = "bypassPermissions"   # agents act without asking (default). Safer: "auto"
+web_port = 8765
+
+[models]
+work = "claude-opus-5-5"         # does ~90% of the work: lead, engineers, reviewers, all sub-agents
+ceo = "claude-fable-5-1"         # used rarely: plan review, rulings, final review
+codex = ""                       # Codex model; empty = Codex's own best default
+allowed = ["claude-opus-5-5", "claude-fable-5-1"]
+banned = ["haiku", "sonnet", "terra", "luna"]
+effort_work = "high"             # low | medium | high | xhigh | max
+effort_light = "medium"          # small jobs such as refining your request
+effort_ceo = "high"
+
+# One block per subscription. profile = "default" uses the normal sign-in of that tool;
+# other accounts get their own folder under ~/.crew/accounts and are signed in by `crew setup`.
+[[account]]
+name = "claude-1"
+vendor = "claude"
+profile = "default"
+
+[[account]]
+name = "claude-2"
+vendor = "claude"
+
+[[account]]
+name = "claude-3"
+vendor = "claude"
+
+[[account]]
+name = "codex-1"
+vendor = "codex"
+profile = "default"
+
+# Seats (the agents) default to one per account, and the first is the lead.
+# To choose yourself, add blocks like:
+# [[seat]]
+# name = "ada"
+# vendor = "claude"
+# account = "claude-1"
+# role = "lead"

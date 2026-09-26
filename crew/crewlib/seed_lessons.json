@@ -1,0 +1,112 @@
+[
+ {
+  "category": "process",
+  "text": "Land a small foundation task first (skeleton, shared interfaces, test scaffold, check commands) before parallel work; parallel writers otherwise make conflicting implicit decisions.",
+  "evidence": "Cognition, Multi-Agents: What's Actually Working (2026); Don't Build Multi-Agents (2025)"
+ },
+ {
+  "category": "process",
+  "text": "Give every task a file scope and never let two in-progress tasks touch the same files; split by module or layer, not by step.",
+  "evidence": "Anthropic C-compiler team: agents fixing the same bug overwrote each other until work was split by file"
+ },
+ {
+  "category": "quality",
+  "text": "Review every change with a fresh session that never saw the author's conversation; clean-context reviewers find about two bugs per change, most of them severe.",
+  "evidence": "Cognition: Devin Review ~2 bugs/PR, 58% severe"
+ },
+ {
+  "category": "quality",
+  "text": "Tests are the real manager of an agent team: invest in a fast, near-perfect check command early, and keep its output short.",
+  "evidence": "Anthropic, Building a C compiler with a team of parallel Claudes (2026)"
+ },
+ {
+  "category": "process",
+  "text": "Do not debate: debate adds little over simply voting, and agents tend to conform rather than correct. Settle disagreements with a test or a binding decision.",
+  "evidence": "Debate or Vote (NeurIPS 2025); controlled multi-agent debate studies"
+ },
+ {
+  "category": "process",
+  "text": "Most multi-agent failures come from unclear specs and inter-agent misalignment, not weak models: write precise specs with testable acceptance criteria.",
+  "evidence": "MAST taxonomy (arXiv 2503.13657): 41.8% specification, 36.9% misalignment, 21.3% verification"
+ },
+ {
+  "category": "process",
+  "text": "Keep tasks between 10 and 45 minutes; larger tasks stall and fail review more often, smaller ones drown in coordination overhead.",
+  "evidence": "Claude Code agent-teams guidance; Anthropic long-running harness (one feature at a time)"
+ },
+ {
+  "category": "process",
+  "text": "Write handover notes as you go (done, decided, next, watch out) so any teammate or another AI can continue your task after a limit or a crash.",
+  "evidence": "Anthropic, Effective harnesses for long-running agents (2025)"
+ },
+ {
+  "category": "speed",
+  "text": "Agents cannot feel time passing: run long test suites with a fast sampled mode during development and the full suite only before submitting.",
+  "evidence": "Anthropic C-compiler: time blindness; --fast test option"
+ },
+ {
+  "category": "usage",
+  "text": "Multi-agent work uses several times more tokens than one agent; the saving is wall-clock time, so keep chat short and do not wake idle agents without a reason.",
+  "evidence": "Anthropic multi-agent research system: agents ~4x, multi-agent ~15x chat tokens"
+ },
+ {
+  "category": "usage",
+  "text": "Unused quota is lost when a 5-hour window resets: give heavy tasks to accounts with plenty left shortly before their reset, and light verification work to accounts that are nearly empty.",
+  "evidence": "Crew scheduler design"
+ },
+ {
+  "category": "tooling",
+  "text": "When driving Claude Code from a program, remove the parent session's CLAUDE_* variables from the child environment; a nested session otherwise refuses to start or inherits the parent's session wiring.",
+  "evidence": "Crew build: nested claude -p ran cleanly only after scrubbing CLAUDECODE and session variables"
+ },
+ {
+  "category": "tooling",
+  "text": "Claude Code's stream-json output includes rate_limit_event messages with the 5-hour and weekly utilization and reset times; read them instead of guessing usage.",
+  "evidence": "Crew build: verified on Claude Code 2.1.283"
+ },
+ {
+  "category": "models",
+  "text": "Keep one top model for the work and lower the effort level for small jobs instead of switching to a weaker model; quality holds and prompt caches stay warm.",
+  "evidence": "Claude API guidance on effort vs model cascades"
+ },
+ {
+  "category": "errors",
+  "text": "Clean the shared integration workspace before every merge and keep build artifacts (__pycache__, node_modules, caches) out of commits; leftovers from test runs otherwise block merges and a task bounces back and forth forever.",
+  "evidence": "Crew build: fault-injection run looped on 'untracked files would be overwritten by merge' until the workspace was cleaned and artifacts excluded"
+ },
+ {
+  "category": "errors",
+  "text": "Give every agent process an id and ignore events from processes that were already replaced; a late 'exited' signal from a stopped process otherwise looks like a crash of its replacement and cascades into restarts.",
+  "evidence": "Crew build: usage-limit failover test knocked the lead out through restart cascades until stale events were ignored"
+ },
+ {
+  "category": "process",
+  "text": "A stop-and-resume must restore the phase and re-dispatch in-flight reviews and merges; otherwise the resumed team idles forever waiting for work nobody restarts.",
+  "evidence": "Crew build: stop/resume fault test"
+ },
+ {
+  "category": "tooling",
+  "text": "Codex emits transient 'Reconnecting... n/5' error events before recovering; only turn.failed or a non-zero exit without turn.completed is a real failure, and a 401 means the account must be signed in again (do not retry it).",
+  "evidence": "Crew build: probed codex exec --json 0.157"
+ },
+ {
+  "category": "tooling",
+  "text": "Claude Code refuses auto-approval when running as root unless IS_SANDBOX is exactly \"1\" (other truthy values do not count).",
+  "evidence": "Crew build: Claude Code 2.1.283"
+ },
+ {
+  "category": "tooling",
+  "text": "Each CLAUDE_CONFIG_DIR gets its own macOS Keychain entry, so several Claude subscriptions can stay signed in side by side when each has its own profile folder.",
+  "evidence": "Crew build: Claude Code 2.1.283 credential naming"
+ },
+ {
+  "category": "process",
+  "text": "Request refiners over-specify (extra flags, custom error types); tell them quality is not extra scope and keep acceptance criteria to what the owner asked for.",
+  "evidence": "Crew real run: a unit-converter request came back with an unrequested --list option and custom exception classes"
+ },
+ {
+  "category": "process",
+  "text": "Concerns that carry a reproduced problem and a suggested fix get adopted into the plan immediately; opinions without evidence do not. Test first, then raise it.",
+  "evidence": "Crew real run: boole reproduced an argparse pitfall with negative scientific notation during planning; the lead assigned the fix inside the CLI task"
+ }
+]
