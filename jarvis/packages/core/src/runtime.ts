@@ -35,6 +35,9 @@ import { ReleaseManager } from "./workshop/release-manager.js";
 import { HoldoutStore, WorkshopManager } from "./workshop/workshop.js";
 import { McpGateway } from "./workshop/mcp-gateway.js";
 import { GapResolver } from "./gap/gap-resolver.js";
+import { BackupService } from "./backup/backup.js";
+import { SkillRuntime } from "./skills/skill-runtime.js";
+import { BrowserExecutor, BROWSER_CAPABILITIES, type BrowserRuntimeOptions } from "./executors/browser.js";
 
 export interface JarvisOptions {
   dataDir: string | null;                  // %LOCALAPPDATA%\Jarvis on Windows; null = in-memory
@@ -51,6 +54,10 @@ export interface JarvisOptions {
    * it, capability gaps are reported, never worked around.
    */
   workshop?: { runner: SandboxRunner; workers: CodingWorker[]; allowUnisolated?: boolean; preferredWorker?: string; mcp?: { host: string; urlHost?: string } };
+  /** Browser Runtime v0: Windows uses the installed Edge; elsewhere give a Chromium path. Omit to leave it off. */
+  browser?: Omit<BrowserRuntimeOptions, "downloadsDir">;
+  /** Where encrypted backups go (a second disk, external drive, or synced folder); default <dataDir>/backups. */
+  backupDestination?: string;
   /** Start the scheduler's timer at start(); tests drive `scheduler.tick()` themselves. */
   runScheduler?: boolean;
   fetchImpl?: typeof fetch;
@@ -71,6 +78,9 @@ export class JarvisCore {
   readonly notifications: NotificationRouter; readonly schedules: ScheduleService; readonly scheduler: Scheduler;
   readonly holdouts: HoldoutStore; readonly releases: ReleaseManager | null; readonly workshop: WorkshopManager | null; readonly gaps: GapResolver;
   readonly mcpGateway: McpGateway | null;
+  readonly backups: BackupService | null;
+  readonly skills: SkillRuntime;
+  readonly browser: BrowserExecutor | null;
   recovery!: RecoverySummary;
   private background = new Set<Promise<unknown>>();
   private attentionTimer: NodeJS.Timeout | null = null;
@@ -111,6 +121,9 @@ export class JarvisCore {
     this.broker.registerExecutor(new ShellExecutor());
     this.broker.registerExecutor(new WebFetchExecutor(opts.fetchImpl));
     for (const d of BUILTIN_CAPABILITIES) this.registry.register(d, { via: "builtin" });
+    // Downloads land inside the artifacts root, the only place research tasks may write (02 §8.3).
+    this.browser = opts.browser ? new BrowserExecutor({ ...opts.browser, downloadsDir: join(root, "artifacts", "downloads") }) : null;
+    if (this.browser) { this.broker.registerExecutor(this.browser); for (const d of BROWSER_CAPABILITIES) this.registry.register(d, { via: "builtin" }); }
     this.gateway = new ModelGateway(ctx);
     const adapters = opts.adapters ?? [{
       adapter: new AnthropicAdapter({ model: opts.bossModel ?? "claude-opus-5-5", effort: opts.bossEffort ?? "medium", ...(opts.fetchImpl ? { fetch: opts.fetchImpl } : {}),
@@ -153,10 +166,19 @@ export class JarvisCore {
       ...(this.mcpGateway ? { gateway: this.mcpGateway } : {}), ...(ws.allowUnisolated ? { allowUnisolated: true } : {}), ...(ws.preferredWorker ? { preferredWorker: ws.preferredWorker } : {}) }) : null;
     this.gaps = new GapResolver({ ctx, tasks: this.tasks, registry: this.registry, gateway: this.gateway, episodic: this.episodic, notifications: this.notifications, evidence: this.evidence,
       holdouts: this.holdouts, ...(this.workshop ? { workshop: this.workshop } : {}), continueTask: id => this.continueTask(id), track: p => this.track(p) });
+    this.backups = opts.dataDir ? new BackupService(ctx, ctx.keys as never, { dataDir: opts.dataDir, ...(opts.backupDestination ? { destination: opts.backupDestination } : {}) }) : null;
     this.scheduler.onCachedAlarm = a => this.track(this.notifications.deliverWithoutStore({ kind: "alarm", title: "Alarm", body: a.message, urgency: "high", schedule_id: a.schedule_id, channels: ["sound", "toast", "console", "speech"] }));
+    this.skills = new SkillRuntime(ctx, this.registry, this.tasks, this.broker, join(root, "skills"));
+    this.skills.onCapabilitiesChanged = e => this.broker.registerExecutor(e);
+    this.skills.restore();
     this.conversation = new ConversationManager({ ctx, episodic: this.episodic, memory: this.memory, builder: this.builder, tasks: this.tasks, policy: this.policy, broker: this.broker,
       gateway: this.gateway, planner: this.planner, steps: this.steps, defaultTaskBudgetUsd: opts.defaultTaskBudgetUsd ?? 2,
-      schedule: (intent, conv, m) => this.schedules.fromIntent(intent, conv, m), inboxDir: join(root, "artifacts", "inbox") });
+      schedule: (intent, conv, m) => this.schedules.fromIntent(intent, conv, m), inboxDir: join(root, "artifacts", "inbox"),
+      saveSkill: (taskId, spec) => {
+        const r = this.skills.saveFromTask(taskId, { slug: spec.name, name: spec.name, description: spec.description, parameters: spec.parameters });
+        return `Saved as ${r.manifest.id} (${r.manifest.lifecycle.state}${r.manifest.lifecycle.state === "draft" ? ": the original task wasn't verified complete, so it runs only when you ask" : ""}). ` +
+          `Inputs: ${r.manifest.parameters.required.join(", ") || "none"}.` + (r.remaining_literals.length ? ` Fixed values kept in it: ${r.remaining_literals.slice(0, 5).map(x => `"${x.slice(0, 40)}"`).join(", ")}.` : "");
+      } });
   }
 
   /** Startup (01 §4.5): integrity, policy load, deterministic recovery scan, safe mode if needed. */
@@ -181,7 +203,12 @@ export class JarvisCore {
     if (this.opts.runScheduler) {
       this.scheduler.start();
       // Quiet hours end, clients connect: held and undelivered notifications go out.
-      this.attentionTimer = setInterval(() => this.track(this.notifications.releaseHeld().then(() => this.notifications.flush())), 60_000);
+      let minutes = 0;
+      this.attentionTimer = setInterval(() => {
+        this.track(this.notifications.releaseHeld().then(() => this.notifications.flush()));
+        // Hourly: nightly backup when due, weekly restore test (03 §9.16).
+        if (++minutes % 60 === 1 && this.backups) this.track(this.backups.maintenance());
+      }, 60_000);
       this.attentionTimer.unref?.();
     } else this.scheduler.tick();
     this.track(this.notifications.resumeAfterRestart());
@@ -259,5 +286,5 @@ export class JarvisCore {
 
   close(): void { if (this.attentionTimer) clearInterval(this.attentionTimer); this.scheduler.stop(); this.notifications.close(); this.builder.close(); this.ctx.db.close(); }
   /** Stops timers, waits for background work, then closes. */
-  async shutdown(): Promise<void> { if (this.attentionTimer) clearInterval(this.attentionTimer); this.scheduler.stop(); await this.idle(); await this.mcpGateway?.close(); this.close(); }
+  async shutdown(): Promise<void> { if (this.attentionTimer) clearInterval(this.attentionTimer); this.scheduler.stop(); await this.idle(); await this.mcpGateway?.close(); await this.browser?.close(); this.close(); }
 }

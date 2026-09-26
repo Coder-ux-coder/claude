@@ -49,6 +49,8 @@ export interface ConversationDeps {
   planner: Planner; steps: StepController; interpreter?: IntentInterpreter;
   defaultTaskBudgetUsd: number;
   schedule?(intent: Intent, conversationId: string, message: ScheduleMessage): Promise<string>;
+  /** "Save this as a skill" (Skill Runtime v0). */
+  saveSkill?(taskId: string, spec: NonNullable<Intent["skill"]>): string;
   /** Where attachments are saved (inside the artifacts root); without it, attachments are refused. */
   inboxDir?: string;
 }
@@ -194,6 +196,14 @@ export class ConversationManager {
         reply(draft.errors.length ? `I couldn't turn that into a rule yet: ${draft.errors.join("; ")}.`
           : r.vague ? `I'll keep that as guidance: "${intent.text}". If you want it enforced, tell me the exact limit.`
           : `I'll treat this as: ${r.interpretation}${draft.overlaps.length ? ` (it overlaps ${draft.overlaps.length} existing rule(s))` : ""}. Confirm or edit it in the Console.`);
+        return;
+      }
+      case "save_skill": {
+        const id = intent.task_ref ?? this.focus.get(c.conv);
+        if (!id) { reply("Which task should I save as a skill?"); return; }
+        if (!intent.skill) { reply("What should the skill be called, and which values should be its inputs?"); return; }
+        try { reply(this.d.saveSkill ? this.d.saveSkill(id, intent.skill) : "Skills aren't available on this installation."); }
+        catch (e) { reply(`I couldn't save that as a skill: ${(e as Error).message}`); }
         return;
       }
       case "schedule": {

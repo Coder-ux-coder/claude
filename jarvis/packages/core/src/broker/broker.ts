@@ -398,6 +398,37 @@ export class Broker {
     }
   }
 
+  /**
+   * Dry-run authorization for a call that hasn't started (a skill checking all its steps
+   * first). Nothing is recorded as an action.
+   */
+  precheck(req: Pick<BrokerRequest, "task_id" | "capability" | "params">): { decision: "allow" | "deny" | "require_decision"; reason: string } {
+    const task = this.tasks.require(req.task_id);
+    const call = this.describeCall(req.capability, req.params);
+    const ev = this.policy.evaluate({ task, action_id: `pre_${hashObject(req).slice(0, 12)}`, capability: `${call.cap.id}@${call.cap.version}`, capability_lifecycle: call.cap.lifecycle, effects: call.effects,
+      tier: call.cap.isolation_tier === "T2" ? "T2" : "T1", fingerprint: "precheck", targets: call.targets, fields: call.fields }, { dryRun: true });
+    const d = ev.decision.decision;
+    return { decision: d === "allow" ? "allow" : d === "deny" ? "deny" : "require_decision", reason: ev.decision.reason_for_owner };
+  }
+
+  /**
+   * Withdraws an action that is waiting for your decision when its caller gave up (a skill
+   * stopped): the action is invalidated, its request closed, and the task runs again if
+   * that was all it waited for.
+   */
+  withdraw(actionId: string, reason: string): void {
+    const a = this.actions.get(actionId);
+    if (a.state !== "awaiting_decision") return;
+    this.ctx.tx(() => {
+      this.actions.invalidate(actionId, reason);
+      if (a.decision_request_id) this.policy.withdrawDecisionRequest(a.decision_request_id, reason);
+      this.forget(actionId);
+      const t = this.tasks.require(a.task_id);
+      if (t.status === "waiting" && t.wait_reason === "owner" && this.policy.openDecisionRequests(a.task_id).length === 0)
+        this.tasks.transition(a.task_id, "running", { initiator: "broker", detail: reason });
+    });
+  }
+
   /** Account revoked: pending actions bound to it are invalidated (04 §10.15). */
   onAccountRevoked(accountId: string): string[] {
     const out: string[] = [];

@@ -14,7 +14,8 @@ Rules:
 - Ask (open_questions) only if the answer changes the target, recipient, amount, date, destination or reversibility of an external effect, or a required input is unknowable.
 - "From now on" or "always" preferences → remember with scope; one-off changes for the current task → steer_task.
 - Enforceable rules ("never", "don't … without asking", "you may … up to") → set_rule. Vague ones ("be careful with money") → set_rule with vague=true.
-- Secrets (passwords, API keys, card numbers) are never repeated or remembered; reply that they belong in the local vault, entered by the owner.`;
+- Secrets (passwords, API keys, card numbers) are never repeated or remembered; reply that they belong in the local vault, entered by the owner.
+- "Save this as a skill" (about the task just done) → save_skill: name, description, and the literal values that should become parameters (e.g. a file path or a name), never personal constants left fixed.`;
 
 // Keyword cross-check (04 §10.6): the model classifies intent; structure rules check it; disagreement resolves to the safer mode.
 const ACTION_VERBS: [RegExp, EffectClass[]][] = [

@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import {
   newId, hashObject, hmac, safeEqualHex, canonicalJson, JarvisError, OwnerRule, AuthorizationDecision, DecisionRequest,
   CONSEQUENTIAL_EFFECTS, READ_EFFECTS, EFFECT_CLASSES,
@@ -460,7 +461,12 @@ export class PolicyEngine implements PolicyReader {
     const scope = a.task.scope;
     const paths = a.targets.filter(t => "path_prefix" in t);
     if (paths.some(p => scope.exclusions.some(x => resourceMatches(x, p)))) return false;
-    const scopePaths = scope.resources.filter(r => "path_prefix" in r);
+    // JARVIS's own quarantine areas are in every task's scope for writes: downloads, and the
+    // task's own artifact folder. They are never your files (the rest of the artifacts root,
+    // e.g. other conversations' attachments, is not included).
+    const root = this.deps.artifactsRoot;
+    const own = root && a.effects.every(e => !e.startsWith("delete.")) ? [{ path_prefix: join(root, "downloads") }, { path_prefix: join(root, "tasks", a.task.task_id) }] : [];
+    const scopePaths = [...scope.resources.filter(r => "path_prefix" in r), ...own];
     if (!paths.length) return true;
     if (!scopePaths.length) return false;
     return paths.every(p => scopePaths.some(s => resourceMatches(s, p)));
@@ -546,6 +552,13 @@ export class PolicyEngine implements PolicyReader {
       this.ctx.events.append({ type: "decision.responded", correlation: { task_id: r.task_id }, summary: `${opt.label}`, data: { decision_request_id: r.decision_request_id, option: opt.id, status } });
       return { status: opt.creates === "rule_draft" ? "rule_draft" : status, request: r };
     });
+  }
+
+  /** Withdraws an open request nobody should answer any more (its action was abandoned). */
+  withdrawDecisionRequest(id: string, reason: string): boolean {
+    const n = this.ctx.db.prepare("update decision_requests set status = 'withdrawn', responded_at = ? where id = ? and status = 'open'").run(this.ctx.clock.iso(), id).changes;
+    if (n) this.ctx.events.append({ type: "decision.withdrawn", summary: reason.slice(0, 200), data: { decision_request_id: id } });
+    return n === 1;
   }
 
   openDecisionRequests(taskId?: string): DecisionRequest[] {

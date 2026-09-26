@@ -58,6 +58,13 @@ export class MasterKeyProvider implements KeyProvider {
   dataKey(purpose: string): Buffer {
     return Buffer.from(hkdfSync("sha256", this.master, Buffer.alloc(0), `jarvis/${purpose}/v1`, 32));
   }
+
+  /**
+   * A copy of the master key for escrow inside an encrypted backup (03 §9.14: "the master
+   * key is escrowed inside the backup under [the passphrase-derived] key"). Only the backup
+   * service calls this; the copy is sealed immediately and never written in clear.
+   */
+  escrowCopy(): Buffer { return Buffer.from(this.master); }
 }
 
 const MAGIC = Buffer.from("JV1");

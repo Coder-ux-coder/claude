@@ -27,7 +27,7 @@ type Component = "console" | "session" | "phone";
 /** Commands that change state: they honour idempotency keys (12 §17.6). Credential calls are excluded so no secret is ever hashed to disk; they are idempotent by design (store rotates in place). */
 export const MUTATING = new Set(["conversation.send", "task.control", "task.steer", "decision.respond", "memory.delete", "memory.accept", "memory.correct", "memory.markdown_apply",
   "memory.export", "memory.import", "rules.propose", "rules.confirm", "rules.revoke", "accounts.revoke", "schedules.control", "notifications.dismiss", "settings.set", "profile.set",
-  "emergency.stop", "emergency.resume", "workshop.approve"]);
+  "emergency.stop", "emergency.resume", "workshop.approve", "backup.run", "backup.purge", "skills.disable", "skills.enable"]);
 interface Client { rpc: NdjsonRpc; component: Component | null; subs: Map<string, () => void>; id: number; challenge?: { component: string; cn: string; sn: string } }
 
 /** Mutual proof for the handshake (neither side ever sends the secret): HMAC(secret, role|client_nonce|server_nonce). */
@@ -353,6 +353,27 @@ export class CoordinatorServer {
       case "workshop.approve": return j.approveBuild(str(P<{ work_order_id: string }>(params).work_order_id, "work_order_id"));
       case "workshop.status": return { configured: !!j.workshop, releases: j.releases ? j.releases.releases().slice(-20) : [] };
       case "gaps.list": return j.gaps.list().slice(0, 50);
+      // ----- skills (07; Skill Runtime v0) -----
+      case "skills.list": return j.registry.list().filter(d => d.kind === "skill").map(d => ({ id: d.id, version: d.version, title: d.title, purpose: d.purpose, lifecycle: d.lifecycle, admin_state: d.admin_state, effects: d.side_effects.effect_classes }));
+      case "skills.disable": { const id = str(P<{ skill_id: string }>(params).skill_id, "skill_id"); j.registry.setAdminState(id, "disabled", "disabled in the Console"); return { ok: true }; }
+      case "skills.enable": { const id = str(P<{ skill_id: string }>(params).skill_id, "skill_id"); j.registry.setAdminState(id, "enabled", "enabled in the Console"); return { ok: true }; }
+      // ----- backups (03 §9.16) -----
+      case "backup.status": {
+        if (!j.backups) return { available: false };
+        const list = j.backups.list();
+        return { available: true, configured: j.backups.configured(), destination: j.backups.destination, backups: list.slice(0, 30),
+          last_backup: list[0]?.at ?? null, last_restore_test: list.find(b => b.verified_at) ? { at: list.find(b => b.verified_at)!.verified_at, result: list.find(b => b.verified_at)!.verify_result } : null };
+      }
+      case "backup.set_passphrase": {
+        if (!j.backups) throw new JarvisError("unsupported_operation", "backups need a data directory");
+        const pass = str(P<{ passphrase: string }>(params).passphrase, "passphrase");
+        j.vault.redactor.register(pass);                  // scrubbed from logs and model context from now on
+        await j.backups.setPassphrase(pass);
+        return { ok: true };
+      }
+      case "backup.run": if (!j.backups) throw new JarvisError("unsupported_operation", "backups need a data directory"); return j.backups.run("manual", { includeVault: P<{ include_vault?: boolean }>(params).include_vault === true });
+      case "backup.verify": if (!j.backups) throw new JarvisError("unsupported_operation", "backups need a data directory"); return j.backups.verify(P<{ backup_id?: string }>(params).backup_id);
+      case "backup.purge": if (!j.backups) throw new JarvisError("unsupported_operation", "backups need a data directory"); return { destroyed: j.backups.purgeAll() };
       // ----- usage (09 §14.1 Console v1: usage) -----
       case "usage.summary": {
         const p = P<{ since?: string }>(params);

@@ -18,7 +18,7 @@ export const IntentCriterion = z.object({
 });
 
 export const Intent = z.object({
-  kind: z.enum(["reply", "new_task", "steer_task", "control", "remember", "correct_memory", "set_rule", "schedule", "question"]),
+  kind: z.enum(["reply", "new_task", "steer_task", "control", "remember", "correct_memory", "set_rule", "schedule", "question", "save_skill"]),
   text: z.string().describe("reply text, question, or the owner's words for this intent"),
   // new_task / steer_task
   objective: z.string().optional(),
@@ -51,6 +51,9 @@ export const Intent = z.object({
   }).optional(),
   // schedule
   schedule: z.object({ kind: z.enum(["alarm", "reminder", "task"]), text: z.string(), at_local: z.string().optional(), rrule: z.string().optional(), tz: z.string().optional() }).optional(),
+  // save_skill ("save this as a skill"): which literal values in the task become parameters
+  skill: z.object({ name: z.string(), description: z.string(),
+    parameters: z.array(z.object({ name: z.string().describe("snake_case"), value: z.string().describe("the exact literal from the task to replace"), description: z.string().optional() })) }).optional(),
 });
 export type Intent = z.infer<typeof Intent>;
 

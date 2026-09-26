@@ -83,7 +83,9 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
 
   const workshop = detectWorkshop(args.dataDir);
   if (!workshop) process.stderr.write("jarvis-core: Workshop not set up (no jarvis-workshop WSL distro); capability gaps will be reported, not built\n");
-  const core = new JarvisCore({ dataDir: args.dataDir, keys, runScheduler: true, ...(workshop ? { workshop } : {}) });
+  // Browser Runtime v0: the installed Edge on Windows; elsewhere only if a Chromium is named.
+  const browser = process.platform === "win32" ? { channel: "msedge" as const } : process.env.JARVIS_CHROMIUM ? { executablePath: process.env.JARVIS_CHROMIUM } : undefined;
+  const core = new JarvisCore({ dataDir: args.dataDir, keys, runScheduler: true, ...(workshop ? { workshop } : {}), ...(browser ? { browser } : {}) });
   const recovery = core.start();
   await core.startServices();
   if (args.safeMode) core.broker.safeMode = true;

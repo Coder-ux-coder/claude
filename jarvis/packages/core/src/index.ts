@@ -59,3 +59,6 @@ export * from "./workshop/worker.js";
 export * from "./workshop/mcp-gateway.js";
 export * from "./workshop/workshop.js";
 export * from "./gap/gap-resolver.js";
+export * from "./backup/backup.js";
+export * from "./skills/skill-runtime.js";
+export * from "./executors/browser.js";
